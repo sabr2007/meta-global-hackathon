@@ -7,12 +7,14 @@ import { loadObjects } from './render/objects';
 import { loadRoomMesh } from './render/roomMesh';
 import { createViewport } from './render/viewport';
 import { BundleError, loadBundle, sceneIdFromUrl } from './scene/bundle';
+import { ArmController } from './sim/armController';
 import { createPhysics } from './sim/physics';
-import { INITIAL_LAYERS, mountPanel, type LayerId } from './ui/panel';
+import { INITIAL_LAYERS, mountPanel, type LayerId, type Panel } from './ui/panel';
 
 const DEFAULT_SCENE = 'living-room';
 const STATS_INTERVAL_MS = 250;
 const OBJECTS_FRAME_MARGIN_M = 0.25; // context around scanned objects in the opening view
+const ARM_FRAME_HEIGHT_M = 0.75; // keep the arm's elbow in the opening view
 
 const LAYER_GROUPS: Partial<Record<LayerId, GroupId>> = {
   structure: GROUP.structure,
@@ -52,8 +54,13 @@ async function start(app: HTMLElement): Promise<void> {
   const geoms = buildGeomLayer(physics);
   const objects = await loadObjects(physics, bundle.baseUrl, bundle.meta.objects ?? []);
   viewport.scene.add(room.root, geoms.root, objects.root);
-  // Open on the scanned objects when there are any: they are small next to the room.
+  // Open on the scanned objects (and the arm) when there are any: they are small next to the room.
   const objectBounds = new THREE.Box3().setFromObject(objects.root);
+  const armInfo = bundle.meta.arm ?? null;
+  if (armInfo && !objectBounds.isEmpty()) {
+    const [x, y, z] = armInfo.position;
+    objectBounds.expandByPoint(new THREE.Vector3(x, y, z)).expandByPoint(new THREE.Vector3(x, y, z + ARM_FRAME_HEIGHT_M));
+  }
   viewport.frame(objectBounds.isEmpty() ? room.bounds() : objectBounds.expandByScalar(OBJECTS_FRAME_MARGIN_M));
 
   const setLayer = (layer: LayerId, visible: boolean): void => {
@@ -69,13 +76,30 @@ async function start(app: HTMLElement): Promise<void> {
     geoms.sync();
     objects.sync();
   };
+  const labels = new Map((bundle.meta.objects ?? []).map((o) => [o.name, o.label]));
+  // The controller reports its first status before the panel exists.
+  let panelRef: Panel | null = null;
+  const arm = armInfo
+    ? new ArmController(physics, armInfo, labels, (status) => panelRef?.setArmStatus(status))
+    : null;
+  const control = arm ? (): void => arm.update() : undefined;
+
   const reset = (): void => {
     physics.reset();
+    arm?.reset();
     sync();
   };
 
   let playing = true;
-  const panel = mountPanel(app, bundle.meta, {
+  // Arm commands only make sense while time runs.
+  const armCommand = (run: () => void): void => {
+    if (!playing) {
+      playing = true;
+      panel.setPlaying(playing);
+    }
+    run();
+  };
+  const panel: Panel = mountPanel(app, bundle.meta, {
     onLayerToggle: setLayer,
     onPlayToggle: () => {
       playing = !playing;
@@ -86,11 +110,17 @@ async function start(app: HTMLElement): Promise<void> {
       geoms.highlight(name);
       objects.highlight(name);
     },
+    onArmPick: (name) => armCommand(() => arm?.pick(name)),
+    onArmPlaceOn: (name) => armCommand(() => arm?.placeOn(name)),
+    onArmPutBack: () => armCommand(() => arm?.putBack()),
+    onArmHome: () => armCommand(() => arm?.goHome()),
   });
   panel.setPlaying(playing);
+  panelRef = panel;
+  if (arm) panel.setArmStatus(arm.status);
 
   if (import.meta.env.DEV) {
-    Object.assign(window, { __scan2sim: { viewport, physics, geoms, objects, room } });
+    Object.assign(window, { __scan2sim: { viewport, physics, geoms, objects, room, arm } });
   }
 
   window.addEventListener('keydown', (event) => {
@@ -111,7 +141,7 @@ async function start(app: HTMLElement): Promise<void> {
     const elapsed = (now - last) / 1000;
     last = now;
     if (playing) {
-      physics.advance(elapsed);
+      physics.advance(elapsed, control);
       sync();
     }
     if (now - statsAt >= STATS_INTERVAL_MS) {

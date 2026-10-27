@@ -11,11 +11,13 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from scan2sim import arm
 from scan2sim.capture import Capture, extract_zip, load_capture
 from scan2sim.export import write_bundle
 from scan2sim.lidar_mesh import read_lidar_mesh
 from scan2sim.lift import lift_masks
 from scan2sim.meta_client import load_settings
+from scan2sim.mount import choose_mount, footprint, reachable
 from scan2sim.objects import body_name, build_scanned_object
 from scan2sim.perceive import perceive_photo, write_perception
 from scan2sim.scene import build_scene
@@ -91,6 +93,8 @@ def _settle_distances(mjcf: Path, bodies: list[str]) -> dict[str, float]:
     """How far each body moves in the first seconds: a few mm means it rests where it was scanned."""
     model = mujoco.MjModel.from_xml_path(str(mjcf))
     data = mujoco.MjData(model)
+    if model.nkey:
+        mujoco.mj_resetDataKeyframe(model, data, 0)
     mujoco.mj_forward(model, data)
     start = {name: data.body(name).xpos.copy() for name in bodies}
     for _ in range(int(SETTLE_SECONDS / model.opt.timestep)):
@@ -129,9 +133,11 @@ def objects(args: argparse.Namespace) -> int:
                 image, view, scene.frame, scene.boxes,
             )
         )
-    scene = dataclasses.replace(scene, objects=tuple(bodies))
+    items = [footprint(b.name, b.position + b.hull_vertices) for b in bodies]
+    mount = None if args.no_arm else choose_mount(scene.boxes, items)
+    scene = dataclasses.replace(scene, objects=tuple(bodies), arm=mount)
     paths = write_bundle(capture, room, scene, read_lidar_mesh(room.mesh_ply, room.mesh_colors), Path(args.out))
-    moved = _settle_distances(paths.mjcf, [b.name for b in bodies])
+    moved = _settle_distances(paths.mjcf, [b.name for b in bodies] + ([arm.LINK_NAMES[-1]] if mount else []))
 
     print(f"{photo.name}: {len(verified)} verified objects, {len(kept)} with LiDAR points, {len(bodies)} SAM 3D bodies")
     for b in bodies:
@@ -140,6 +146,15 @@ def objects(args: argparse.Namespace) -> int:
             f"  {b.label:<22} {size} cm  depth x{b.depth_scale:.2f}  "
             f"fit {b.fit_error_m * 1000:.1f} mm  moves {moved[b.name] * 100:.1f} cm in {SETTLE_SECONDS:.0f} s"
         )
+    if mount:
+        where = f"on a {mount.pedestal_height:.2f} m pedestal by" if mount.pedestal_height else "on"
+        print(
+            f"arm {where} {mount.support} at ({mount.position[0]:.2f}, {mount.position[1]:.2f}), "
+            f"reaches {len(reachable(mount, items))}/{len(items)} objects, "
+            f"hand moves {moved[arm.LINK_NAMES[-1]] * 1000:.1f} mm in {SETTLE_SECONDS:.0f} s"
+        )
+    elif not args.no_arm:
+        print("arm: no free spot within reach of the objects, left out")
     print(f"wrote {paths.mjcf.parent}")
     return 0
 
@@ -172,6 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     objects_cmd.add_argument("--look-at", help="RoomPlan element name, e.g. table_0 (default: largest table)")
     objects_cmd.add_argument("--room", type=int, default=0)
     objects_cmd.add_argument("--cache", help="keep paid results (masks, SAM 3D meshes) here and reuse them")
+    objects_cmd.add_argument("--no-arm", action="store_true", help="leave the robot arm out of the scene")
     objects_cmd.set_defaults(handler=objects)
 
     args = parser.parse_args(argv)

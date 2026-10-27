@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from scan2sim.arm import ArmMount
 from scan2sim.frames import WorldFrame
 from scan2sim.roomplan import Room, RoomElement
 
@@ -80,6 +81,7 @@ class SimScene:
     probes: tuple[Probe, ...]
     room_label: str | None
     objects: tuple[ScannedObject, ...] = ()
+    arm: ArmMount | None = None
 
 
 def world_frame_for(room: Room) -> WorldFrame:

@@ -27,6 +27,27 @@ export interface ScannedObjectInfo {
   fit_error_mm: number;
 }
 
+/** The robot arm placed by `scan2sim objects` (pipeline/src/scan2sim/arm.py). */
+export interface ArmInfo {
+  base: string;
+  position: [number, number, number];
+  yaw: number;
+  pedestal_m: number;
+  support: string | null;
+  joints: string[];
+  home: number[];
+  keyframe: string;
+  grip_site: string;
+  gripper: {
+    actuator: string;
+    open: number; // per finger, m
+    fingers: [string, string];
+    max_width: number; // widest object the fingers close around, m
+    tip_below_grip: number; // fingertips reach this far below the grip point, m
+  };
+  reach_m: [number, number];
+}
+
 export interface SceneMeta {
   format: string;
   source: {
@@ -41,6 +62,7 @@ export interface SceneMeta {
   elements: ElementInfo[];
   probes: { name: string; shape: string }[];
   objects?: ScannedObjectInfo[]; // absent in bundles from `scan2sim build`
+  arm?: ArmInfo | null;
   files: { mjcf: string; mesh: string };
 }
 

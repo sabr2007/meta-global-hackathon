@@ -11,10 +11,12 @@ from typing import Any
 import numpy as np
 import trimesh
 
+from scan2sim import arm
 from scan2sim.capture import Capture, CapturedRoom
 from scan2sim.frames import WorldFrame
 from scan2sim.lidar_mesh import FACE_CLASSES, LidarMesh
 from scan2sim.mjcf import scene_to_mjcf
+from scan2sim.mount import REACH_MAX, REACH_MIN
 from scan2sim.scene import ScannedObject, SimScene
 
 BUNDLE_FORMAT = "scan2sim/scene@1"
@@ -98,6 +100,7 @@ def scene_metadata(capture: Capture, room: CapturedRoom, scene: SimScene, mesh_s
             for p in scene.probes
         ],
         "objects": [_object_metadata(o) for o in scene.objects],
+        "arm": _arm_metadata(scene.arm) if scene.arm else None,
         "mesh": mesh_stats,
         "files": {"mjcf": "scene.xml", "mesh": "room_mesh.glb"},
     }
@@ -113,6 +116,28 @@ def _object_metadata(obj: ScannedObject) -> dict[str, Any]:
         "start": [round(v, 4) for v in obj.position.tolist()],
         "depth_scale": round(obj.depth_scale, 3),
         "fit_error_mm": round(obj.fit_error_m * 1000, 1),
+    }
+
+
+def _arm_metadata(mount: arm.ArmMount) -> dict[str, Any]:
+    return {
+        "base": arm.LINK_NAMES[0],
+        "position": [round(v, 4) for v in mount.position.tolist()],
+        "yaw": round(mount.yaw, 4),
+        "pedestal_m": round(mount.pedestal_height, 3),
+        "support": mount.support,
+        "joints": list(arm.JOINT_NAMES),
+        "home": list(arm.HOME),
+        "keyframe": "home",
+        "grip_site": arm.GRIP_SITE,
+        "gripper": {
+            "actuator": arm.GRIPPER_ACTUATOR,
+            "open": arm.GRIPPER_OPEN,
+            "fingers": list(arm.FINGER_JOINTS),
+            "max_width": round(2 * arm.FINGER_TRAVEL, 4),
+            "tip_below_grip": round(arm.PALM_BOTTOM + arm.FINGER_LENGTH - arm.GRIP_POINT, 4),
+        },
+        "reach_m": [REACH_MIN, REACH_MAX],
     }
 
 

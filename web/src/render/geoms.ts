@@ -1,10 +1,13 @@
 import * as THREE from 'three';
 import type { Physics } from '../sim/physics';
+import { armMaterial, meshGeometry } from './armLook';
 
-// Geom groups written by the pipeline (see pipeline/src/scan2sim/mjcf.py).
+// Geom groups written by the pipeline (see pipeline/src/scan2sim/mjcf.py and arm.py).
 // Group 4 holds the convex colliders of scanned objects; render/objects.ts draws their meshes.
-export const GROUP = { probes: 0, structure: 1, furniture: 2, openings: 3, scanned: 4 } as const;
+// Group 5 is the robot arm; group 6 its invisible helpers (finger colliders, sites).
+export const GROUP = { probes: 0, structure: 1, furniture: 2, openings: 3, scanned: 4, arm: 5 } as const;
 export type GroupId = (typeof GROUP)[keyof typeof GROUP];
+const DRAWN_GROUPS: ReadonlySet<number> = new Set([GROUP.probes, GROUP.structure, GROUP.furniture, GROUP.openings, GROUP.arm]);
 
 const HIGHLIGHT_COLOR = new THREE.Color('#ff5a1f');
 const EDGE_COLOR = new THREE.Color('#2b2a27');
@@ -42,29 +45,37 @@ function geometryFor(type: number, size: ArrayLike<number>, physics: Physics): T
     case types.mjGEOM_CAPSULE.value:
       return new THREE.CapsuleGeometry(size[0], size[1] * 2, 8, 24).rotateX(Math.PI / 2);
     default:
-      return null; // planes are drawn by the scan mesh; meshes arrive in a later step
+      return null; // planes are drawn by the scan mesh
   }
 }
 
 function createView(physics: Physics, index: number): GeomView | null {
   const { mujoco, model } = physics;
+  const group: number = model.geom_group[index];
+  if (!DRAWN_GROUPS.has(group)) return null;
   const type: number = model.geom_type[index];
+  const isMesh = type === mujoco.mjtGeom.mjGEOM_MESH.value;
   const size = model.geom_size.subarray(index * 3, index * 3 + 3);
-  const geometry = geometryFor(type, size, physics);
+  const geometry = isMesh ? meshGeometry(physics, model.geom_dataid[index]) : geometryFor(type, size, physics);
   if (!geometry) return null;
 
   const rgba = model.geom_rgba.subarray(index * 4, index * 4 + 4);
-  const group: number = model.geom_group[index];
-  const isProxy = group !== GROUP.probes;
-  const baseColor = new THREE.Color().setRGB(rgba[0], rgba[1], rgba[2], THREE.SRGBColorSpace);
-  const material = new THREE.MeshStandardMaterial({
-    color: baseColor,
-    roughness: isProxy ? 0.9 : 0.45,
-    metalness: 0,
-    transparent: rgba[3] < 1,
-    opacity: rgba[3],
-    depthWrite: rgba[3] >= 1,
-  });
+  const isProxy = group !== GROUP.probes && group !== GROUP.arm;
+  let material: THREE.MeshStandardMaterial;
+  if (group === GROUP.arm) {
+    material = armMaterial(physics, model.geom_matid[index]);
+  } else {
+    material = new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setRGB(rgba[0], rgba[1], rgba[2], THREE.SRGBColorSpace),
+      roughness: isProxy ? 0.9 : 0.45,
+      metalness: 0,
+      transparent: rgba[3] < 1,
+      opacity: rgba[3],
+      depthWrite: rgba[3] >= 1,
+    });
+  }
+  const baseColor = material.color.clone();
+  const baseOpacity = material.opacity;
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = !isProxy;
   mesh.receiveShadow = !isProxy;
@@ -84,7 +95,7 @@ function createView(physics: Physics, index: number): GeomView | null {
 
   const name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM.value, index) || `geom_${index}`;
   object.name = name;
-  return { index, name, group, object, material, edges, baseColor, baseOpacity: rgba[3] };
+  return { index, name, group, object, material, edges, baseColor, baseOpacity };
 }
 
 export function buildGeomLayer(physics: Physics): GeomLayer {

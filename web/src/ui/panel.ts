@@ -1,4 +1,5 @@
 import type { Confidence, ElementInfo, ScannedObjectInfo, SceneMeta } from '../scene/bundle';
+import type { ArmStatus } from '../sim/armController';
 
 export type LayerId = 'scan' | 'objects' | 'ceiling' | 'structure' | 'furniture' | 'openings';
 
@@ -7,6 +8,10 @@ export interface PanelCallbacks {
   onPlayToggle(): void;
   onReset(): void;
   onHover(name: string | null): void;
+  onArmPick(name: string): void;
+  onArmPlaceOn(name: string): void;
+  onArmPutBack(): void;
+  onArmHome(): void;
 }
 
 export interface SimStats {
@@ -18,6 +23,7 @@ export interface SimStats {
 export interface Panel {
   setStats(stats: SimStats): void;
   setPlaying(playing: boolean): void;
+  setArmStatus(status: ArmStatus): void;
 }
 
 const LAYERS: { id: LayerId; label: string; initial: boolean }[] = [
@@ -123,10 +129,17 @@ function objectList(elements: ElementInfo[], callbacks: PanelCallbacks): HTMLEle
   return list;
 }
 
-function scannedList(objects: ScannedObjectInfo[], callbacks: PanelCallbacks): HTMLElement {
+interface ScannedList {
+  root: HTMLElement;
+  /** Relabel the per-object arm actions for what the arm is doing now. */
+  setArm(status: ArmStatus): void;
+}
+
+function scannedList(objects: ScannedObjectInfo[], callbacks: PanelCallbacks, withArm: boolean): ScannedList {
   const list = el('ul', 'objects');
+  const actions: { name: string; label: string; button: HTMLButtonElement }[] = [];
   for (const object of objects) {
-    const item = el('li');
+    const item = el('li', withArm ? 'object-row' : undefined);
     const button = hoverable(object.name, callbacks);
     const size = object.size_m.map((v) => (v * 100).toFixed(1)).join(' × ');
     button.append(
@@ -136,9 +149,64 @@ function scannedList(objects: ScannedObjectInfo[], callbacks: PanelCallbacks): H
       el('span', 'object__dims', `${size} cm`),
     );
     item.append(button);
+    if (withArm) {
+      const action = el('button', 'action', 'Pick');
+      action.type = 'button';
+      action.addEventListener('click', () => {
+        if (action.dataset.mode === 'place') callbacks.onArmPlaceOn(object.name);
+        else if (action.dataset.mode === 'back') callbacks.onArmPutBack();
+        else callbacks.onArmPick(object.name);
+      });
+      action.addEventListener('pointerenter', () => callbacks.onHover(object.name));
+      action.addEventListener('pointerleave', () => callbacks.onHover(null));
+      actions.push({ name: object.name, label: object.label, button: action });
+      item.append(action);
+    }
     list.append(item);
   }
-  return list;
+  return {
+    root: list,
+    setArm({ phase, holding }: ArmStatus): void {
+      for (const { name, label, button } of actions) {
+        const mode = holding === null ? 'pick' : holding === name ? 'back' : 'place';
+        button.dataset.mode = mode;
+        button.textContent = mode === 'pick' ? 'Pick' : mode === 'back' ? 'Put back' : 'Put on';
+        button.disabled = phase === 'busy';
+        const verb = mode === 'pick' ? 'Pick up' : mode === 'back' ? 'Put back' : 'Put the held object on';
+        button.setAttribute('aria-label', `${verb} ${label}`);
+      }
+    },
+  };
+}
+
+interface ArmSection {
+  root: HTMLElement;
+  setStatus(status: ArmStatus): void;
+}
+
+function armSection(callbacks: PanelCallbacks): ArmSection {
+  const arm = section('Robot', '7-DoF arm');
+  const status = el('p', 'arm-status', 'Ready');
+  status.setAttribute('role', 'status');
+  status.dataset.phase = 'idle';
+  const controls = el('div', 'sim-controls');
+  const home = el('button', 'button', 'Home');
+  home.type = 'button';
+  home.addEventListener('click', () => callbacks.onArmHome());
+  const back = el('button', 'button', 'Put back');
+  back.type = 'button';
+  back.addEventListener('click', () => callbacks.onArmPutBack());
+  controls.append(home, back);
+  arm.body.append(status, controls);
+  return {
+    root: arm.root,
+    setStatus({ phase, text, holding, error }: ArmStatus): void {
+      status.textContent = text;
+      status.dataset.phase = error ? 'error' : phase;
+      home.disabled = phase === 'busy';
+      back.disabled = phase === 'busy' || holding === null;
+    },
+  };
 }
 
 export function mountPanel(container: HTMLElement, meta: SceneMeta, callbacks: PanelCallbacks): Panel {
@@ -160,7 +228,7 @@ export function mountPanel(container: HTMLElement, meta: SceneMeta, callbacks: P
   const play = el('button', 'button button--primary', 'Pause');
   play.type = 'button';
   play.addEventListener('click', () => callbacks.onPlayToggle());
-  const reset = el('button', 'button', 'Drop again');
+  const reset = el('button', 'button', 'Reset');
   reset.type = 'button';
   reset.addEventListener('click', () => callbacks.onReset());
   controls.append(play, reset);
@@ -169,10 +237,15 @@ export function mountPanel(container: HTMLElement, meta: SceneMeta, callbacks: P
   sim.body.append(controls, stats);
 
   const scanned = meta.objects ?? [];
+  const withArm = Boolean(meta.arm);
   const sections = [masthead, layers.root, sim.root];
+  const arm = withArm ? armSection(callbacks) : null;
+  if (arm) sections.push(arm.root);
+  let scannedView: ScannedList | null = null;
   if (scanned.length > 0) {
     const objects = section('Scanned objects', `${scanned.length} · SAM 3D + LiDAR`);
-    objects.body.append(scannedList(scanned, callbacks));
+    scannedView = scannedList(scanned, callbacks, withArm);
+    objects.body.append(scannedView.root);
     sections.push(objects.root);
   }
   const furniture = meta.elements.filter((e) => e.kind === 'object');
@@ -190,6 +263,10 @@ export function mountPanel(container: HTMLElement, meta: SceneMeta, callbacks: P
     setPlaying(playing: boolean): void {
       play.textContent = playing ? 'Pause' : 'Play';
       play.setAttribute('aria-pressed', String(!playing));
+    },
+    setArmStatus(status: ArmStatus): void {
+      arm?.setStatus(status);
+      scannedView?.setArm(status);
     },
   };
 }

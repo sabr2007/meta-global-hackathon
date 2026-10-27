@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
+import mujoco
 import numpy as np
 
+from scan2sim import arm
 from scan2sim.frames import quat_from_matrix
 from scan2sim.scene import Box, ScannedObject, SimScene
 
 FLOOR_MARGIN = 1.0  # extra plane size around the scanned floor (render size only)
 SCANNED_DENSITY = 600.0  # kg/m^3 until physical properties come from Muse Spark
 COLLIDER_ALPHA = 0.35
+FURNITURE_CONTYPE = 4  # collides with contype-1 bodies (objects, probes) but not the arm (arm.ARM_CONTYPE)
 
 # Geom groups let the viewer toggle layers.
 GROUP_PROBES = 0
@@ -41,6 +44,11 @@ def _box_geom(parent: ET.Element, box: Box) -> None:
         group = GROUP_FURNITURE
     else:
         group = GROUP_STRUCTURE
+    contype = 0
+    if box.collides:
+        # RoomPlan furniture boxes are bounding boxes (a chair's includes the air around its
+        # backrest): objects still land on them, but the arm only meets walls and tables.
+        contype = FURNITURE_CONTYPE if box.kind == "object" and box.category != "table" else 1
     ET.SubElement(
         parent,
         "geom",
@@ -51,7 +59,7 @@ def _box_geom(parent: ET.Element, box: Box) -> None:
         size=_fmt(np.maximum(box.half_size, 1e-3)),
         rgba=_fmt(KIND_RGBA[box.kind]),
         group=str(group),
-        contype="1" if box.collides else "0",
+        contype=str(contype),
         conaffinity="1" if box.collides else "0",
     )
 
@@ -80,10 +88,29 @@ def _scanned_body(parent: ET.Element, obj: ScannedObject) -> None:
     )
 
 
+def _add_home_key(root: ET.Element) -> None:
+    """Keyframe 0: everything where the scene puts it, the arm in its home pose, gripper open."""
+    model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"))
+    qpos = model.qpos0.copy()
+    ctrl = np.zeros(model.nu)
+    targets = {**dict(zip(arm.JOINT_NAMES, arm.HOME)), **{f: arm.GRIPPER_OPEN for f in arm.FINGER_JOINTS}}
+    for name, value in targets.items():
+        qpos[model.jnt_qposadr[model.joint(name).id]] = value
+    for name, value in zip((*arm.JOINT_NAMES, arm.GRIPPER_ACTUATOR), arm.home_ctrl()):
+        ctrl[model.actuator(name).id] = value
+    keyframe = ET.SubElement(root, "keyframe")
+    ET.SubElement(keyframe, "key", name="home", qpos=" ".join(f"{v:.6g}" for v in qpos), ctrl=" ".join(f"{v:.6g}" for v in ctrl))
+
+
 def scene_to_mjcf(scene: SimScene, model_name: str = "scanned-room") -> str:
     root = ET.Element("mujoco", model=model_name)
     ET.SubElement(root, "compiler", angle="radian", autolimits="true")
-    ET.SubElement(root, "option", timestep="0.002", integrator="implicitfast")
+    # Elliptic friction cones and a no-slip pass: held objects don't creep out of the fingers.
+    option = ET.SubElement(
+        root, "option", timestep="0.002", integrator="implicitfast", cone="elliptic", noslip_iterations="4"
+    )
+    # Several contact points per convex pair: flat faces rest (and get gripped) without rocking.
+    ET.SubElement(option, "flag", multiccd="enable")
 
     default = ET.SubElement(root, "default")
     probe_default = ET.SubElement(default, "default", {"class": "probe"})
@@ -93,10 +120,9 @@ def scene_to_mjcf(scene: SimScene, model_name: str = "scanned-room") -> str:
         scanned_default, "geom", density=_fmt([SCANNED_DENSITY]), friction="0.9 0.005 0.0001", group=str(GROUP_SCANNED)
     )
 
-    if scene.objects:
-        asset = ET.SubElement(root, "asset")
-        for obj in scene.objects:
-            _hull_mesh(asset, obj)
+    asset = ET.SubElement(root, "asset")
+    for obj in scene.objects:
+        _hull_mesh(asset, obj)
 
     worldbody = ET.SubElement(root, "worldbody")
     ET.SubElement(worldbody, "light", name="ceiling_light", pos="0 0 2.5", dir="0 0 -1", diffuse="0.8 0.8 0.8")
@@ -137,6 +163,10 @@ def scene_to_mjcf(scene: SimScene, model_name: str = "scanned-room") -> str:
 
     for obj in scene.objects:
         _scanned_body(worldbody, obj)
+
+    if scene.arm is not None:
+        arm.add_arm(root, asset, worldbody, scene.arm)
+        _add_home_key(root)
 
     ET.indent(root)
     return ET.tostring(root, encoding="unicode") + "\n"
