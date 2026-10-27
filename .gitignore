@@ -1,0 +1,18 @@
+# Private captures and everything derived from them (photos of real homes)
+data/
+web/public/scenes/
+
+# Build and tool output
+web/node_modules/
+web/dist/
+pipeline/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.gstack/
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
