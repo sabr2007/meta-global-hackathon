@@ -1,170 +1,184 @@
-# 3D Model Anything
+# Ayna for iPhone
 
-iPhone app that scans a whole house, over as many days as you like, into bundles the three.js
-rebuild pipeline (`scan-to-threejs` skill) can use directly. Per room it records, on one ARSession:
+*Show your robot the after.*
 
-- **RoomPlan** (headless): labeled walls, doors, windows, openings and furniture boxes.
-- **LiDAR mesh**, drawn live as triangles by photo coverage (red needs photos, green is covered), saved as `mesh/room-N.ply`.
-- **Posed photos**: sharp frames (or full-res stills) taken automatically where they add the most
-  coverage, plus a shutter for close-ups. Exact camera pose + intrinsics per photo.
-- **Depth frames**: 256×192 Float16 depth + confidence + a 640×480 color JPEG, up to 5/s.
+The scanner is the first step of Ayna. You walk around a table with a LiDAR iPhone. The app
+records the table and its room, then asks for one **hero shot**: the "before" photo. It shares
+everything as a `house-capture/5` bundle. The pipeline (`../pipeline`, `scan2sim`) turns that
+bundle into a MuJoCo twin of the table. Muse Image draws the "after" from the hero shot, a
+robot arm works towards that state in simulation, and SAM 3.1 checks the result against the
+picture.
 
-Requires an iPhone or iPad **with LiDAR** running iOS 17+.
+The capture engine comes from the open-source **3D Model Anything** app by Wes Bos (MIT, see
+[`LICENSE-3d-model-anything`](LICENSE-3d-model-anything)), imported unchanged in the first
+commit of this folder. The flow, the design, the hero shot and the review are new. See
+[`../NEW_WORK.md`](../NEW_WORK.md) for the split.
+
+## Requirements
+
+- An iPhone with LiDAR (iPhone 12 Pro or later; the target device is an iPhone 13 Pro) on iOS 17 or later.
+  Other devices can open and share mirrors but cannot scan.
+- Xcode 27 and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 
 ## Build
 
+The Xcode project is generated from `project.yml` and is not committed.
+
 ```sh
-cd apps/house-capture
-xcodegen generate          # regenerates HouseCapture.xcodeproj from project.yml (after adding files)
-xcodebuild -project HouseCapture.xcodeproj -scheme HouseCapture -configuration Release \
-  -destination 'generic/platform=iOS' -derivedDataPath build -allowProvisioningUpdates build
+cd ios && xcodegen generate
 ```
 
-Or open the project in Xcode, pick your team under *Signing & Capabilities*, and run on the phone.
+Then open `Ayna.xcodeproj`, pick your team under *Signing & Capabilities* and run on the phone.
+You can also build from the command line:
 
-## Rooms and scanning
+```sh
+xcodebuild -project Ayna.xcodeproj -scheme Ayna -configuration Release \
+  -destination 'generic/platform=iOS' -derivedDataPath build \
+  -allowProvisioningUpdates DEVELOPMENT_TEAM=<your team id> build
+```
 
-The Fieldwork house screen shows a numbered room library with previews rendered from saved scans. Open a room for an interactive 3D preview, photo-detail view, sharing, and scan history. Warm paper surfaces, ink typography, orange actions and ruled sections carry through the house library and room pages. Sessions and Recently Deleted are collapsed below the room library. Thumbnail rendering is serialized and caches only small images; scans without cached photo colours use neutral clay geometry. Tap **Scan a room** to begin; internal tracking groups are created automatically. Open a saved room and choose **Continue scanning from this room** to recognize that location before scanning nearby. Maps of 35 MB or more, or groups with four rooms, automatically start fresh. Matching room names within the house adds to the room's history, even across internal tracking groups.
+```sh
+xcrun devicectl device install app --device <device id> build/Build/Products/Release-iphoneos/Ayna.app
+```
 
-Name the room, tap **Scan**, then move around it until coverage improves. **Finish room** saves it; **Finish session** ends the visit. Tracking groups and coordinate transforms remain in the export format for later house assembly, but are not concepts the user needs to manage. Separate captures still need alignment before they can form a connected house model.
+`DEVELOPMENT_TEAM` is deliberately not in `project.yml`. Use a Release build for real scans,
+because Debug turns off Swift optimizations. Run `xcodegen generate` again after adding or
+renaming files. Known risks for the first build are listed in [`BUILD_NOTES.md`](BUILD_NOTES.md).
 
-Swipe left on a room to move it and its history to **Recently Deleted**. Restore it there, or explicitly delete it permanently. Scan versions can be inspected, switched, compared and moved to Recently Deleted individually. Rename keeps a stable room ID; typing an identical name does not silently replace a different room. On permanent deletion, Sessions used only by that room are deleted; recordings shared with other rooms are retained. Room-specific layouts and meshes are removed from shared sessions. Empty tracking groups are removed automatically. Deletion invalidates affected tracking maps and merged previews to avoid reusing deleted geometry. Unrelated rooms and maps remain intact. Session deletion remains available under **Sessions**.
+## The flow
 
-Every finished room is written to house.json and the bundle right away and the map is re-saved
-after each room, so a crash costs at most the room in progress.
+**Home → New scan → Scan → Hero shot → Review → Share .zip**
 
-**Sharing**: open a saved room → *Share room (.zip)* → AirDrop. This exports the active scan's layout, mesh, photos and depth, excluding other scans and session-wide structures/maps. Original room indices and poses are preserved; the saved mesh may include nearby surfaces from the same capture session. To share an older version, select *Use this scan* first. The house screen's *Share whole house* and each session's *Share* remain available.
-Everything is also in the Files app under 3D Model Anything.
+One scan is one **mirror**. Every mirror is a new capture session with a single room, and it
+always starts in a fresh ARKit world. The app never relocalizes against an earlier scan.
 
-**Photo preview** maps cropped photo textures onto the mesh, preserving image detail between
-LiDAR vertices. It chooses sharp, unobstructed views and reuses photos from aligned earlier
-sessions. Texture decoding shares a 48-megapixel budget across the house; areas without a
-usable full-triangle photo keep their cached vertex colors.
+1. **Home.** The Ayna logo, the lime *New scan* card and your mirrors. Each mirror shows a clay
+   thumbnail of its mesh, its date and its photo detail. Long-press a mirror to delete it.
+2. **Scan.** The camera starts right away. The LiDAR mesh is drawn over the camera image:
+   - Orange triangles still need photos; lime triangles are covered. A triangle counts as
+     covered when its score reaches `CoverageEngine.goodScore`. Newly covered triangles flash
+     briefly.
+   - Photos are taken automatically. The app keeps sharp frames from views that add coverage,
+     and gives a light tap for each one. The shutter adds a close-up.
+   - The top shows *photo detail* in large dot-matrix digits, lime from 85%, and the photo count.
+   - The middle shows RoomPlan's coaching ("Move closer to the wall", "Slow down", …) and the
+     state of the scan.
+   - The bottom holds a round radar, the shutter and *Done*. The radar is heading-up: you are in
+     the centre with the camera's field of view, and walls and furniture are dots, lime when
+     photographed and orange when not. *Done* turns lime when the scan reads complete: at least
+     3 walls, 8 photos and 85% photo detail. It never blocks saving.
+3. **Hero shot.** After *Done*, the room is still open in the same ARSession, so the hero photo's
+   pose lands in the scan's own world frame. The screen asks you to frame the whole work surface
+   and shows a horizon level that turns lime within 1.5°. The shutter waits up to a second for a
+   steady camera. It then takes a full-resolution still through ARKit's
+   `captureHighResolutionFrame` (the same path as the high-resolution auto photos) and falls back
+   to the video frame if the still fails. A depth frame is recorded at the same pose. You can
+   *Retake* or *Use it*. *Skip* saves the scan without a hero shot, and *Back* returns to scanning.
+4. **Review.** The mirror opens by itself once it is saved. It shows the name (rename from the
+   menu) and the 3D preview, coloured from the photos. It also shows counters for photos, depth
+   frames and coverage, and the hero shot.
+5. **Share .zip.** Exports this mirror's bundle through the share sheet (AirDrop, Files, …).
+   *Send to Ayna* is a placeholder marked *Coming soon*; the app makes no network requests.
 
-## On disk
+Let the review finish *Coloring from photos* before you share. That pass writes
+`mesh/room-0-colors.bin`, and the pipeline uses it for the mesh colours.
+
+## What a mirror contains
+
+The format is unchanged `house-capture/5`, the one `pipeline/src/scan2sim/capture.py` reads.
+The only addition is an optional `hero` field on one photo. The shared zip holds exactly one
+`manifest.json`:
 
 ```
-Documents/Houses/<house>/
-  house.json                         zones, sessions (+ alignment), rooms (active + history)
-  zones/<area>/worldmap.arworldmap   latest map of the area (NSKeyedArchiver, secure coding)
-  zones/<area>/structure.json|usdz   RoomPlan merge of the area's active rooms (preview only)
-  sessions/<yyyy-MM-dd HH.mm.ss>/    one session = one scan bundle, house-capture/5:
-    manifest.json          rooms, files, device, alignment, world-map status, diagnostics (rewritten after every room)
-    worldmap.arworldmap    the map at the end of the session
-    structure.json|usdz    this session's rooms merged by RoomPlan
-    rooms/room-N.json      CapturedRoom (RoomPlan's Codable JSON), .usdz, -mesh.usdz (detailed shapes)
-    rooms/room-N-data.json raw CapturedRoomData (re-run RoomBuilder on it later)
-    mesh/room-N.ply        LiDAR mesh at the end of room N (includes earlier rooms' surfaces;
-                           `inroom` marks room N): binary PLY, per vertex x y z nx ny nz coverage
-                           red green blue inroom, per face vertex_indices class
-                           (0 none 1 wall 2 floor 3 ceiling 4 table 5 seat 6 window 7 door)
-    mesh/room-N-colors.bin per-vertex photo colors, written by the in-app 3D preview
+Mirror 01.zip
+  Room/
+    manifest.json          "format": "house-capture/5", rooms[1] (file, mesh.file), photos, depthFrames
+    rooms/room-0.json      RoomPlan CapturedRoom; room-0.usdz, room-0-mesh.usdz, room-0-data.json
+    mesh/room-0.ply        LiDAR mesh in ARKit world space; room-0-colors.bin once the review coloured it
     photos/photos.json     [{ file, room, timestamp, width, height, transform, intrinsics, tracking,
-                              manual, exposure, blurPixels, pass, highRes, camera }]
-    photos/NNNN.jpg        up to 3024 px long edge, sensor orientation (EXIF 6)
-    depth/frames.json      [{ file, confidence, rgb, rgbIntrinsics, camera, room, timestamp, width, height, transform, intrinsics }]
-    depth/NNNNN.f16z       256×192 Float16 depth (m), raw DEFLATE: zlib.decompress(data, -15)
-    depth/NNNNN.conf       256×192 UInt8 confidence (0–2)
-    depth/NNNNN.jpg        640×480 color of the same frame
+                              manual, exposure, blurPixels, pass, highRes, camera, hero? }]
+    photos/NNNN.jpg        sensor orientation (EXIF 6), up to 3024 px on the long edge
+    depth/frames.json      [{ file, confidence, rgb, rgbIntrinsics, camera, room, timestamp,
+                              width, height, transform, intrinsics }]
+    depth/NNNNN.f16z|.conf|.jpg
 ```
 
-**Coordinates**: each session is in its own ARKit world: meters, +Y up (gravity), right-handed
-(same as three.js). Into the house frame: `point_house = zone.toHouse × session.alignment.toZone ×
-point_session` (column-major 4×4s in house.json; identity for `first`/`relocalized` sessions of the
-first area). Photo `transform` is camera-to-world (camera looks down −Z); JPEG pixels are the raw
-landscape sensor image and `intrinsics` (fx, fy, cx, cy) match them — ignore EXIF when projecting.
-RoomPlan surface/object `transform`s are centered on the element; `dimensions` = width × height × depth.
+- `transform` is camera-to-world, column-major 4×4. The camera looks down −Z, and the world is
+  ARKit's: metres, +Y up. `intrinsics` is a column-major 3×3 that matches the JPEG pixels.
+- **Hero shot**: exactly one photo has `"hero": true`. It uses the same conventions as every
+  other photo and is usually a full-resolution still (`"highRes": true`). The depth frame
+  closest in time was recorded at the same pose. Until the pipeline reads the flag, pass the
+  hero's file stem by hand, for example `scan2sim objects "Mirror 01.zip" --photo 0042`.
 
-`diagnostics.json` is checkpointed every five seconds during capture, including an unfinished room.
-It records bounded memory/thermal/frame-age samples, feature and mesh counts, configuration changes,
-memory warnings, interruptions, and structured RoomPlan/ARKit/high-resolution-photo error chains
-(domain, code, failure reason and recovery suggestion). ARKit errors are observed through the existing
-ARSCNView delegate; the app does not replace RoomPlan's ARSession delegate. The same diagnostic fields
-are included in the manifest when it is saved. A successful simulator check cannot reproduce or rule
-out a device tracking failure; preserve the failing session and correlate its times with device logs.
+On the phone, mirrors live in `Documents/Houses/ayna/`: `house.json` plus one
+`sessions/<date>/` folder per mirror. The folder is also visible in the Files app. The upstream
+house / zone / session model is still underneath: Ayna keeps one implicit house and gives each
+scan its own tracking group. The session's ARKit world map is still saved, which keeps the
+option of relocalizing on the same table later, for example to show the robot in AR.
 
-`manifest.diagnostics`: RoomPlan's and the scan's AR configurations, frame-to-frame world jumps,
-white balance, an event log (tracking / mapping status changes, pauses, map saves), how
-relocalization went (seconds to *normal* / *verified*, residual) and periodic live-vs-saved mesh checks.
+## Design
 
-## Launch arguments (developer)
+`Ayna/AynaDesign.swift` holds the design system:
 
-- `-selftest`: checks everything that doesn't need the camera (house.json round trips, session
-  folders, room history, deleting sessions, the saved-mesh ghost + alignment check, earlier-photo
-  loading, manifests, zipping). Runs in the simulator; prints `SELFTEST:` lines, exits 0/1.
-  Copy a real bundle to the app's `Documents/selftest-bundle` to also time it on real data.
-- `-autotest`: a hands-free room scan in a new "Autotest" house (phone on a desk), with a pause/resume,
-  logs `AUTOTEST:` lines, finishes, exits. `-autotest-continue`: continues the newest Autotest house
-  (relocalize → verify → scan → finish), logging the relocalization.
-- `-diag`: probes how RoomPlan and ARKit's mesh/depth coexist on one ARSession (`DIAG:` lines).
+- **Colours.** The app is dark everywhere: background `#1B1B1C`, surfaces `#252528` and `#3A3A3E`,
+  neutral grey `#B5B5BA`, text white, secondary text `#9A9AA0`. **Lime `#B8FF5E`** means done,
+  covered or verified; text on lime is `#173404`. **Orange `#EE7F35`** means something needs attention.
+- **Type.** [Michroma](https://fonts.google.com/specimen/Michroma) is the wide geometric face for
+  the logo and titles. [Doto](https://fonts.google.com/specimen/Doto) is the dot-matrix face, like
+  LiDAR points, for numbers and counters. SF Pro is used for body text.
+- **Logo.** "AYNA" in Michroma over the same word in Doto, flipped vertically in `#55555A`: the
+  thing and its mirror of points. Each dotted letter is centred under its solid one.
+- **Motif.** Overlapping light-grey circles with a thin `#1B1B1C` outline, with one orange accent.
+  Cards use 20–24 pt corners, buttons are pills, and the main *New scan* card is lime.
+- **Icon.** A light-grey Michroma "A" over its dotted reflection on graphite.
 
-Read logs with `xcrun devicectl device process launch --console --device <id> com.wesbos.housecapture -autotest`.
+The fonts in `Ayna/Fonts` come from [google/fonts](https://github.com/google/fonts) (`ofl/michroma`,
+`ofl/doto`) under the SIL Open Font License; their licenses are `OFL-Michroma.txt` and
+`OFL-Doto.txt`. Doto is a variable font, so the app ships two static instances with round dots
+(`ROND=100`) at `wght=700` and `wght=900`. Their PostScript names are `Doto-Bold` and
+`Doto-Black`. The scripts that make the instances and the icon live in `tools/` (Python;
+`pip install fonttools pillow`):
 
-## Tracking recovery and photo reliability
+```sh
+python tools/make_doto_static.py "Doto[ROND,wght].ttf" Ayna/Fonts
+```
 
-During capture, a prominent warning explains excessive motion, insufficient visual detail,
-relocalization, interruptions, or stale camera frames. Photos, depth recording, and coverage
-input stop while tracking is unreliable; capture resumes after 1.5 seconds of fresh normal
-tracking. A warning vibration marks tracking loss. Pausing remains a separate user action.
-The view asks ARKit to attempt relocalization after interruptions without resetting the world;
-Finish remains available (including while paused) if recovery does not succeed.
+```sh
+python tools/make_app_icon.py
+```
 
-A fatal ARKit or RoomPlan error prevents adding another room to the failed session. Available
-room data is preserved and the UI directs you to finish the session and start a new capture.
-Recovery is not guaranteed, and sudden fatal failures may arrive without an earlier warning.
+## Code map
 
-Regular video-frame photos are the default. Optional high-resolution automatic photos can be
-selected before scanning; requests are at least three seconds apart and require nominal thermal
-state and stable tracking. Manual photos use copied regular camera frames and cannot overlap a
-pending photo operation. Finishing waits for accepted photo writes; overdue still callbacks are
-invalidated so they cannot leak into the next room. JPEG write failures are surfaced in the UI.
-This reduces optional capture load; it is not evidence that still capture caused the recorded
-October 6 drift failure.
+| File | What |
+|---|---|
+| `AynaApp.swift` | app entry, share sheet, developer launch modes |
+| `HomeScreen.swift` | Home: logo, New scan card, mirror list |
+| `MirrorLibrary.swift` | the implicit house, mirrors, names, start/delete/rename |
+| `CaptureScreen.swift` | the scan screen and its auto flow (start, finish, close) |
+| `HeroShotView.swift` | hero shot framing, level, confirm |
+| `MirrorScreen.swift` | review, 3D preview, Share .zip, Send to Ayna placeholder |
+| `AynaDesign.swift` | colours, fonts, logo, circles, buttons, cards, thumbnails |
+| `Coverage.swift` | wall coverage model and the round radar (`CoverageMap`) |
+| `CaptureController.swift` | upstream capture session; Ayna adds the hero shot and the auto-photo haptic |
+| `CoverageEngine.swift`, `ScanView.swift` | upstream coverage scoring and live mesh; Ayna adds the lime flash, orange/lime colours and a forced depth frame |
+| everything else | upstream engine, preview, bundle format, diagnostics and self-tests |
 
-## Capture performance
+## Developer launch arguments (Debug builds)
 
-Use a **Release** build for physical scanning; Debug builds disable Swift optimizations and
-are intended for debugging. Coverage inputs are coalesced before the worker queue (one newest
-snapshot per anchor). Work yields after two anchors, room-layout updates coalesce, and UI mesh
-outputs coalesce before reaching the main thread. No geometry is downsampled in the saved mesh.
-An export flushes pending accepted geometry before writing. Unchanged vertex positions and
-normals reuse their current scores exactly; changed geometry is rescored. Saturated vertices
-stop at the original score cap of 2 so triangle-average coverage colors remain consistent.
-Diagnostics include pending and replaced mesh-update counts alongside queue delay.
+These are kept from upstream:
 
-`-selftest` exercises mailbox concurrency/fairness, scoring, cache invalidation, and pending
-geometry export. Optionally copy `mesh/room-0.ply` and `photos/photos.json` to simulator
-`Documents/coverage-benchmark/` to compare baseline and optimized scoring on actual geometry.
-This benchmark uses photo poses without depth occlusion; it is not a live phone FPS benchmark.
+- `-selftest` checks storage, bundles, export and coverage scoring without the camera, then
+  exits 0 or 1. It runs in the simulator.
+- `-autotest` runs a hands-free scan in a new "Autotest" house, then exits. `-autotest-continue`
+  relocalizes in that house first.
+- `-diag` probes RoomPlan together with ARKit's mesh and depth on one session.
+- `-preview-house <folder>` (with `-preview-session n`, `-preview-style …`) opens the 3D preview directly.
 
-## Capture guidance and review
+Read the logs with
+`xcrun devicectl device process launch --console --device <id> com.sabyrzhan.ayna -selftest`.
 
-**Photo detail** is the fraction of observed mesh area with useful photography, not the percentage of the room scanned. Inferred furniture backs, floors and ceilings do not reduce this number. Old scans also display their measured mesh coverage instead of the legacy mixed score. The finish recommendation checks measured walls, photo count and observed photo detail; it never blocks saving partial work. After two minutes with little progress, the app suggests inspecting gaps or saving rather than continuing indefinitely. Photo selection runs automatically in the background; there are no aiming markers or capture targets. Tracking loss pauses new capture and shows a recent reference photo to help recover the view. Saved data can still be kept.
+## Privacy
 
-Thermal pressure, memory warnings and long scans reduce depth recording, photo frequency and coverage evaluation work. High-resolution automatic photos are disabled under constrained budgets. After a large map or four rooms, save and start a fresh scan rather than extending the same map further.
-
-After each room, **Review saved room in 3D** opens the textured preview. Use coverage colours to inspect missing photography. A room's **Connect to another room** action shows numbered doorway plans, supports a 180-degree orientation choice, and requires a combined preview before saving. This is manual doorway alignment; it does not claim an automatic verified registration. The reference room must already be placed in the house and both captures must have established tracking.
-
-## Sharing and importing
-
-Use the system share sheet to AirDrop exports or save them to Files. No Mac receiver or companion
-app is required. The iOS app does not make network requests or request local-network access.
-To review an exported room/session on another device, extract its ZIP in Files, then use the
-home screen's import button to select the folder containing `manifest.json`. Imports create a new
-house, preserve original room indices and scan coordinates, and never replace existing scans.
-Whole-house folder import is not supported. Non-LiDAR devices can import, review and share.
-
-## Release preparation
-
-`Help & privacy` contains offline help and the privacy policy. Their authoritative content is
-`HouseCapture/Support.json` and `HouseCapture/PrivacyPolicy.json`; `release/prepare-pages.py`
-generates matching public HTML pages. Set real HTTPS privacy/support URLs in `project.yml`
-before publishing. `release/app-store-metadata.json` and `release/release-checklist.txt` contain
-store copy, review instructions and outstanding account/device checks. Run `release/validate.py`
-against the archived `.app` for local checks; it intentionally fails while public URLs or store
-metadata are unset. It does not replace Xcode Organizer validation or App Review.
-
-Camera permission is checked before creating a capture. Scanning requires 500 MB available at
-start/resume and pauses below 200 MB; this is a reserve, not a guarantee against other processes
-using storage. Save errors are shown, and failed session saves can be retried without closing.
-Backgrounding still pauses recording. Development launch modes are enabled only in Debug builds.
+Ayna has no account, analytics or network requests. Scans stay on the phone until you share a
+zip. Photos and geometry of a real space are private data, so this repository never contains
+scans, photos or keys.
