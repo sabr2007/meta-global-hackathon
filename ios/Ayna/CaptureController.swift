@@ -154,6 +154,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   /// a light tap for every automatic photo
   private let photoHaptic = UIImpactFeedbackGenerator(style: .light)
   private var meshReadyAt: TimeInterval?
+  /// times `restartMeshIfMissing` restarted reconstruction in this room
+  private var meshRestarts = 0
   /// mesh export taken just before RoomPlan stops (stopping reconfigures the session)
   private var preStopMesh: Result<(vertices: Int, faces: Int, covered: Float), Error>?
 
@@ -679,6 +681,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     recovery = TrackingRecovery()
     trackingIssue = recovery.issue
     meshReadyAt = nil
+    meshRestarts = 0
     preStopMesh = nil
     lastWarning = nil
     instruction = nil
@@ -1127,6 +1130,25 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     arSession.run(updated, options: []) // no reset: same world, RoomPlan keeps going
   }
 
+  /// The configuration can list `.meshWithClassification` while ARKit hands out no mesh
+  /// anchors at all: on device, the first enable right after the scan starts produced none in
+  /// both test scans, and a restart produced them within seconds. When tracking is normal and
+  /// none have appeared, drop the flag: the next `ensureMeshAndDepth` adds it back.
+  private func restartMeshIfMissing(_ frame: ARFrame, now: TimeInterval) {
+    guard meshReady, meshRestarts < Self.maxMeshRestarts, let readyAt = meshReadyAt,
+          now - readyAt > Self.meshGracePeriod, case .normal = frame.camera.trackingState,
+          !frame.anchors.contains(where: { $0 is ARMeshAnchor }),
+          let c = arSession.configuration as? ARWorldTrackingConfiguration,
+          let updated = c.copy() as? ARWorldTrackingConfiguration else { return }
+    meshRestarts += 1
+    updated.initialWorldMap = nil
+    updated.sceneReconstruction.remove(.meshWithClassification)
+    meshReady = false
+    meshReadyAt = nil
+    diagnostics.log("mesh watchdog #\(meshRestarts): no mesh anchors \(String(format: "%.1f", now - readyAt)) s after enabling, restarting reconstruction", since: startedAt)
+    arSession.run(updated, options: []) // no reset: same world, RoomPlan keeps going
+  }
+
   @objc private func memoryWarning() {
     guard !closed else { return }
     memoryPressureUntil = CACurrentMediaTime() + 60
@@ -1330,6 +1352,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     if frame.timestamp - lastMeshCheck > 0.5 {
       lastMeshCheck = frame.timestamp
       ensureMeshAndDepth()
+      restartMeshIfMissing(frame, now: now)
     }
     if !cameraControl.whiteBalanceLocked, let t = meshReadyAt, now - t > 3 {
       cameraControl.lockWhiteBalance()
@@ -1478,6 +1501,9 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   nonisolated private static let acceptableBlur: Float = 6
   /// m² of not-yet-covered surface a photo must add
   private static let minimumGain: Float = 0.06
+  /// how long tracking may run with the mesh enabled but no mesh anchor before a restart
+  private static let meshGracePeriod: TimeInterval = 4
+  private static let maxMeshRestarts = 2
   /// long edge of saved photos; full-res stills are scaled down to this
   private static let maxPhotoEdge: CGFloat = 3024
 

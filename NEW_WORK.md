@@ -76,7 +76,10 @@ From upstream, kept as the engine of the app:
   - `DepthRecorder.consider(force:)`;
   - `PhotoRecord.hero`;
   - `save` returns whether a write started;
-  - automatic photos pause while framing the hero shot.
+  - automatic photos pause while framing the hero shot;
+  - `CaptureController.restartMeshIfMissing`: restarts LiDAR reconstruction when RoomPlan's
+    configuration lists the mesh but ARKit hands out no mesh anchors. On device, the first
+    enable right after the automatic scan start produced none in both test scans.
 
   The bundle format is unchanged apart from the optional `hero` field. The saved PLY colours are
   unchanged.
