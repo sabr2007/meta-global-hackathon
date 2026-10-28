@@ -111,9 +111,9 @@ struct AynaLogo: View {
 // MARK: - circles
 
 /// Overlapping light-grey circles with a thin dark outline, one of them the accent: Ayna's
-/// shorthand for things on a surface.
+/// shorthand for things on a surface. The cluster keeps its shape at any size and sits centred.
 struct CircleCluster: View {
-  /// centre in fractions of the view's width/height, radius as a fraction of its shorter side
+  /// centre and radius in units of the cluster's height; x is measured from the middle
   struct Dot {
     var x: CGFloat
     var y: CGFloat
@@ -127,21 +127,25 @@ struct CircleCluster: View {
   var accent = AynaTheme.orange
   var lineWidth: CGFloat = 1.5
 
-  /// a few objects on a table, one of them the one that matters
+  /// width of the layout in units of its height (the cluster shrinks to fit narrow views)
+  private static let span: CGFloat = 2.6
+
+  /// a few objects on a table, one of them the one that matters (drawn last, on top)
   static let objects: [Dot] = [
-    Dot(x: 0.14, y: 0.36, r: 0.17),
-    Dot(x: 0.36, y: 0.56, r: 0.36),
-    Dot(x: 0.60, y: 0.36, r: 0.27),
-    Dot(x: 0.79, y: 0.62, r: 0.22, accent: true),
-    Dot(x: 0.93, y: 0.30, r: 0.12),
+    Dot(x: -0.95, y: 0.05, r: 0.30),
+    Dot(x: -0.45, y: -0.05, r: 0.42),
+    Dot(x: 0.15, y: 0.08, r: 0.36),
+    Dot(x: 1.02, y: 0.12, r: 0.20),
+    Dot(x: 0.62, y: -0.10, r: 0.26, accent: true),
   ]
 
   var body: some View {
     Canvas { ctx, size in
-      let unit = min(size.width, size.height)
+      let unit = min(size.height, size.width / Self.span)
       for d in dots {
         let r = d.r * unit
-        let circle = Path(ellipseIn: CGRect(x: d.x * size.width - r, y: d.y * size.height - r, width: 2 * r, height: 2 * r))
+        let x = size.width / 2 + d.x * unit, y = size.height / 2 + d.y * unit
+        let circle = Path(ellipseIn: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r))
         ctx.fill(circle, with: .color(d.accent ? accent : fill))
         ctx.stroke(circle, with: .color(stroke), lineWidth: lineWidth)
       }
