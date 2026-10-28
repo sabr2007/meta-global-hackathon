@@ -22,6 +22,8 @@ enum MirrorLibrary {
     var photoDetail: Int?
     var photos = 0
     var depthFrames = 0
+    /// the hero shot ("before" image), if one was taken
+    var hero: URL?
   }
 
   /// The implicit house, created on first use. A house.json that exists but can't be read is
@@ -59,13 +61,16 @@ enum MirrorLibrary {
 
   private static func name(_ n: Int) -> String { String(format: "Mirror %02d", n) }
 
-  /// Counts from manifest.json (call off the main thread)
+  /// Counts from manifest.json, the hero shot from photos.json (call off the main thread)
   static func summary(of bundle: ScanBundle, index: Int) -> Summary {
     var summary = Summary()
     if let manifest = bundle.manifest {
       summary.photoDetail = manifest.rooms.first { $0.index == index }?.photographedPercent
       summary.photos = manifest.photoCount
       summary.depthFrames = manifest.depthFrameCount ?? 0
+    }
+    if let hero = bundle.photos.last(where: { $0.hero == true && $0.room == index }) {
+      summary.hero = bundle.file(hero.file)
     }
     return summary
   }

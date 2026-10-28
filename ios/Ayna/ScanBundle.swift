@@ -439,6 +439,9 @@ struct PhotoRecord: Codable {
   var highRes: Bool?
   /// camera state when the photo was taken, for normalizing brightness/color across photos
   var camera: CameraState?
+  /// Ayna: the room's hero shot, a full view of the work surface taken after the scan in the same
+  /// world (the "before" image). Only present, and true, on that one photo.
+  var hero: Bool? = nil
 }
 
 /// Exposure + white balance + ARKit's light estimate for one frame

@@ -4,8 +4,9 @@ import SwiftUI
 
 /// Full-screen scan of one mirror: the camera with the LiDAR mesh drawn over it (orange needs
 /// photos, lime is covered), photo detail and the photo count on top, RoomPlan's coaching in the
-/// middle, the radar, the shutter and Done at the bottom. Once the room is saved the session
-/// finishes by itself and the screen closes; Home then opens the review.
+/// middle, the radar, the shutter and Done at the bottom. Done leads to the hero shot
+/// (HeroShotOverlay); once the room is saved the session finishes by itself and the screen
+/// closes, and Home opens the review.
 struct CaptureScreen: View {
   @ObservedObject var controller: CaptureController
   /// Ayna's flow: start scanning on appear, finish the session once its room is saved, close
@@ -30,15 +31,19 @@ struct CaptureScreen: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
       }
-      VStack(spacing: 12) {
-        topBar
-        Spacer(minLength: 0)
-        middle
-        bottomBar
+      if scanning && controller.heroMode {
+        HeroShotOverlay(controller: controller)
+      } else {
+        VStack(spacing: 12) {
+          topBar
+          Spacer(minLength: 0)
+          middle
+          bottomBar
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+        .animation(.easeInOut(duration: 0.3), value: controller.notice)
       }
-      .padding(.horizontal, 16)
-      .padding(.bottom, 8)
-      .animation(.easeInOut(duration: 0.3), value: controller.notice)
     }
     .background(AynaTheme.background)
     .foregroundStyle(AynaTheme.text)
@@ -359,11 +364,12 @@ struct CaptureScreen: View {
     }
     .buttonStyle(.plain)
     .animation(.easeInOut(duration: 0.25), value: ready)
-    .accessibilityHint(ready ? "Photo detail looks complete. Saves the scan." : "Saves the scan with what was recorded so far.")
+    .accessibilityHint(ready ? "Photo detail looks complete. Next: the hero shot." : "Ends the scan with what was recorded so far. Next: the hero shot.")
   }
 
+  /// Done: the hero shot, then the room is saved
   private func done() {
-    controller.finishRoom()
+    controller.beginHeroShot()
   }
 }
 

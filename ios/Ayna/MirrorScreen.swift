@@ -36,6 +36,7 @@ struct MirrorScreen: View {
           Text("This mirror's files are missing.").foregroundStyle(AynaTheme.orange).aynaCard()
         }
         metrics
+        heroRow
         actions
       }
       .padding(.horizontal, 20)
@@ -106,6 +107,32 @@ struct MirrorScreen: View {
     .aynaCard()
   }
 
+  private var heroRow: some View {
+    let hero = summary?.hero
+    return HStack(spacing: 14) {
+      if let hero {
+        UprightPhoto(url: hero, maxPixels: 600)
+          .frame(width: 72, height: 96)
+          .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      }
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 6) {
+          StatusDot(color: summary == nil ? AynaTheme.secondary : hero == nil ? AynaTheme.orange : AynaTheme.lime)
+          Text(hero == nil ? "No hero shot" : "Hero shot").font(.headline)
+        }
+        Text(hero == nil
+             ? "Take one after Done on the next scan: a full view of the work surface, the \"before\" for Muse Image."
+             : "The \"before\" for Muse Image: the whole work surface, posed in the same world as the scan.")
+          .font(.caption)
+          .foregroundStyle(AynaTheme.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer(minLength: 0)
+    }
+    .aynaCard()
+    .accessibilityElement(children: .combine)
+  }
+
   private var actions: some View {
     VStack(alignment: .leading, spacing: 10) {
       Button(action: share) {
@@ -125,7 +152,7 @@ struct MirrorScreen: View {
       }
       .foregroundStyle(AynaTheme.secondary)
       .padding(.leading, 4)
-      Text("The .zip is the house-capture/5 bundle of this mirror: RoomPlan layout, LiDAR mesh, posed photos and depth frames.")
+      Text("The .zip is the house-capture/5 bundle of this mirror: RoomPlan layout, LiDAR mesh, posed photos (the hero shot is marked \"hero\": true in photos.json) and depth frames.")
         .font(.caption)
         .foregroundStyle(AynaTheme.secondary)
         .padding(.top, 6)

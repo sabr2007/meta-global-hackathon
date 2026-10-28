@@ -226,6 +226,26 @@ struct StatusDot: View {
 
 // MARK: - thumbnails
 
+/// A bundle photo shown upright (JPEGs keep sensor orientation with EXIF 6), decoded small off
+/// the main thread
+struct UprightPhoto: View {
+  let url: URL
+  var maxPixels = 1200
+  @State private var image: UIImage?
+  var body: some View {
+    ZStack {
+      AynaTheme.raised
+      if let image {
+        Image(uiImage: image).resizable().scaledToFit()
+      } else {
+        ProgressView().tint(AynaTheme.neutral)
+      }
+    }
+    .task(id: url) { image = await ThumbnailStore().upright(url, maxPixels: maxPixels) }
+    .accessibilityHidden(true)
+  }
+}
+
 /// The saved LiDAR mesh of a mirror, rendered small: photo colours when the preview has cached
 /// them, matte grey clay otherwise.
 struct MirrorThumbnail: View {

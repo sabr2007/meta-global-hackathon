@@ -111,6 +111,12 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   @Published private(set) var priorPhotoCount = 0
   /// what finishing is doing right now
   @Published private(set) var finishingStep = ""
+  /// After Done, before the room is finished: framing the hero shot (auto photos stop; tracking,
+  /// RoomPlan and depth recording keep running in the same world)
+  @Published private(set) var heroMode = false
+  @Published private(set) var heroInFlight = false
+  /// the saved hero photo of the room being scanned, until it is used or retaken
+  @Published private(set) var heroPhoto: PhotoRecord?
 
   let arSession = ARSession()
   private var roomSessionCreated = false
@@ -685,6 +691,9 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     lastProgressPercent = 0
     roomPhotoCount = 0
     hint = .none
+    heroMode = false
+    heroInFlight = false
+    heroPhoto = nil
     engine.setRoom(nil)
     scanView.showRoom(nil)
     phase = .scanning
@@ -703,6 +712,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     guard phase == .scanning else { return }
     if paused { resume() }
     commitCandidate(allowHighResolution: false)
+    heroMode = false
     phase = .finishingRoom
     scanView.feed.isOn = false // freeze accepted mesh input for the export barrier
     // export the mesh while it's all still there, then let RoomPlan wrap up (didEndWith → finish)
@@ -763,6 +773,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
       commitCandidate(allowHighResolution: false)
       cameraControl.unlock()
       if paused { resume() }
+      heroMode = false
       phase = .finishingRoom
     }
     if let error {
@@ -1333,7 +1344,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
       if engine.latestHint != hint { hint = engine.latestHint }
 
     }
-    if let blur = lastBlur { autoPhoto(frame, blur: blur) }
+    if let blur = lastBlur, !heroMode { autoPhoto(frame, blur: blur) }
   }
 
   /// How far the image smears during this frame's exposure, in pixels: rotation
@@ -1470,10 +1481,12 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   /// long edge of saved photos; full-res stills are scaled down to this
   private static let maxPhotoEdge: CGFloat = 3024
 
-  private func save(_ shot: Shot, manual: Bool) {
+  /// True if the photo is being written
+  @discardableResult
+  private func save(_ shot: Shot, manual: Bool, hero: Bool = false) -> Bool {
     // auto photos wait their turn; manual taps always go through (within reason)
     guard !closed, phase == .scanning || phase == .finishingRoom,
-          photosInFlight < (manual ? 3 : 1), !paused || manual else { return }
+          photosInFlight < (manual ? 3 : 1), !paused || manual else { return false }
     photosInFlight += 1
     lastPhotoTime = shot.timestamp
 
@@ -1497,7 +1510,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
       blurPixels: manual ? nil : shot.blur * Float(scale),
       pass: "scan",
       highRes: shot.highRes,
-      camera: shot.camera
+      camera: shot.camera,
+      hero: hero ? true : nil
     )
     let view = PhotoView(transform: shot.transform)
     let enginePhoto = CoverageEngine.Photo(
@@ -1521,6 +1535,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
       await MainActor.run {
         defer { self.photosInFlight -= 1 }
         guard !self.closed else { return }
+        if hero { self.heroInFlight = false }
         if ok {
           self.photos.append(record)
           self.photoViews.append((record.room, view))
@@ -1530,12 +1545,14 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
           self.roomPhotoCount += 1
           self.refreshCoverage()
           if !manual { self.photoHaptic.impactOccurred() }
+          if hero { self.heroPhoto = record }
         } else {
           self.lastWarning = "A photo could not be saved. Check available storage before continuing."
           self.diagnostics.log("JPEG write failed: \(record.file)", since: self.startedAt)
         }
       }
     }
+    return true
   }
 
   nonisolated static func sharpness(blurAt1920 b: Float) -> Float {
@@ -1589,6 +1606,129 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     return CGImageDestinationFinalize(dest)
   }
 
+  // MARK: - Hero shot
+
+  var canTakeHeroShot: Bool {
+    heroMode && phase == .scanning && !paused && captureReady && heroPhoto == nil && !heroInFlight && !highResInFlight && photosInFlight == 0
+  }
+
+  var heroPhotoURL: URL? { heroPhoto.map { bundle.file($0.file) } }
+
+  /// Done: frame the whole work surface for one "before" photo, in this ARSession and before the
+  /// room is finished, so its pose is in the same world as the scan
+  func beginHeroShot() {
+    guard phase == .scanning, !heroMode else { return }
+    if paused { resume() }
+    commitCandidate(allowHighResolution: false) // keep the sharp frame the scan was holding
+    heroPhoto = nil
+    heroMode = true
+    diagnostics.log("hero shot: framing", since: startedAt)
+  }
+
+  /// Back to scanning; a hero shot taken so far stays as an ordinary photo
+  func cancelHeroShot() {
+    guard heroMode, !heroInFlight else { return }
+    retireHeroPhoto()
+    heroMode = false
+    diagnostics.log("hero shot: back to scanning", since: startedAt)
+  }
+
+  /// Finish the room without a hero shot
+  func skipHeroShot() {
+    guard heroMode, !heroInFlight else { return }
+    retireHeroPhoto()
+    diagnostics.log("hero shot skipped", since: startedAt)
+    finishRoom()
+  }
+
+  /// Keep the hero shot and finish the room as usual
+  func useHeroShot() {
+    guard heroMode, !heroInFlight, heroPhoto != nil else { return }
+    diagnostics.log("hero shot used: \(heroPhoto?.file ?? "-")", since: startedAt)
+    finishRoom()
+  }
+
+  /// Try again; the previous shot stays as an ordinary photo
+  func retakeHeroShot() {
+    guard heroMode, !heroInFlight else { return }
+    retireHeroPhoto()
+  }
+
+  private func retireHeroPhoto() {
+    if let i = photos.lastIndex(where: { $0.hero == true }) { photos[i].hero = nil }
+    heroPhoto = nil
+  }
+
+  /// Waits briefly for a steady camera, asks ARKit for a full-resolution still (the same call as
+  /// high-resolution auto photos) and falls back to the video frame. Saved like any photo, with
+  /// its pose and intrinsics, plus `hero: true`.
+  func takeHeroShot() {
+    guard canTakeHeroShot else { return }
+    heroInFlight = true
+    diagnostics.log("hero shot requested", since: startedAt)
+    Task {
+      // a sharp still needs a still camera: give the predicted blur up to a second to settle
+      let deadline = CACurrentMediaTime() + 1
+      while (lastBlur ?? .infinity) > Self.sharpBlur, CACurrentMediaTime() < deadline, !closed {
+        try? await Task.sleep(for: .milliseconds(50))
+      }
+      guard heroMode, !closed, phase == .scanning, captureReady, let video = heroVideoShot() else {
+        heroInFlight = false
+        show(notice: "Hold the phone steady with the table in view, then take the hero shot again.")
+        return
+      }
+      var shot = video
+      if let still = await heroStill() {
+        shot = still
+        shot.depth = video.depth // the video frame's depth, a moment earlier, same view
+      }
+      guard heroMode, !closed, phase == .scanning else {
+        heroInFlight = false
+        return
+      }
+      diagnostics.log("hero shot taken: \(shot.highRes ? "full-resolution still" : "video frame") \(Int(shot.resolution.width))x\(Int(shot.resolution.height))", since: startedAt)
+      // heroInFlight ends when the JPEG is written (or if it can't be)
+      if !save(shot, manual: true, hero: true) { heroInFlight = false }
+    }
+  }
+
+  /// The current video frame as the hero photo (the fallback), with a depth frame recorded at
+  /// exactly this pose for the hero's 3D lifting
+  private func heroVideoShot() -> Shot? {
+    guard let frame = arSession.currentFrame, CACurrentMediaTime() - frame.timestamp < 0.5,
+          case .normal = frame.camera.trackingState,
+          let buffer = Self.copy(frame.capturedImage) else { return nil }
+    depthRecorder.consider(frame, room: roomIndex, camera: cameraControl.state(for: frame), force: true)
+    var shot = Shot(frame: frame, buffer: buffer, blur: lastBlur ?? 0)
+    shot.depth = DepthRecorder.grid(for: frame)
+    shot.camera = cameraControl.state(for: frame)
+    return shot
+  }
+
+  /// A full-resolution still, or nil if unsupported, failed, late (3 s), blurred or untracked
+  private func heroStill() async -> Shot? {
+    guard highResSupported else { return nil }
+    let frame: ARFrame? = await withCheckedContinuation { k in
+      let once = ResumeOnce(k)
+      arSession.captureHighResolutionFrame { frame, error in
+        if let error {
+          let chain = Diagnostics.errorChain(error)
+          Task { @MainActor in self.diagnostics.recordFailure(source: "hero high-resolution photo", chain: chain, since: self.startedAt) }
+        }
+        once.resume(frame)
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 3) { once.resume(nil) }
+    }
+    guard let frame, case .normal = frame.camera.trackingState else { return nil }
+    let smear = self.blur(at: frame.timestamp, for: frame) ?? lastBlur ?? 0
+    guard smear / Float(frame.camera.imageResolution.width) * 1920 <= Self.acceptableBlur,
+          let buffer = Self.copy(frame.capturedImage) else { return nil }
+    var shot = Shot(frame: frame, buffer: buffer, blur: smear)
+    shot.highRes = true
+    shot.camera = cameraControl.state(for: frame)
+    return shot
+  }
+
   // MARK: - Helpers
 
   nonisolated fileprivate static func describeTracking(_ state: ARCamera.TrackingState) -> String {
@@ -1614,6 +1754,20 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   private static let names = ["Living room", "Kitchen", "Dining room", "Hallway", "Bedroom", "Bathroom", "Office"]
   static func suggestedName(for index: Int) -> String {
     index < names.count ? names[index] : "Room \(index + 1)"
+  }
+}
+
+/// Resumes a continuation once: the first of a callback and a timeout wins
+private final class ResumeOnce<T>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var continuation: CheckedContinuation<T, Never>?
+  init(_ continuation: CheckedContinuation<T, Never>) { self.continuation = continuation }
+  func resume(_ value: T) {
+    let pending: CheckedContinuation<T, Never>? = lock.withLock {
+      defer { continuation = nil }
+      return continuation
+    }
+    pending?.resume(returning: value)
   }
 }
 
