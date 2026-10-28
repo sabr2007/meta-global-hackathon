@@ -18,7 +18,7 @@ from scan2sim.lidar_mesh import read_lidar_mesh
 from scan2sim.lift import lift_masks
 from scan2sim.meta_client import load_settings
 from scan2sim.mount import choose_mount, footprint, reachable
-from scan2sim.objects import body_name, build_scanned_object
+from scan2sim.objects import body_name, build_scanned_object, rests_on, target_surface
 from scan2sim.perceive import perceive_photo, write_perception
 from scan2sim.scene import build_scene
 from scan2sim.stages import sam3d_objects, verified_objects
@@ -59,10 +59,9 @@ def _photo_looking_at(capture: Capture, room_index: int, element_name: str | Non
     """Most central photo of a RoomPlan element (default: the largest table top)."""
     room = next(r for r in capture.rooms if r.index == room_index)
     scene = build_scene(room.room, probe_count=0)
-    candidates = [b for b in scene.boxes if (b.name == element_name if element_name else b.category == "table")]
-    if not candidates:
+    target = target_surface(scene.boxes, element_name)
+    if target is None:
         raise ValueError(f"no element named {element_name!r}" if element_name else "room has no table")
-    target = max(candidates, key=lambda b: b.half_size[0] * b.half_size[2])
     top_center_world = np.array([target.center[0], target.center[1], target.top_z, 1.0])
     point_arkit = (np.linalg.inv(scene.frame.matrix) @ top_center_world)[:3]
     hits = views_of(point_arkit, capture.photos)
@@ -116,10 +115,23 @@ def objects(args: argparse.Namespace) -> int:
         return 2
     cache = Path(args.cache) if args.cache else None
 
-    image, verified = asyncio.run(verified_objects(load_settings(), photo, cache))
     scene = build_scene(room.room, probe_count=0)
+    surface = target_surface(scene.boxes, args.look_at)
+    if args.look_at and surface is None:
+        print(f"no element named {args.look_at!r} in room {args.room}", file=sys.stderr)
+        return 2
+    image, verified = asyncio.run(verified_objects(load_settings(), photo, cache))
     lifted = {id(o.mask): o for o in lift_masks(capture, view, image, [v.mask for v in verified], scene.frame)}
-    kept = [v for v in verified if id(v.mask) in lifted]
+    # Keep only what lies on the scanned surface (not a shelf above it) before the paid SAM 3D call.
+    kept = []
+    for v in verified:
+        o = lifted.get(id(v.mask))
+        if o is None:
+            continue
+        if surface is not None and not rests_on(surface, o.center[:2], o.bottom_z):
+            print(f"  {v.label}: not on {surface.name} (starts {o.bottom_z - surface.top_z:+.2f} m from its top), skipped")
+            continue
+        kept.append(v)
     reconstructions = asyncio.run(sam3d_objects(image, [v.mask for v in kept], cache))
 
     bodies = []
@@ -139,7 +151,11 @@ def objects(args: argparse.Namespace) -> int:
     paths = write_bundle(capture, room, scene, read_lidar_mesh(room.mesh_ply, room.mesh_colors), Path(args.out))
     moved = _settle_distances(paths.mjcf, [b.name for b in bodies] + ([arm.LINK_NAMES[-1]] if mount else []))
 
-    print(f"{photo.name}: {len(verified)} verified objects, {len(kept)} with LiDAR points, {len(bodies)} SAM 3D bodies")
+    where = f" on {surface.name}" if surface is not None else ""
+    print(
+        f"{photo.name}: {len(verified)} verified objects, {len(lifted)} with LiDAR points, "
+        f"{len(kept)}{where}, {len(bodies)} SAM 3D bodies"
+    )
     for b in bodies:
         size = " x ".join(f"{v * 100:.1f}" for v in b.size)
         print(

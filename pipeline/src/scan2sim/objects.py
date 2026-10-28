@@ -19,11 +19,22 @@ from scan2sim.scene import Box, ScannedObject
 DROP_GAP_M = 0.003  # start just above the support so the drop is gentle
 SUPPORT_TOLERANCE_M = 0.05  # RoomPlan tops can sit a few cm above the real surface
 FOOTPRINT_MARGIN_M = 0.03
+# An object rests on the scanned surface when its lowest LiDAR points start this close to the
+# RoomPlan top: below covers tops placed above the real surface, above covers small stacks
+# (a case on a notebook), while a wall shelf over the table sits ~0.4 m higher.
+ON_SURFACE_BELOW_M = 0.06
+ON_SURFACE_ABOVE_M = 0.10
 
 
 def body_name(index: int, label: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "object"
     return f"obj_{index}_{slug}"
+
+
+def _over_footprint(box: Box, xy: np.ndarray) -> bool:
+    local = box.rotation.T @ (np.array([xy[0], xy[1], box.center[2]]) - box.center)
+    # RoomPlan local axes are x width, y height, z depth, so the footprint is local x/z.
+    return abs(local[0]) <= box.half_size[0] + FOOTPRINT_MARGIN_M and abs(local[2]) <= box.half_size[2] + FOOTPRINT_MARGIN_M
 
 
 def support_top(boxes: tuple[Box, ...], xy: np.ndarray, bottom_z: float) -> float:
@@ -32,11 +43,22 @@ def support_top(boxes: tuple[Box, ...], xy: np.ndarray, bottom_z: float) -> floa
     for box in boxes:
         if not box.collides or box.top_z > bottom_z + SUPPORT_TOLERANCE_M:
             continue
-        local = box.rotation.T @ (np.array([xy[0], xy[1], box.center[2]]) - box.center)
-        # RoomPlan local axes are x width, y height, z depth, so the footprint is local x/z.
-        if abs(local[0]) <= box.half_size[0] + FOOTPRINT_MARGIN_M and abs(local[2]) <= box.half_size[2] + FOOTPRINT_MARGIN_M:
+        if _over_footprint(box, xy):
             best = max(best, box.top_z)
     return best
+
+
+def target_surface(boxes: tuple[Box, ...], element_name: str | None = None) -> Box | None:
+    """The RoomPlan element whose objects are scanned: the named one, else the largest table."""
+    candidates = [b for b in boxes if (b.name == element_name if element_name else b.category == "table")]
+    return max(candidates, key=lambda b: b.half_size[0] * b.half_size[2], default=None)
+
+
+def rests_on(surface: Box, center_xy: np.ndarray, bottom_z: float) -> bool:
+    """Whether an object centred at center_xy, whose LiDAR points start at bottom_z, lies on `surface`."""
+    if not surface.top_z - ON_SURFACE_BELOW_M <= bottom_z <= surface.top_z + ON_SURFACE_ABOVE_M:
+        return False
+    return _over_footprint(surface, center_xy)
 
 
 def build_scanned_object(

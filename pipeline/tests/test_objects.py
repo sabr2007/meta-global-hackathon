@@ -10,7 +10,7 @@ from fixtures import TABLE_H, room_document
 from scan2sim.export import _object_metadata
 from scan2sim.mjcf import scene_to_mjcf
 from scan2sim.object_mesh import HULL_MAX_VERTICES, convex_hull, oriented_size, simplify
-from scan2sim.objects import body_name, support_top
+from scan2sim.objects import body_name, rests_on, support_top, target_surface
 from scan2sim.roomplan import parse_room
 from scan2sim.scene import ScannedObject, build_scene
 
@@ -62,6 +62,32 @@ def test_support_is_the_floor_away_from_furniture(scene):
 
 def test_a_surface_far_above_the_object_is_not_its_support(scene):
     assert support_top(scene.boxes, _table(scene).center[:2], 0.2) == 0.0
+
+
+def test_the_scanned_surface_is_the_largest_table_or_the_named_element(scene):
+    table = _table(scene)
+    assert target_surface(scene.boxes) is table
+    assert target_surface(scene.boxes, table.name) is table
+    assert target_surface(scene.boxes, "no_such_element") is None
+
+
+def test_an_object_whose_points_start_just_below_the_roomplan_top_rests_on_the_table(scene):
+    table = _table(scene)
+    assert rests_on(table, table.center[:2], TABLE_H - 0.02)
+
+
+def test_a_small_stack_on_the_table_still_rests_on_it(scene):
+    table = _table(scene)
+    assert rests_on(table, table.center[:2], TABLE_H + 0.03)
+
+
+def test_an_object_on_a_shelf_over_the_table_does_not_rest_on_it(scene):
+    table = _table(scene)
+    assert not rests_on(table, table.center[:2], TABLE_H + 0.41)
+
+
+def test_an_object_on_the_floor_beside_the_table_does_not_rest_on_it(scene):
+    assert not rests_on(_table(scene), np.array([-1.7, 1.2]), TABLE_H)
 
 
 def test_scanned_object_rests_on_the_table(scene):
