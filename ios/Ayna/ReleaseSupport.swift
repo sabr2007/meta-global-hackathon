@@ -28,10 +28,10 @@ enum CaptureReadiness {
     case .authorized: break
     case .notDetermined:
       guard await AVCaptureDevice.requestAccess(for: .video) else {
-        throw CaptureReadinessError(message: "Camera access is off. Enable Camera for 3D Model Anything in Settings, then try scanning again.")
+        throw CaptureReadinessError(message: "Camera access is off. Enable Camera for Ayna in Settings, then try scanning again.")
       }
     case .denied:
-      throw CaptureReadinessError(message: "Camera access is off. Enable Camera for 3D Model Anything in Settings, then try scanning again.")
+      throw CaptureReadinessError(message: "Camera access is off. Enable Camera for Ayna in Settings, then try scanning again.")
     case .restricted:
       throw CaptureReadinessError(message: "Camera access is restricted on this device. Check Screen Time or device-management restrictions. You can still import and view scans.")
     @unknown default:
@@ -80,21 +80,14 @@ struct HelpDocumentView: View {
 }
 
 struct AppHelpScreen: View {
-  private func publicURL(_ key: String) -> URL? {
-    guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-          let url = URL(string: value), url.scheme == "https", url.host != nil else { return nil }
-    return url
-  }
   var body: some View {
     List {
-      Section("3D Model Anything") {
-        NavigationLink("Scanning, importing & sharing") { HelpDocumentView(resource: "Support") }
-        NavigationLink("Privacy policy") { HelpDocumentView(resource: "PrivacyPolicy") }
-        if let url = publicURL("HouseCapturePrivacyURL") { Link("Privacy policy online", destination: url) }
-        if let url = publicURL("HouseCaptureSupportURL") { Link("Contact support", destination: url) }
+      Section("Ayna") {
+        NavigationLink("Scanning & sharing") { HelpDocumentView(resource: "Support") }
+        NavigationLink("Privacy") { HelpDocumentView(resource: "PrivacyPolicy") }
       }
       Section("Permissions") {
-        Text("The camera is used only while capturing rooms. Importing and reviewing saved scans does not require camera access.")
+        Text("The camera is used only while scanning. Opening and sharing saved mirrors does not require camera access.")
         Button("Open app settings") {
           if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
         }

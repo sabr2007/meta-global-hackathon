@@ -1,0 +1,26 @@
+{
+  "title": "Privacy",
+  "updated": "October 28, 2026",
+  "sections": [
+    {
+      "title": "Your scans stay on this iPhone",
+      "body": "Ayna does not require an account and makes no network requests. Scans, photos, layouts and diagnostics are not sent anywhere. There is no advertising, analytics or tracking."
+    },
+    {
+      "title": "What the app saves",
+      "body": "When you scan, Ayna uses the camera and LiDAR to save room geometry, photos, depth frames, camera poses and a tracking map on the device, plus the device model, system version and technical diagnostics such as tracking errors and memory or thermal conditions. Photos and geometry can reveal private details of your surroundings."
+    },
+    {
+      "title": "Sharing",
+      "body": "Nothing is shared automatically. When you use Share .zip, iOS sends the archive to the app, device or person you choose. Review the destination before sharing; copies you share are not removed when you delete the mirror. Send to Ayna is not available yet; when it is, it will upload only the mirror you choose, when you choose it."
+    },
+    {
+      "title": "Storage and deletion",
+      "body": "Mirrors are stored in the app's Documents folder, also visible in the Files app, and may be included in your device backups. Delete mirror removes a mirror's local files permanently. Temporary ZIP files made for sharing are removed after the share sheet closes."
+    },
+    {
+      "title": "Permissions",
+      "body": "Camera access is requested when you start a scan and can be revoked in Settings. Ayna does not request access to Contacts, location, the microphone or the Photos library."
+    }
+  ]
+}

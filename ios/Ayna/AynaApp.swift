@@ -3,7 +3,7 @@ import AVFoundation
 import UniformTypeIdentifiers
 
 @main
-struct HouseCaptureApp: App {
+struct AynaApp: App {
   var body: some Scene {
     WindowGroup {
       #if DEBUG
@@ -47,7 +47,7 @@ struct HomeView: View {
         LazyVStack(alignment: .leading, spacing: 0) {
           VStack(alignment: .leading, spacing: 14) {
             FieldworkEyebrow(text: "A record of your spaces")
-            Text("3D Model Anything").font(.largeTitle.weight(.bold)).tracking(-1)
+            Text("Ayna").font(.largeTitle.weight(.bold)).tracking(-1)
             Text("Room by room. Every detail.").font(.title3).foregroundStyle(Fieldwork.secondary)
           }.padding(.top, 20).padding(.bottom, 36)
           FieldworkRule()
