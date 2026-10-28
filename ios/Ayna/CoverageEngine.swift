@@ -78,6 +78,9 @@ final class CoverageEngine: @unchecked Sendable {
     /// Material index = coverage band * 3 + shade.
     var bands: [Data]
     var bandCounts: [Int]
+    /// Triangles that the latest photo just turned green, for a brief highlight in the live view
+    var flash = Data()
+    var flashCount = 0
   }
 
   /// Called on main with anchors whose colors (or geometry) changed
@@ -173,8 +176,9 @@ final class CoverageEngine: @unchecked Sendable {
     queue.async {
       self.photos.append(photo)
       var changed: [AnchorMesh] = []
-      for a in self.anchors.values where self.score(a, with: photo) {
-        changed.append(self.mesh(for: a))
+      for a in self.anchors.values where Self.mightSee(photo, a) {
+        let before = a.score
+        if self.score(a, with: photo) { changed.append(self.mesh(for: a, before: before)) }
       }
       for i in self.targets.indices {
         if self.targetScore[i] < 2 {
@@ -534,8 +538,11 @@ final class CoverageEngine: @unchecked Sendable {
 
   // MARK: - outputs
 
-  private func mesh(for a: AnchorData) -> AnchorMesh {
+  /// `before`: the anchor's scores before a new photo, to mark the triangles it turned green
+  private func mesh(for a: AnchorData, before: [Float]? = nil) -> AnchorMesh {
     var bands = [[UInt32]](repeating: [], count: 12)
+    var flash: [UInt32] = []
+    let previous = before.flatMap { $0.count == a.score.count ? $0 : nil }
     var f = 0
     while f + 2 < a.faces.count {
       let i0 = Int(a.faces[f]), i1 = Int(a.faces[f + 1]), i2 = Int(a.faces[f + 2])
@@ -551,6 +558,9 @@ final class CoverageEngine: @unchecked Sendable {
         band = 3
       } else {
         band = Self.band((a.score[i0] + a.score[i1] + a.score[i2]) / 3)
+        if band == 2, let previous, Self.band((previous[i0] + previous[i1] + previous[i2]) / 3) < 2 {
+          flash.append(contentsOf: [a.faces[f], a.faces[f + 1], a.faces[f + 2]])
+        }
       }
       // Stable for a triangle across coverage updates; adjacent faces get different jewel tones.
       let hash = (a.faces[f] &* 73856093) ^ (a.faces[f + 1] &* 19349663) ^ (a.faces[f + 2] &* 83492791)
@@ -564,7 +574,9 @@ final class CoverageEngine: @unchecked Sendable {
       normals: a.localNormals.withUnsafeBufferPointer { Data(buffer: $0) },
       vertexCount: a.local.count,
       bands: bands.map { b in b.withUnsafeBufferPointer { Data(buffer: $0) } },
-      bandCounts: bands.map { $0.count / 3 }
+      bandCounts: bands.map { $0.count / 3 },
+      flash: flash.withUnsafeBufferPointer { Data(buffer: $0) },
+      flashCount: flash.count / 3
     )
   }
 

@@ -135,7 +135,7 @@ struct AutoTestView: View {
   var body: some View {
     Group {
       if let controller {
-        CaptureScreen(controller: controller) {}
+        CaptureScreen(controller: controller, autoFlow: false) {}
           .task { await run(controller) }
       } else {
         Text(failure ?? "Starting…").padding()

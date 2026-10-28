@@ -97,72 +97,141 @@ struct PhotoView {
   }
 }
 
-/// Top-down coverage map. With a camera pose it's heading-up and centered on
-/// you (live, while scanning); without one it's a north-up overview of the room.
+/// Round, top-down radar of the scan. With a camera pose it's heading-up and centred on you
+/// (live, while scanning): rings, a sweeping beam, the camera's field of view, walls and
+/// furniture as dots, lime where a photo covers them and orange where they still need one.
+/// Without a pose it's a north-up overview of the room.
 struct CoverageMap: View {
   var coverage: Coverage
   var camera: simd_float4x4?
   var photos: [SIMD2<Float>] = []
   /// remaining gaps from the detail pass
   var redSpots: [SIMD2<Float>] = []
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  /// one turn of the beam, seconds
+  private static let sweep: Double = 3
+  /// how far behind the beam dots stay lit
+  private static let trail: CGFloat = .pi * 0.6
+  /// horizontal field of view of the photos in portrait (the sensor's short side)
+  private static let fieldOfView: CGFloat = .pi * 54 / 180
+  /// spacing of the dots along walls and furniture, meters
+  private static let dotSpacing: Float = 0.12
+
+  private enum Tone: Int, CaseIterable { case covered, needed, opening, previous, gap, photo }
 
   var body: some View {
-    Canvas { ctx, size in
-      let (toScreen, _) = projection(size: size)
-      let line = { (a: SIMD2<Float>, b: SIMD2<Float>) -> Path in
-        var p = Path()
-        p.move(to: toScreen(a))
-        p.addLine(to: toScreen(b))
-        return p
+    TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion || camera == nil)) { timeline in
+      Canvas { ctx, size in
+        let t = timeline.date.timeIntervalSinceReferenceDate
+        let beam = CGFloat(t.truncatingRemainder(dividingBy: Self.sweep) / Self.sweep) * 2 * .pi - .pi / 2
+        draw(in: &ctx, size: size, beam: camera != nil && !reduceMotion ? beam : nil)
       }
+    }
+    .clipShape(Circle())
+    .overlay(Circle().strokeBorder(AynaTheme.raised, lineWidth: 1))
+    .accessibilityElement()
+    .accessibilityLabel("Coverage radar")
+    .accessibilityValue("\(coverage.coveredWalls) of \(coverage.walls.count) walls photographed")
+  }
 
-      for (a, b) in coverage.previous {
-        ctx.stroke(line(a, b), with: .color(.gray.opacity(0.6)), lineWidth: 3)
+  private func draw(in ctx: inout GraphicsContext, size: CGSize, beam: CGFloat?) {
+    let c = CGPoint(x: size.width / 2, y: size.height / 2)
+    let radius = min(size.width, size.height) / 2
+    func circle(_ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)) }
+
+    ctx.fill(circle(radius), with: .color(AynaTheme.background.opacity(0.84)))
+    for k in 1...3 {
+      ctx.stroke(circle(radius * CGFloat(k) / 3.2), with: .color(AynaTheme.raised), lineWidth: 1)
+    }
+    var cross = Path()
+    cross.move(to: CGPoint(x: c.x - radius, y: c.y)); cross.addLine(to: CGPoint(x: c.x + radius, y: c.y))
+    cross.move(to: CGPoint(x: c.x, y: c.y - radius)); cross.addLine(to: CGPoint(x: c.x, y: c.y + radius))
+    ctx.stroke(cross, with: .color(AynaTheme.raised.opacity(0.6)), lineWidth: 0.5)
+
+    if camera != nil {
+      // what the camera sees: heading-up, so always straight ahead
+      var fov = Path()
+      fov.move(to: c)
+      fov.addArc(center: c, radius: radius, startAngle: .radians(-.pi / 2 - Self.fieldOfView / 2),
+                 endAngle: .radians(-.pi / 2 + Self.fieldOfView / 2), clockwise: false)
+      fov.closeSubpath()
+      ctx.fill(fov, with: .linearGradient(Gradient(colors: [AynaTheme.neutral.opacity(0.32), AynaTheme.neutral.opacity(0.03)]),
+                                          startPoint: c, endPoint: CGPoint(x: c.x, y: c.y - radius)))
+    }
+    if let beam {
+      var sector = Path()
+      sector.move(to: c)
+      sector.addArc(center: c, radius: radius, startAngle: .radians(beam - Self.trail), endAngle: .radians(beam), clockwise: false)
+      sector.closeSubpath()
+      let fraction = Self.trail / (2 * .pi)
+      ctx.fill(sector, with: .conicGradient(Gradient(stops: [
+        .init(color: AynaTheme.neutral.opacity(0), location: 0),
+        .init(color: AynaTheme.neutral.opacity(0.2), location: fraction),
+        .init(color: AynaTheme.neutral.opacity(0), location: min(1, fraction + 0.001)),
+      ]), center: c, angle: .radians(beam - Self.trail)))
+      var line = Path()
+      line.move(to: c)
+      line.addLine(to: CGPoint(x: c.x + cos(beam) * radius, y: c.y + sin(beam) * radius))
+      ctx.stroke(line, with: .color(AynaTheme.neutral.opacity(0.75)), lineWidth: 1.2)
+    }
+
+    // dots, batched into one path per tone and brightness
+    let toScreen = projection(size: size)
+    var paths: [Int: Path] = [:]
+    func dot(_ p: SIMD2<Float>, _ tone: Tone, size r: CGFloat) {
+      let s = toScreen(p)
+      var level = 0
+      if let beam {
+        // lit right after the beam passes, fading over the trail
+        let behind = (beam - atan2(s.y - c.y, s.x - c.x)).truncatingRemainder(dividingBy: 2 * .pi)
+        let delta = behind < 0 ? behind + 2 * .pi : behind
+        level = delta < Self.trail / 3 ? 2 : delta < Self.trail ? 1 : 0
       }
-      for box in coverage.objects {
-        var p = Path()
-        p.addLines(box.corners.map(toScreen))
-        p.closeSubpath()
-        ctx.fill(p, with: .color((box.covered ? Color.green : .orange).opacity(0.25)))
-        ctx.stroke(p, with: .color(box.covered ? .green : .orange), lineWidth: 1)
+      paths[tone.rawValue * 3 + level, default: Path()].addEllipse(in: CGRect(x: s.x - r, y: s.y - r, width: 2 * r, height: 2 * r))
+    }
+    func dots(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ tone: Tone, size r: CGFloat) {
+      let n = max(1, Int((simd_distance(a, b) / Self.dotSpacing).rounded()))
+      for i in 0...n { dot(a + (b - a) * Float(i) / Float(n), tone, size: r) }
+    }
+    for p in photos { dot(p, .photo, size: 1) }
+    for p in redSpots { dot(p, .gap, size: 0.9) }
+    for (a, b) in coverage.previous { dots(a, b, .previous, size: 1.2) }
+    for box in coverage.objects {
+      for i in box.corners.indices { dots(box.corners[i], box.corners[(i + 1) % box.corners.count], box.covered ? .covered : .needed, size: 1.5) }
+    }
+    for wall in coverage.walls {
+      let n = wall.segments.count
+      for (i, covered) in wall.segments.enumerated() {
+        let a = wall.a + (wall.b - wall.a) * Float(i) / Float(n)
+        let b = wall.a + (wall.b - wall.a) * Float(i + 1) / Float(n)
+        dots(a, b, covered ? .covered : .needed, size: wall.lowConfidence ? 1.4 : 1.8)
       }
-      for wall in coverage.walls {
-        let n = wall.segments.count
-        for (i, covered) in wall.segments.enumerated() {
-          let a = wall.a + (wall.b - wall.a) * Float(i) / Float(n)
-          let b = wall.a + (wall.b - wall.a) * Float(i + 1) / Float(n)
-          let style = StrokeStyle(lineWidth: 5, lineCap: .butt, dash: wall.lowConfidence ? [4, 3] : [])
-          ctx.stroke(line(a, b), with: .color(covered ? .green : .red), style: style)
-        }
+    }
+    for gap in coverage.gaps { dots(gap.a, gap.b, .opening, size: 1.6) }
+    for (key, path) in paths {
+      guard let tone = Tone(rawValue: key / 3) else { continue }
+      let base: Color = switch tone {
+      case .covered: AynaTheme.lime
+      case .needed, .gap: AynaTheme.orange
+      case .opening: AynaTheme.neutral
+      case .previous: AynaTheme.reflection
+      case .photo: AynaTheme.text
       }
-      for gap in coverage.gaps {
-        ctx.stroke(line(gap.a, gap.b), with: .color(gap.isWindow ? .cyan : .blue), lineWidth: 8)
-      }
-      for p in redSpots {
-        let s = toScreen(p)
-        ctx.fill(Path(ellipseIn: CGRect(x: s.x - 2, y: s.y - 2, width: 4, height: 4)), with: .color(.red.opacity(0.85)))
-      }
-      for p in photos {
-        let s = toScreen(p)
-        ctx.fill(Path(ellipseIn: CGRect(x: s.x - 1.5, y: s.y - 1.5, width: 3, height: 3)), with: .color(.pink.opacity(0.8)))
-      }
-      if camera != nil {
-        // you, pointing up
-        let c = CGPoint(x: size.width / 2, y: size.height / 2)
-        var arrow = Path()
-        arrow.move(to: CGPoint(x: c.x, y: c.y - 9))
-        arrow.addLine(to: CGPoint(x: c.x + 6, y: c.y + 6))
-        arrow.addLine(to: CGPoint(x: c.x, y: c.y + 2))
-        arrow.addLine(to: CGPoint(x: c.x - 6, y: c.y + 6))
-        arrow.closeSubpath()
-        ctx.fill(arrow, with: .color(.white))
-      }
+      let dim: Double = tone == .gap ? 0.45 : tone == .photo ? 0.35 : 0.72
+      ctx.fill(path, with: .color(base.opacity([dim, (dim + 1) / 2, 1][key % 3])))
+    }
+
+    if camera != nil {
+      // you
+      ctx.fill(circle(4.5), with: .color(AynaTheme.text))
+      ctx.stroke(circle(4.5), with: .color(AynaTheme.background), lineWidth: 1.5)
     }
   }
 
   /// world (x, z) → screen, fitted to everything drawn
-  private func projection(size: CGSize) -> ((SIMD2<Float>) -> CGPoint, Float) {
-    let all = coverage.walls.flatMap { [$0.a, $0.b] } + coverage.previous.flatMap { [$0.0, $0.1] }
+  private func projection(size: CGSize) -> (SIMD2<Float>) -> CGPoint {
+    let all = coverage.walls.flatMap { [$0.a, $0.b] } + coverage.previous.flatMap { [$0.0, $0.1] } + coverage.objects.flatMap(\.corners)
     if let camera {
       let pos = SIMD2(camera.columns.3.x, camera.columns.3.z)
       let f = -SIMD2(camera.columns.2.x, camera.columns.2.z)
@@ -170,20 +239,21 @@ struct CoverageMap: View {
       let beta = -heading
       let radius = max(2.5, all.map { simd_distance($0, pos) }.max() ?? 2.5) + 0.3
       let scale = Float(min(size.width, size.height)) / 2 / radius
-      return ({ p in
+      return { p in
         let d = p - pos
         let x = cos(beta) * d.x - sin(beta) * d.y
         let y = sin(beta) * d.x + cos(beta) * d.y
         return CGPoint(x: CGFloat(x * scale) + size.width / 2, y: CGFloat(y * scale) + size.height / 2)
-      }, scale)
+      }
     }
     let lo = all.reduce(SIMD2<Float>(repeating: .infinity)) { simd_min($0, $1) }
     let hi = all.reduce(SIMD2<Float>(repeating: -.infinity)) { simd_max($0, $1) }
-    let span = all.isEmpty ? SIMD2<Float>(1, 1) : simd_max(hi - lo, SIMD2(1, 1))
-    let scale = min(Float(size.width) / (span.x + 0.6), Float(size.height) / (span.y + 0.6))
+    // fit the room's diagonal inside the circle
+    let span = all.isEmpty ? Float(1) : max(1, simd_length(hi - lo))
+    let scale = Float(min(size.width, size.height)) / (span + 0.6)
     let mid = all.isEmpty ? .zero : (lo + hi) / 2
-    return ({ p in
+    return { p in
       CGPoint(x: CGFloat((p.x - mid.x) * scale) + size.width / 2, y: CGFloat((p.y - mid.y) * scale) + size.height / 2)
-    }, scale)
+    }
   }
 }

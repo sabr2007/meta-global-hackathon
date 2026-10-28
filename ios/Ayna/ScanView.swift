@@ -18,12 +18,13 @@ final class ScanView: NSObject, ARSCNViewDelegate {
   private let outline = SCNNode()
   private var lastOutline: CFTimeInterval = 0
 
-  /// Red facets need photos; green facets have good photo coverage.
-  /// Keep the camera visible through the fill and trace the actual LiDAR triangles on top.
+  /// Orange facets need photos; lime facets have good photo coverage (score ≥
+  /// `CoverageEngine.goodScore`, bands 0–1 vs 2). Keep the camera visible through the fill and
+  /// trace the actual LiDAR triangles on top.
   private let materials: [SCNMaterial] = [
-    (0xFF3939, 0.28), (0xF94B4B, 0.23), (0xE82B2B, 0.25),
-    (0xFF3939, 0.28), (0xF94B4B, 0.23), (0xE82B2B, 0.25),
-    (0x39ED75, 0.24), (0x51F589, 0.22), (0x26D966, 0.23),
+    (0xEE7F35, 0.30), (0xF28F4C, 0.25), (0xE2712A, 0.27),
+    (0xEE7F35, 0.30), (0xF28F4C, 0.25), (0xE2712A, 0.27),
+    (0xB8FF5E, 0.26), (0xC6FF7D, 0.23), (0xA6F046, 0.25),
     (0xFFFFFF, 0.0), (0xFFFFFF, 0.0), (0xFFFFFF, 0.0),
   ].map { hex, alpha in
     let m = SCNMaterial()
@@ -61,8 +62,20 @@ final class ScanView: NSObject, ARSCNViewDelegate {
   private let openingLine: SCNMaterial = {
     let m = SCNMaterial()
     m.lightingModel = .constant
-    m.diffuse.contents = UIColor.cyan
+    m.diffuse.contents = AynaTheme.uiNeutral
     m.readsFromDepthBuffer = false
+    return m
+  }()
+  /// Triangles a new photo just covered glow lime for a moment, then fade
+  private let flashMaterial: SCNMaterial = {
+    let m = SCNMaterial()
+    m.lightingModel = .constant
+    m.diffuse.contents = AynaTheme.uiLime
+    m.transparency = 0.8
+    m.blendMode = .add
+    m.isDoubleSided = false
+    m.readsFromDepthBuffer = true // same surface as the fill, drawn after it like the triangle lines
+    m.writesToDepthBuffer = false
     return m
   }()
 
@@ -154,7 +167,7 @@ final class ScanView: NSObject, ARSCNViewDelegate {
     }
   }
 
-  /// RoomPlan's current walls (white) and doors/windows/openings (cyan), as outlines
+  /// RoomPlan's current walls (white) and doors/windows/openings (grey), as outlines
   func showRoom(_ room: CapturedRoom?) {
     let now = CACurrentMediaTime()
     guard room == nil || now - lastOutline > 0.4 else { return } // RoomPlan updates a lot
@@ -285,7 +298,24 @@ final class ScanView: NSObject, ARSCNViewDelegate {
         reveal.timingMode = .easeOut
         node.runAction(reveal, forKey: "scan-reveal")
       }
+      if m.flashCount > 0 && !UIAccessibility.isReduceMotionEnabled { flash(m, vertices: vertices, on: node) }
     }
+  }
+
+  /// A short lime glow on the triangles a new photo just turned from orange to lime
+  private func flash(_ m: CoverageEngine.AnchorMesh, vertices: SCNGeometrySource, on node: SCNNode) {
+    node.childNode(withName: "scan-flash", recursively: false)?.removeFromParentNode()
+    let geometry = SCNGeometry(sources: [vertices], elements: [
+      SCNGeometryElement(data: m.flash, primitiveType: .triangles, primitiveCount: m.flashCount, bytesPerIndex: 4)
+    ])
+    geometry.materials = [flashMaterial]
+    let glow = SCNNode(geometry: geometry)
+    glow.name = "scan-flash"
+    glow.renderingOrder = 2
+    node.addChildNode(glow)
+    let fade = SCNAction.fadeOut(duration: 0.55)
+    fade.timingMode = .easeOut
+    glow.runAction(.sequence([fade, .removeFromParentNode()]))
   }
 }
 

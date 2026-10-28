@@ -145,6 +145,8 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   }()
   private lazy var depthRecorder = DepthRecorder(bundle: bundle)
   private let cameraControl = CameraControl()
+  /// a light tap for every automatic photo
+  private let photoHaptic = UIImpactFeedbackGenerator(style: .light)
   private var meshReadyAt: TimeInterval?
   /// mesh export taken just before RoomPlan stops (stopping reconfigures the session)
   private var preStopMesh: Result<(vertices: Int, faces: Int, covered: Float), Error>?
@@ -1527,6 +1529,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
           self.photoCount = self.photos.count
           self.roomPhotoCount += 1
           self.refreshCoverage()
+          if !manual { self.photoHaptic.impactOccurred() }
         } else {
           self.lastWarning = "A photo could not be saved. Check available storage before continuing."
           self.diagnostics.log("JPEG write failed: \(record.file)", since: self.startedAt)
