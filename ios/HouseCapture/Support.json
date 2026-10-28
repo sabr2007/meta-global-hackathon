@@ -1,0 +1,42 @@
+{
+  "title": "Help & support",
+  "updated": "October 7, 2026",
+  "sections": [
+    {
+      "title": "Supported devices",
+      "body": "Scanning requires a LiDAR-equipped iPhone Pro or iPad Pro running iOS or iPadOS 17 or later. Other supported devices can import, view, and share existing scans. A Mac companion app is not required."
+    },
+    {
+      "title": "Scan a room",
+      "body": "Create a house, choose Scan a room, and give the room a name. Allow camera access when prompted. Move slowly around the room in good light, keeping furniture and walls in view. Photos save automatically. Finish room keeps the available scan; you can stop before all surfaces have useful photos. Verify measurements before using them for precision work."
+    },
+    {
+      "title": "Camera access is off",
+      "body": "Open Help & privacy → Open app settings and enable Camera. If Camera is restricted, check Screen Time or your device-management policy. Saved scans remain available without camera access."
+    },
+    {
+      "title": "Import a shared room",
+      "body": "Save a 3D Model Anything room or session ZIP to Files. Tap the ZIP in Files to extract it. In 3D Model Anything, tap the import icon at the top left and choose the extracted folder containing manifest.json. If Files created an extra outer folder, select the inner folder with that file. Whole-house folder import is not supported; share a room or session instead. Each import creates a new house and leaves the original folder unchanged."
+    },
+    {
+      "title": "Share and AirDrop",
+      "body": "Open a room and tap Share room, then choose AirDrop or another destination in the system share sheet. This shares the active scan’s layout, mesh, photos and depth data. Use Scan history → Use this scan to share an older version. The house options menu can share the whole house, and Sessions can share an entire capture session. No receiver, companion app, or account is needed."
+    },
+    {
+      "title": "Photo detail and previews",
+      "body": "Photo detail measures useful photography on observed mesh surfaces, not how much of the room has been scanned. Rotate the 3D preview or switch to Photo detail to inspect gaps. A scan may initially appear in clay colours while photo colouring finishes. Some nearby geometry may be present in the saved mesh."
+    },
+    {
+      "title": "Interrupted scans and storage",
+      "body": "Recording pauses when the app goes into the background or tracking becomes unreliable. Return to the app, recover the previous view, and resume when ready. If tracking cannot recover, finish the room and keep what was captured. Keep at least 500 MB free before scanning; long scans need more. The app pauses new recording when available storage falls below 200 MB so you can finish and free space. These checks cannot guarantee a save if other apps consume the remaining storage."
+    },
+    {
+      "title": "Recover or remove a room",
+      "body": "Room options → Delete room moves it to Recently Deleted, below the house’s room list. Restore it there or delete it permanently. Deleting a house removes its scans permanently after confirmation. Shared files and device backups are separate copies."
+    },
+    {
+      "title": "If something goes wrong",
+      "body": "Keep the original scan. Note your device model, iOS/iPadOS version, app version (shown in Help & privacy), the action that failed and the exact error. Do not include private room photos or scan exports in a support message unless you choose to share them. Use the support contact on the published App Store listing."
+    }
+  ]
+}

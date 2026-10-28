@@ -1,0 +1,34 @@
+{
+  "title": "Privacy policy",
+  "updated": "October 7, 2026",
+  "sections": [
+    {
+      "title": "Your scans stay under your control",
+      "body": "3D Model Anything does not require an account and does not send scans, photos, room layouts, or usage analytics to the developer. The app has no advertising, tracking, or developer-operated cloud service."
+    },
+    {
+      "title": "What the app saves",
+      "body": "When you scan, the app uses the camera and LiDAR to save room geometry, reference photos, depth frames, camera poses, and tracking maps on your device. It also saves room names, scan times, device and system information, and technical diagnostics such as tracking errors and memory or thermal conditions. Photos and room geometry can reveal private details of your surroundings."
+    },
+    {
+      "title": "Permissions",
+      "body": "Camera access is requested when you start a scan. You can revoke it in the device Settings app. Importing, reviewing, deleting, and sharing existing scans does not require camera access. The app does not request access to your Contacts, location, microphone, or Photos library."
+    },
+    {
+      "title": "Sharing and Files",
+      "body": "Nothing is shared automatically. When you use Share, iOS sends the exported ZIP to the app, service, device, or person you choose. Exports may contain reference photos and other recorded scan data, including technical diagnostics in session or whole-house exports. A room mesh can include nearby surfaces recorded during the same session. Review the destination before sharing. Copies you share or save elsewhere are controlled by that destination and are not removed when you delete the original."
+    },
+    {
+      "title": "Storage, backups and deletion",
+      "body": "Scans are stored in the app’s Documents folder, also accessible through Files. Your device backup settings may include this data in an Apple device backup. The app itself does not synchronize scans to a developer server. Rooms and individual scan versions moved to Recently Deleted remain stored until you restore them or explicitly delete them permanently. Deleting a house permanently removes its local scan data. Device backups and exported copies must be managed separately."
+    },
+    {
+      "title": "Imported scans and temporary exports",
+      "body": "When you import a folder, the app copies its room data into local storage. The original folder remains where you selected it. Temporary ZIP files are used to prepare shares and are removed after the share sheet closes; abandoned temporary shares are cleaned up later."
+    },
+    {
+      "title": "Changes and support",
+      "body": "This policy describes this version of 3D Model Anything. Updates will include a revised policy if the app’s data practices change. Support contact information is provided on the app’s App Store support page once published."
+    }
+  ]
+}
