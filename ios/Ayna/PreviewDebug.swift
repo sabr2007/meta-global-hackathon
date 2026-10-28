@@ -27,14 +27,6 @@ enum PreviewDebug {
   /// The view to show instead of the home screen, when launched with `-preview-house`.
   /// App entry: `if let preview = PreviewDebug.launchView() { preview } else { … }`
   @MainActor static func launchView() -> AnyView? {
-    #if DEBUG
-    // Open the real Fieldwork room screen against simulator fixtures for visual checks.
-    if let houseID = value("-fieldwork-house"), let roomID = value("-fieldwork-room") {
-      return AnyView(NavigationStack {
-        FieldworkRoomScreen(houseID: houseID, roomID: roomID, generation: 0, onCapture: { _, _, _, _ in })
-      }.tint(Fieldwork.orange).preferredColorScheme(.light))
-    }
-    #endif
     guard let path = value("-preview-house") else { return nil }
     let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     let url = path.hasPrefix("/") ? URL(fileURLWithPath: path, isDirectory: true) : docs.appendingPathComponent(path, isDirectory: true)
