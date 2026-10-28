@@ -71,11 +71,14 @@ always starts in a fresh ARKit world. The app never relocalizes against an earli
    pose lands in the scan's own world frame. The screen asks you to frame the whole work surface
    and shows a horizon level that turns lime within 1.5°. The shutter waits up to a second for a
    steady camera. It then takes a full-resolution still through ARKit's
-   `captureHighResolutionFrame` (the same path as the high-resolution auto photos) and falls back
-   to the video frame if the still fails. A depth frame is recorded at the same pose. You can
-   *Retake* or *Use it*. *Skip* saves the scan without a hero shot, and *Back* returns to scanning.
-4. **Review.** The mirror opens by itself once it is saved. It shows the name (rename from the
-   menu) and the 3D preview, coloured from the photos. It also shows counters for photos, depth
+   `captureHighResolutionFrame` (the same path as the high-resolution auto photos). It keeps the
+   still only if it is larger than the video frame and shows the same view (within 20 cm and
+   12°); otherwise it uses the video frame. A depth frame is recorded at the moment of the shot.
+   You can *Retake* or *Use it*. *Skip* saves the scan without a hero shot, and *Back* returns to
+   scanning.
+4. **Review.** The mirror opens by itself once it is saved. If saving reported a problem, the scan
+   screen first shows it on a *Saved* card. The review shows the name (rename from the menu) and
+   the 3D preview, coloured from the photos. It also shows counters for photos, depth
    frames and coverage, and the hero shot.
 5. **Share .zip.** Exports this mirror's bundle through the share sheet (AirDrop, Files, …).
    *Send to Ayna* is a placeholder marked *Coming soon*; the app makes no network requests.
@@ -107,11 +110,12 @@ Mirror 01.zip
   ARKit's: metres, +Y up. `intrinsics` is a column-major 3×3 that matches the JPEG pixels.
 - **Hero shot**: exactly one photo has `"hero": true`. It uses the same conventions as every
   other photo and is usually a full-resolution still (`"highRes": true`). The depth frame
-  closest in time was recorded at the same pose. Until the pipeline reads the flag, pass the
+  closest in time was recorded during the shot, from the same view. Until the pipeline reads the flag, pass the
   hero's file stem by hand, for example `scan2sim objects "Mirror 01.zip" --photo 0042`.
 
 On the phone, mirrors live in `Documents/Houses/ayna/`: `house.json` plus one
-`sessions/<date>/` folder per mirror. The folder is also visible in the Files app. The upstream
+`sessions/<date>/` folder per mirror. The folder is also visible in the Files app. A scan killed
+before its room was saved cannot become a mirror, so Home deletes its folder the next time it opens. The upstream
 house / zone / session model is still underneath: Ayna keeps one implicit house and gives each
 scan its own tracking group. The session's ARKit world map is still saved, which keeps the
 option of relocalizing on the same table later, for example to show the robot in AR.

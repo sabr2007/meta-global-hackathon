@@ -4,9 +4,19 @@ All of `ios/` after the upstream import was written on Linux, with no Xcode. Two
 possible there:
 
 - **Syntax**: every file passes `swiftc -parse` with Swift 6.4.1 (`docker run swift:6.4-noble`).
-- **Review**: a read-through for type errors, API signatures and actor isolation.
+- **Review**: a second, independent review compared every new call with the real upstream
+  declarations: signatures, labels, access levels. It also type-checked the riskiest
+  constructs with `swiftc -typecheck -swift-version 5` against stubbed Apple types:
+  - `ResumeOnce` with `withCheckedContinuation`;
+  - CGFloat → Double conversions into `.radians`;
+  - the `case … where` switch patterns;
+  - memberwise inits next to private `@State`;
+  - `@discardableResult save`.
+  
+  It found no compile errors. Its logic findings are fixed: warnings while saving, the hero
+  still check, room-scoped retake, abandoned scans and the closed-controller guard.
 
-Neither replaces a compile, so expect a few fixes on the first Xcode 27 build. This file lists
+Neither replaces a compile against the real SDK, so expect a few fixes on the first Xcode 27 build. This file lists
 what is most likely to need attention, file by file, and what to check on the iPhone 13 Pro.
 
 ## Generating the project
@@ -83,13 +93,20 @@ The upstream sources that the new code calls (`PreviewModel`, `PreviewScene.scen
 - The line turns lime within 1.5°, with a selection tick.
 - The shutter shows *Hold still…* for up to about 4 s, then the confirm card with the photo upright.
 - In the shared bundle, `photos/photos.json` has exactly one `"hero": true`. Expect
-  `"highRes": true`; `false` means the fallback video frame was used. The export strips
+  `"highRes": true`. `false` means the video frame was used: the still failed, was late or
+  blurred, was not larger than the video frame, or showed a different view (more than 20 cm or
+  12° away). The export strips
   diagnostics, so look at the session's `diagnostics.json` on the phone (Files → Ayna →
   `Houses/ayna/sessions/…`) to see why. `depth/frames.json` should have a frame with almost
   the same `timestamp` and pose. *Retake* removes the flag from the earlier photo and keeps the
   photo.
 - *Use it* shows "Saving Mirror 01…", then the map save (up to 6 s, "keep the camera moving
-  slowly"), then the review opens by itself.
+  slowly"), then the review opens by itself. If anything went wrong while saving (a RoomPlan
+  layout error, a file that couldn't be written), the screen stops on a *Saved* card that shows
+  the warning, and *Open mirror* continues.
+- If RoomPlan ends on its own while the hero confirm card is up, the shown hero shot is kept
+  (`"hero": true`) even though *Use it* was not tapped. This is deliberate: it is a valid
+  "before" photo. If RoomPlan ends before any hero shot, the mirror has none.
 
 **Review**
 
@@ -101,6 +118,9 @@ The upstream sources that the new code calls (`PreviewModel`, `PreviewScene.scen
 - The zip holds exactly one `manifest.json`, under `Room/`.
 - *Rename mirror*, then *Delete mirror* from the menu and from Home's long-press: the session
   folder under `Documents/Houses/ayna/sessions/` disappears.
+- Kill the app in the middle of a scan, then reopen it. Home removes that unfinished session
+  folder: no rooms, no `endedAt`, nothing in its manifest. Scans whose room was saved are kept
+  even if the session never finished.
 
 **Debug builds:** run `-selftest`. It should still pass, because the house model, export and
 coverage scoring are unchanged.

@@ -163,6 +163,7 @@ struct HomeView: View {
 
   private func reload() {
     do {
+      if capture == nil { try? MirrorLibrary.removeAbandonedScans() }
       let house = try MirrorLibrary.house()
       let list = MirrorLibrary.mirrors(in: house)
       var bundles: [String: ScanBundle] = [:]

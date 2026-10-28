@@ -68,6 +68,9 @@ struct HeroShotOverlay: View {
   }
 
   @ViewBuilder private func status(level: Bool) -> some View {
+    if let warning = controller.lastWarning, !controller.heroInFlight {
+      pill(warning, dot: AynaTheme.orange)
+    }
     if controller.paused {
       VStack(alignment: .leading, spacing: 10) {
         pill("Paused. Resume to take the hero shot.", dot: AynaTheme.orange)

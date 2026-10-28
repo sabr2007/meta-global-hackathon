@@ -670,7 +670,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     roomName = room.name
     selectedRoomID = room.id
   }
-  var canStartRoom: Bool { phase == .betweenRooms && !sessionNeedsRestart && !recordingSaveFailed && !requiresFreshScan && !roomName.trimmingCharacters(in: .whitespaces).isEmpty }
+  var canStartRoom: Bool { !closed && phase == .betweenRooms && !sessionNeedsRestart && !recordingSaveFailed && !requiresFreshScan && !roomName.trimmingCharacters(in: .whitespaces).isEmpty }
 
   func startRoom() {
     guard canStartRoom else { return }
@@ -1655,7 +1655,7 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
   }
 
   private func retireHeroPhoto() {
-    if let i = photos.lastIndex(where: { $0.hero == true }) { photos[i].hero = nil }
+    if let i = photos.lastIndex(where: { $0.hero == true && $0.room == roomIndex }) { photos[i].hero = nil }
     heroPhoto = nil
   }
 
@@ -1678,7 +1678,9 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
         return
       }
       var shot = video
-      if let still = await heroStill() {
+      // the still only if it beats the video frame and shows the same view (upstream's check)
+      if let still = await heroStill(), still.resolution.width > video.resolution.width,
+         Self.sameView(still.transform, video.transform) {
         shot = still
         shot.depth = video.depth // the video frame's depth, a moment earlier, same view
       }
@@ -1703,6 +1705,12 @@ final class CaptureController: NSObject, ObservableObject, RoomCaptureSessionDel
     shot.depth = DepthRecorder.grid(for: frame)
     shot.camera = cameraControl.state(for: frame)
     return shot
+  }
+
+  /// Within 20 cm and 12°: two frames that show the same thing
+  private static func sameView(_ a: simd_float4x4, _ b: simd_float4x4) -> Bool {
+    let va = PhotoView(transform: a), vb = PhotoView(transform: b)
+    return simd_distance(va.position, vb.position) < 0.2 && simd_dot(va.forward, vb.forward) > cos(Float.pi / 15)
   }
 
   /// A full-resolution still, or nil if unsupported, failed, late (3 s), blurred or untracked

@@ -72,7 +72,8 @@ struct CaptureScreen: View {
       case .betweenRooms where !controller.rooms.isEmpty:
         Task { await controller.finishSession() } // one room per mirror
       case .done:
-        onClose()
+        // a problem reported while saving is shown on the Saved card before leaving
+        if controller.lastWarning == nil { onClose() }
       default:
         break
       }
@@ -162,7 +163,7 @@ struct CaptureScreen: View {
     case .finishing:
       statusCard(controller.finishingStep.isEmpty ? "Saving…" : controller.finishingStep)
     case .done:
-      statusCard("Saved")
+      savedCard
     case .failed(let message):
       failedCard(message)
     }
@@ -287,6 +288,26 @@ struct CaptureScreen: View {
     HStack(spacing: 12) {
       ProgressView().tint(AynaTheme.lime)
       Text(text).font(.subheadline.weight(.medium))
+    }
+    .frame(maxWidth: 500)
+    .aynaCard(AynaTheme.surface.opacity(0.96))
+  }
+
+  /// Seen only when saving reported a problem (otherwise the screen closes by itself)
+  private var savedCard: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 8) {
+        StatusDot(color: AynaTheme.lime)
+        Text("Saved").font(.headline)
+      }
+      if let warning = controller.lastWarning {
+        HStack(alignment: .top, spacing: 8) {
+          StatusDot(color: AynaTheme.orange).padding(.top, 5)
+          Text(warning).font(.footnote).fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      Button("Open mirror", action: onClose)
+        .buttonStyle(AynaButtonStyle(kind: .lime))
     }
     .frame(maxWidth: 500)
     .aynaCard(AynaTheme.surface.opacity(0.96))

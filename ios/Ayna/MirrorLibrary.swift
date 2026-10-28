@@ -84,6 +84,19 @@ enum MirrorLibrary {
     return controller
   }
 
+  /// A scan the app never finished (killed mid-scan, before its room was saved) can't be shown
+  /// or shared; remove its folder so it doesn't keep its photos and depth forever. Call only
+  /// while no capture is running.
+  @MainActor static func removeAbandonedScans() throws {
+    let house = try house()
+    for session in house.sessions where session.rooms.isEmpty && session.endedAt == nil {
+      let referenced = house.rooms.contains { $0.history.contains { $0.session == session.id } }
+      let savedRoom = !(house.bundle(for: session).manifest?.rooms.isEmpty ?? true)
+      guard !referenced, !savedRoom else { continue }
+      try HouseProject.deleteSession(houseID: houseID, sessionID: session.id)
+    }
+  }
+
   /// Removes the mirror's session folder, its rooms in house.json and its empty tracking group
   @MainActor static func delete(_ mirror: Mirror) throws {
     try HouseProject.deleteSession(houseID: houseID, sessionID: mirror.session)
