@@ -32,7 +32,12 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
-        UILaunchScreen: {}
+        # dark everywhere, including the launch screen (#1B1B1C)
+        UIUserInterfaceStyle: Dark
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        # Michroma (titles), Doto static instances (numbers); OFL, see Fonts/OFL-*.txt
+        UIAppFonts: [Michroma-Regular.ttf, Doto-Bold.ttf, Doto-Black.ttf]
         # camera/AR app: full screen, portrait only
         UIRequiresFullScreen: true
         UIStatusBarHidden: false

@@ -63,19 +63,20 @@ struct HelpDocumentView: View {
     ScrollView {
       if let document = HelpDocument.load(resource) {
         VStack(alignment: .leading, spacing: 24) {
-          Text(document.title).font(.largeTitle.bold())
-          FieldworkEyebrow(text: "Updated \(document.updated)")
+          Text(document.title).font(.michroma(26, relativeTo: .largeTitle))
+          AynaEyebrow(text: "Updated \(document.updated)")
           ForEach(document.sections) { section in
             VStack(alignment: .leading, spacing: 8) {
               Text(section.title).font(.headline)
-              Text(section.body).foregroundStyle(Fieldwork.secondary).textSelection(.enabled)
+              Text(section.body).foregroundStyle(AynaTheme.secondary).textSelection(.enabled)
             }
+            .aynaCard()
           }
-        }.padding(24).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
+        }.padding(20).frame(maxWidth: 680, alignment: .leading).frame(maxWidth: .infinity)
       } else {
-        ContentUnavailableView("Help is unavailable", systemImage: "doc.text", description: Text("Please reinstall the app update to restore its bundled help."))
+        ContentUnavailableView("Help is unavailable", systemImage: "doc.text", description: Text("Please reinstall the app to restore its bundled help."))
       }
-    }.background(Fieldwork.paper).foregroundStyle(Fieldwork.ink)
+    }.background(AynaTheme.background).foregroundStyle(AynaTheme.text)
   }
 }
 
@@ -86,18 +87,23 @@ struct AppHelpScreen: View {
         NavigationLink("Scanning & sharing") { HelpDocumentView(resource: "Support") }
         NavigationLink("Privacy") { HelpDocumentView(resource: "PrivacyPolicy") }
       }
+      .listRowBackground(AynaTheme.surface)
       Section("Permissions") {
         Text("The camera is used only while scanning. Opening and sharing saved mirrors does not require camera access.")
         Button("Open app settings") {
           if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
         }
       }
+      .listRowBackground(AynaTheme.surface)
       Section("About") {
         Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))")
-        Text("Scans are approximate. Verify measurements before construction or other precision work.").font(.footnote)
+        Text("Built on the open-source 3D Model Anything capture app by Wes Bos (MIT).").font(.footnote).foregroundStyle(AynaTheme.secondary)
+        Text("Fonts: Michroma and Doto, SIL Open Font License 1.1.").font(.footnote).foregroundStyle(AynaTheme.secondary)
+        Text("Scans are approximate. Verify measurements before precision work.").font(.footnote).foregroundStyle(AynaTheme.secondary)
       }
+      .listRowBackground(AynaTheme.surface)
     }
-    .scrollContentBackground(.hidden).background(Fieldwork.paper)
-    .navigationTitle("Help & privacy").navigationBarTitleDisplayMode(.inline)
+    .scrollContentBackground(.hidden).background(AynaTheme.background)
+    .navigationTitle("About Ayna").navigationBarTitleDisplayMode(.inline)
   }
 }
