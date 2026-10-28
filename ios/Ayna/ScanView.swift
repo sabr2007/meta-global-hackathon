@@ -71,8 +71,8 @@ final class ScanView: NSObject, ARSCNViewDelegate {
     let m = SCNMaterial()
     m.lightingModel = .constant
     m.diffuse.contents = AynaTheme.uiLime
-    m.transparency = 0.8
-    m.blendMode = .add
+    m.transparency = 0.7
+    m.blendMode = .alpha // .add would wash out to white over a bright camera image
     m.isDoubleSided = false
     m.readsFromDepthBuffer = true // same surface as the fill, drawn after it like the triangle lines
     m.writesToDepthBuffer = false
