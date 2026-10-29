@@ -87,7 +87,8 @@ flowchart LR
   clear long axis); 3 cm is half the smallest object on our desks, Meta's Habitat "tidy house" uses 15 cm
   at room scale. The score is *requested moves done × objects left in place*, so a refused or failed move
   always costs points. Positions are checked against the goals the robots were sent to; the independent
-  check is how well the twin, rendered from the photo's camera, overlaps the imagined photo's masks.
+  check compares the twin, rendered from the photo's camera, with the imagined photo itself: how well the
+  silhouettes overlap, and how far apart their centres are on the table, in centimetres.
 - **Feasible before it is shown.** A version passes only if, for every move, some robot can pick the
   object and put it down where its gripped footprint will land, on the same surface, not on an object
   that stays; otherwise it is rejected with the blocking number, and Spark's next note to the editor
