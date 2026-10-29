@@ -12,11 +12,13 @@
 //   camera     only what the photo shows: the centre of the object's SAM 3.1 mask cast onto the table
 //   noise-1cm  the simulator's pose plus 1 cm of random error (seeded per episode and object)
 //   noise-2cm  the same with 2 cm
+//   module:<name>  your own perception model: --perception my-model.mjs (see scripts/perception-example.mjs)
 //
 // Runs are read from the server in AYNA_URL as AYNA_EMAIL (scripts/session.ts).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import loadMujoco from '@mujoco/mujoco';
 import { scans } from '../src/ayna/client';
 import { checkPlan } from '../src/ayna/dispatch';
@@ -36,7 +38,15 @@ import { login } from './session';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SETTLE_S = 1.5;
 const POLICIES = ['exact', 'camera', 'noise-1cm', 'noise-2cm'] as const;
-type Policy = (typeof POLICIES)[number];
+type Policy = (typeof POLICIES)[number] | `module:${string}`;
+
+/** Your own perception model, from `--perception file.mjs`: where it thinks each object is (world xy,
+ * metres) from what the photo shows, or null to fall back to the true pose. */
+interface Perception {
+  name: string;
+  locate(object: SceneObject, photo: { camera: SceneContext['camera']; mask: Rle | null }): [number, number] | null;
+}
+let custom: Perception | null = null;
 
 function args(name: string): string[] {
   return process.argv.flatMap((arg, i) => (arg === `--${name}` && process.argv[i + 1] ? [process.argv[i + 1]] : []));
@@ -68,6 +78,10 @@ function perceptionOf(policy: Policy, episode: string, ctx: SceneContext): Map<s
     if (policy === 'camera') {
       const before = ctx.before.find((b) => b.object === object.name);
       const seen = before ? placeOnPlane(ctx.camera, before.rle, object.start[2]).center : null;
+      errors.set(object.name, seen ? [seen[0] - object.start[0], seen[1] - object.start[1]] : [0, 0]);
+    } else if (policy.startsWith('module:') && custom) {
+      const mask = ctx.before.find((b) => b.object === object.name)?.rle ?? null;
+      const seen = custom.locate(object, { camera: ctx.camera, mask });
       errors.set(object.name, seen ? [seen[0] - object.start[0], seen[1] - object.start[1]] : [0, 0]);
     } else if (policy !== 'exact') {
       errors.set(object.name, gaussian(seeded(`${episode}/${object.name}`), policy === 'noise-1cm' ? 0.01 : 0.02));
@@ -142,8 +156,13 @@ async function main(): Promise<void> {
   const scanId = args('scan')[0] ?? 'desk-sam3d';
   const since = args('since')[0] ?? '';
   const policies = (args('policy').length ? args('policy') : [...POLICIES]) as Policy[];
-  const unknown = policies.filter((p) => !POLICIES.includes(p));
+  const unknown = policies.filter((p) => !(POLICIES as readonly string[]).includes(p));
   if (unknown.length) throw new Error(`unknown policy ${unknown.join(', ')}; pick from ${POLICIES.join(', ')}`);
+  const module = args('perception')[0];
+  if (module) {
+    custom = ((await import(pathToFileURL(path.resolve(module)).href)) as { default: Perception }).default;
+    policies.push(`module:${custom.name}`);
+  }
   const scene = loadScene(scanId);
   const { session, owner } = await login();
   const cards = (await scans.runs(session, owner, scanId)).runs.filter((r) => r.score !== null && r.created >= since);

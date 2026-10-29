@@ -41,3 +41,13 @@ the success rule Ayna's own receipt uses. In the app: a run's receipt → **Expo
 pose with its goal using `success`. `web/scripts/policies.ts` does exactly this for Ayna's own robots under
 four kinds of perception, with the app's verifier (`web/src/ayna/verify.ts`), and is the place to plug in
 another controller: `replay()` builds the twin, runs the plan and measures it.
+
+**Scoring your own perception.** `--perception my-model.ts` loads a module whose default export has a
+`name` and `locate(object, { camera, mask })`, returning where it thinks the object is on the table (world
+x, y in metres). The robots then reach for that spot, and the run is scored like the built-in policies.
+`web/scripts/perception-example.ts` is a working example (the mask centre, which reproduces the `camera`
+row exactly):
+
+```sh
+cd web && npx tsx scripts/policies.ts --scan desk-sam3d --policy exact --perception scripts/perception-example.ts
+```
