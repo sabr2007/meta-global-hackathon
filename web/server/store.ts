@@ -187,6 +187,8 @@ function blobStore(): Store {
         validUntil: Date.now() + URL_TTL_MS,
         allowedContentTypes: [contentType],
         maximumSizeInBytes: maxBytes,
+        addRandomSuffix: false, // the server finds the upload by its exact path
+        allowOverwrite: true, // the phone may retry an upload that did not finish
       });
       return { url: presignedUrl, method: 'PUT', headers: { 'content-type': contentType } };
     },
