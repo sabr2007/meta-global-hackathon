@@ -11,6 +11,7 @@ import type { SceneGeometry } from './sceneGeometry';
 // along an A* path, raises the lift so the arm works at the surface height, and picks or places
 // top-down like the stationary arm. Targets: [x, y, yaw, lift, 7 arm joints, gripper].
 
+const PLACE_CHECK_RADIUS_M = 0.03; // a small object's footprint when checking a target before the plan
 const APPROACH_M = 0.12; // pre-grasp height above the grasp point
 const LIFT_M = 0.15;
 const TABLE_GAP_M = 0.006; // fingertips stay this far above the surface the object rests on
@@ -140,6 +141,8 @@ export class MobileManipulator extends RobotBase {
   reachPoint(x: number, y: number): ReachCheck {
     const base = this.basePose();
     const distance = Math.hypot(x - base.x, y - base.y);
+    const surface = this.scene.placeSurface(x, y, PLACE_CHECK_RADIUS_M);
+    if (typeof surface === 'string') return { ok: false, reason: `can't put things down there: ${surface}`, distance_m: distance };
     const spot = canPark(this.scene.navGrid(), this.scene.regionsFor(this.radius), [base.x, base.y], this.parkingQuery([x, y]));
     if (!spot) return { ok: false, reason: this.noParkingReason([x, y]), distance_m: distance };
     return { ok: true, reason: `can park ${spot.armDistance.toFixed(2)} m from it`, distance_m: distance };

@@ -70,7 +70,7 @@ class RegistryRobot implements FleetRobot {
     return { ok: r.ok, reason: r.reason, distanceM: r.distance_m };
   }
 
-  run(step: MoveStep): Promise<StepResult> {
+  async run(step: MoveStep): Promise<StepResult> {
     const { mujoco, model, data } = this.physics;
     const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, step.object);
     const shape = objectShape(this.physics, step.object);
@@ -78,7 +78,10 @@ class RegistryRobot implements FleetRobot {
     const oy = shape.center[1] - data.xpos[body * 3 + 1];
     const c = Math.cos(step.yawDelta);
     const s = Math.sin(step.yawDelta);
-    return this.robot.run({ object: step.object, x: step.x + c * ox - s * oy, y: step.y + s * ox + c * oy, yawDelta: step.yawDelta });
+    const result = await this.robot.run({ object: step.object, x: step.x + c * ox - s * oy, y: step.y + s * ox + c * oy, yawDelta: step.yawDelta });
+    // A robot that could not put the object down at the goal puts it back, so the next step starts free.
+    if (!result.ok && this.robot.status.holding) await this.robot.run({ action: 'putBack' });
+    return result;
   }
 
   update(): void {

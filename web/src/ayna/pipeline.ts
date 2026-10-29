@@ -147,7 +147,10 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
 
     // Close the loop once: objects a robot handled but that ended off goal get a second plan from
     // where they are now (refused ones would only be refused again).
-    const missed = receipt.results.filter((r) => r.wanted === 'move' && !r.ok && !r.note.startsWith('refused'));
+    // Only objects a robot moved (it reported success, or the grasp slipped) are worth a second try;
+    // a placement the robot refused would be refused again.
+    const retryable = new Set(executed.filter((e) => e.result.ok || /slipped|missed/i.test(e.result.reason)).map((e) => e.step.object));
+    const missed = receipt.results.filter((r) => r.wanted === 'move' && !r.ok && retryable.has(r.name));
     if (missed.length) {
       trace({ step: 'verify', state: 'info', text: `${missed.map((m) => m.label).join(', ')} ended off goal; planning a second pass from where ${missed.length === 1 ? 'it is' : 'they are'}` });
       const retry = chosen.check.goals
