@@ -3,7 +3,7 @@
 
 import type { RunCard } from '../ayna/client';
 import type { PlannedStep, Refusal } from '../ayna/dispatch';
-import type { Step, TraceEvent } from '../ayna/run';
+import type { Step, TraceEvent, Usage } from '../ayna/run';
 import type { Receipt } from '../ayna/verify';
 
 export const MODEL_OF: Record<Step, string> = {
@@ -129,7 +129,27 @@ export function stepsList(steps: PlannedStep[], refusals: Refusal[], robotLabel:
   };
 }
 
-export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean }): HTMLElement {
+const MODEL_NAMES: Record<string, string> = {
+  'muse-voice-transcribe-1.0': 'Voice Transcribe',
+  'muse-spark-1.3': 'Muse Spark',
+  'muse-image-1.0': 'Muse Image',
+  'sam-3.1': 'SAM 3.1',
+};
+
+/** Calls, time and cost per Meta model over a run. */
+export function modelSummary(usage: Usage[]): { model: string; calls: number; ms: number; costUsd: number }[] {
+  const byModel = new Map<string, { model: string; calls: number; ms: number; costUsd: number }>();
+  for (const u of usage) {
+    const entry = byModel.get(u.model) ?? { model: MODEL_NAMES[u.model] ?? u.model, calls: 0, ms: 0, costUsd: 0 };
+    entry.calls += 1;
+    entry.ms += u.ms;
+    entry.costUsd += u.costUsd;
+    byModel.set(u.model, entry);
+  }
+  return [...byModel.values()];
+}
+
+export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean; usage?: Usage[] }): HTMLElement {
   const card = h('section', 'receipt card');
   card.setAttribute('aria-label', 'Receipt');
   const head = h('header', 'receipt__head');
@@ -160,6 +180,16 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
     const verdict = h('blockquote', 'receipt__verdict');
     verdict.append(h('span', 'eyebrow', 'Muse Spark'), h('p', '', extras.verdict));
     card.append(verdict);
+  }
+  if (extras.usage?.length) {
+    const models = h('ul', 'receipt__models');
+    models.setAttribute('aria-label', 'Meta models used in this run');
+    for (const m of modelSummary(extras.usage)) {
+      const chip = h('li', 'receipt__model');
+      chip.append(h('span', 'eyebrow', m.model), h('span', 'num', `×${m.calls}`), h('span', 'receipt__model-cost', `${seconds(m.ms)} · $${m.costUsd.toFixed(3)}`));
+      models.append(chip);
+    }
+    card.append(models);
   }
   const foot = h('footer', 'receipt__foot');
   foot.append(
