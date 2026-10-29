@@ -74,6 +74,7 @@ class ScannedObject:
     concept: str = ""  # the SAM 3.1 noun phrase that finds it in a photo
     level_deg: float = 0.0  # tilt of its SAM 3D pose that placement removed
     photo_scale: float = 1.0  # size correction that matched its silhouette to the photo mask
+    depth_source: str = "lidar"  # "lidar", or "table" when it was slid along its camera rays onto the table
 
 
 @dataclass(frozen=True)

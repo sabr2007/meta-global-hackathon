@@ -19,6 +19,12 @@ Before the depth is fitted, two corrections from the photo itself:
   SAM 3.1 masks and sit 10-35 px off (SAM 3D lays objects out in MoGe's estimated camera, not the
   phone's), so after the depth fit small objects came out 15-25% too large. The mesh is scaled about
   its centre and moved across the image until its silhouette has the mask's area and centroid.
+
+After it, one from the table: LiDAR sees through glass and clear plastic (a perfume bottle's points
+lie on the table behind it) and smooths small objects into the table, so its depth can put a mesh
+inside the table it stands on. Such a mesh slides back along its camera rays until it rests on the
+table, which leaves the photo's view of it unchanged. Only a mesh the LiDAR fits clearly better where
+it was (a laptop on a tray) keeps the LiDAR depth and is lifted out of the table instead.
 """
 
 from __future__ import annotations
@@ -45,6 +51,8 @@ LEVEL_DONE_DEG = 0.2
 LEVEL_STEPS = 3  # the hull's base changes as it turns; three steps settle every object we scanned
 SILHOUETTE_STEPS = 2  # the second step absorbs perspective; a third changes nothing we can measure
 MAX_PHOTO_SCALE = 1.25  # a partly hidden mask must not shrink (or grow) a mesh by more than this
+SEE_THROUGH_M = 0.02  # LiDAR depth this deep inside the table means it saw past the object
+SLIDE_FIT_TOLERANCE_M = 0.003  # keep the LiDAR depth only when it fits the points this much better
 
 
 @dataclass(frozen=True)
@@ -54,6 +62,7 @@ class Placement:
     fit_error_m: float  # mean distance from the object's LiDAR points to the placed mesh surface
     level_deg: float = 0.0  # tilt of the SAM 3D pose that levelling removed
     photo_scale: float = 1.0  # size correction from the photo silhouette
+    depth_source: str = "lidar"  # "lidar", or "table" when the mesh was slid back to rest on it
 
 
 def rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -109,6 +118,30 @@ def silhouette_correction(
     scaled_px = center_px + scale * (_centroid(rendered) - center_px)  # where the centroid goes when scaled
     ray = lambda px: np.array([*((px - principal) / focal), 1.0])  # noqa: E731
     return scale, center[2] * (ray(_centroid(observed)) - ray(scaled_px))
+
+
+def table_contact_scale(mesh_cv: np.ndarray, cv_to_world: np.ndarray, rest_z: float) -> float | None:
+    """Depth scale at which the mesh's lowest point is at height rest_z (None if the camera is not above it)."""
+    lowest = float((mesh_cv @ cv_to_world[:3, :3].T)[:, 2].min())
+    drop = rest_z - cv_to_world[2, 3]
+    return drop / lowest if lowest < 0 and drop < 0 else None
+
+
+def choose_depth(
+    mesh_cv: np.ndarray, faces: np.ndarray, cv_to_world: np.ndarray, k_lidar: float, lidar_world: np.ndarray, rest_z: float
+) -> tuple[float, str]:
+    """The LiDAR depth scale, or the table contact one when the LiDAR depth puts the mesh inside the table."""
+    k_table = table_contact_scale(mesh_cv, cv_to_world, rest_z)
+    if k_table is None or k_lidar <= k_table:
+        return k_lidar, "lidar"
+    lidar_placed = _transform(cv_to_world, mesh_cv * k_lidar)
+    depth_inside = rest_z - float(lidar_placed[:, 2].min())
+    if depth_inside > SEE_THROUGH_M:
+        return k_table, "table"
+    fit = lambda world: float(surface_distances(world, faces, lidar_world).mean())  # noqa: E731
+    lifted = fit(lidar_placed + [0.0, 0.0, depth_inside])
+    slid = fit(_transform(cv_to_world, mesh_cv * k_table))
+    return (k_table, "table") if slid <= lifted + SLIDE_FIT_TOLERANCE_M else (k_lidar, "lidar")
 
 
 def rotation_matrix(rotation_wxyz: np.ndarray) -> np.ndarray:
@@ -173,9 +206,11 @@ def place_mesh(
     frame: WorldFrame,
     lidar_points_world: np.ndarray,
     mask: ObjectMask | None = None,
+    rest_z: float | None = None,
 ) -> Placement:
     """SAM 3D mesh -> world: levelled on its base, matched to its photo silhouette when the mask is
-    given, depth (and so metric size) taken from its LiDAR points."""
+    given, depth (and so metric size) taken from its LiDAR points, or from resting on the table
+    whose top is at rest_z when the LiDAR depth puts it inside."""
     to_world = camera_to_world(view, frame, image)
     rotation = to_world[:3, :3]
     mesh_cv = mesh_in_camera(vertices_glb, pose)
@@ -197,6 +232,9 @@ def place_mesh(
     k = depth_scale(mesh_cv, _transform(np.linalg.inv(to_world), lidar_world))
     if k is None:
         raise ValueError("the object's LiDAR points do not overlap its mesh in the photo")
+    source = "lidar"
+    if rest_z is not None:
+        k, source = choose_depth(mesh_cv, faces, to_world, k, lidar_world, rest_z)
     world = _transform(to_world, mesh_cv * k)
     fit = float(surface_distances(world, faces, lidar_world).mean())
-    return Placement(vertices_world=world, depth_scale=k, fit_error_m=fit, level_deg=level_deg, photo_scale=photo_scale)
+    return Placement(world, k, fit, level_deg, photo_scale, source)

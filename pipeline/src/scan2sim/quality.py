@@ -11,7 +11,9 @@ One row per object:
 - drift_cm: how far the body moves in the first SETTLE_SECONDS of simulation;
 - color_de: CIE76 difference between the object's mean colour in the hero photo (inside its mask)
   and the mean colour of the visible side of its mesh;
-- iou: photo camera vs placed mesh, as stored in scene.json (camera.alignment).
+- iou: photo camera vs placed mesh, as stored in scene.json (camera.alignment);
+- depth: where the object's depth came from, as stored in scene.json ("table" means the LiDAR saw
+  past it, so its LiDAR columns measure the background, not the object).
 """
 
 from __future__ import annotations
@@ -49,6 +51,7 @@ class ObjectQuality:
     drift_cm: float
     color_de: float | None
     iou: float | None
+    depth: str | None = None
 
 
 def settle_drift(mjcf: Path, bodies: list[str], seconds: float = SETTLE_SECONDS) -> dict[str, float]:
@@ -97,6 +100,7 @@ def object_quality(
     lidar_points: np.ndarray | None,
     drift_m: float,
     iou: float | None,
+    depth: str | None = None,
 ) -> ObjectQuality:
     """All metrics of one object whose mesh is already placed in the world."""
     vertices = np.asarray(mesh_world.vertices, dtype=np.float64)
@@ -111,7 +115,7 @@ def object_quality(
     if camera is not None and photo is not None and mask is not None:
         colors = np.asarray(mesh_world.visual.vertex_colors)
         color_de = mean_color_difference(photo, full_raster(mask, (camera.width, camera.height)), colors[camera.seen(vertices, surface)])
-    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou)
+    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth)
 
 
 def lidar_points(capture_dir: Path, photo_stem: str, masks: dict[str, ObjectMask], frame: WorldFrame) -> dict[str, np.ndarray]:
@@ -149,7 +153,7 @@ def report(bundle: Path, capture: Path | None = None, photo_stem: str | None = N
     return [
         object_quality(
             o["name"], o["label"], placed_mesh(bundle, o), camera, photo, masks.get(o["name"]), points.get(o["name"]),
-            drift[o["body"]], alignment.get(o["name"], {}).get("iou"),
+            drift[o["body"]], alignment.get(o["name"], {}).get("iou"), o.get("depth_source"),
         )
         for o in objects
     ]
@@ -161,12 +165,12 @@ def _cell(value: float | None, spec: str) -> str:
 
 def format_table(rows: list[ObjectQuality]) -> str:
     """Fixed-width table with a median row (per column; per axis for the size ratios)."""
-    lines = [f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}"]
+    lines = [f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}  depth"]
     for r in rows:
         size = " / ".join(f"{v:.2f}" for v in r.size) if r.size else "-"
         lines.append(
             f"{r.label[:23]:<24}{_cell(r.lidar_mm, '.1f'):>9}  {size:>18}{r.tilt_deg:>7.1f}{r.drift_cm:>9.2f}"
-            f"{_cell(r.color_de, '.1f'):>7}{_cell(r.iou, '.2f'):>6}"
+            f"{_cell(r.color_de, '.1f'):>7}{_cell(r.iou, '.2f'):>6}  {r.depth or '-'}"
         )
     median = lambda values: float(np.median(values)) if values else None  # noqa: E731
     sizes = np.array([r.size for r in rows if r.size])

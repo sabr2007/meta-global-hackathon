@@ -19,6 +19,7 @@ from scan2sim.placement import (
     level_rotation,
     mesh_in_camera,
     place_mesh,
+    table_contact_scale,
     upright_cv_to_arkit,
 )
 from scan2sim.reconstruct import ObjectPose
@@ -203,3 +204,54 @@ def test_place_mesh_matches_an_oversized_shifted_mesh_to_its_photo_silhouette():
     assert oriented_size(placed.vertices_world) == pytest.approx(oriented_size(truth), rel=0.03)
     assert placed.vertices_world.mean(axis=0) == pytest.approx(truth.mean(axis=0), abs=0.003)
     assert placed.fit_error_m < unmatched.fit_error_m
+
+
+TABLE_Z = -0.45  # the desk camera is 45 cm above the table
+REST_Z = TABLE_Z + 0.003
+
+
+def _bottle(image, view, frame, standing_on: float = TABLE_Z) -> tuple[trimesh.Trimesh, np.ndarray, np.ndarray]:
+    """A 6 x 6 x 12 cm bottle standing at height `standing_on`: (mesh, world vertices, camera vertices)."""
+    to_world = camera_to_world(view, frame, image)
+    bottle = trimesh.creation.box(extents=[0.06, 0.06, 0.12])
+    for _ in range(4):
+        bottle = bottle.subdivide()
+    world = bottle.vertices + [0.0, 0.5, standing_on + 0.06]
+    return bottle, world, (world - to_world[:3, 3]) @ to_world[:3, :3]
+
+
+def test_table_contact_scale_puts_the_lowest_point_on_the_table():
+    image, view, frame = _desk_camera()
+    to_world = camera_to_world(view, frame, image)
+    _, _, cv = _bottle(image, view, frame, standing_on=TABLE_Z - 0.05)
+    k = table_contact_scale(cv, to_world, TABLE_Z)
+    assert (cv * k @ to_world[:3, :3].T + to_world[:3, 3])[:, 2].min() == pytest.approx(TABLE_Z)
+    assert table_contact_scale(cv, to_world, 0.1) is None  # a table above the camera
+
+
+def test_a_bottle_the_lidar_sees_through_rests_on_the_table():
+    image, view, frame = _desk_camera()
+    to_world = camera_to_world(view, frame, image)
+    bottle, truth, truth_cv = _bottle(image, view, frame)
+    seen = _nearest_per_ray(truth_cv) @ to_world[:3, :3].T  # rays from the camera centre through the bottle
+    behind = seen * ((TABLE_Z - to_world[2, 3]) / seen[:, 2:]) + to_world[:3, 3]  # ...land on the table behind it
+
+    placed = place_mesh(truth_cv @ PYTORCH3D_TO_CV @ GLB_TO_SAM3D, bottle.faces, IDENTITY, image, view, frame, behind, rest_z=REST_Z)
+    lidar_only = place_mesh(truth_cv @ PYTORCH3D_TO_CV @ GLB_TO_SAM3D, bottle.faces, IDENTITY, image, view, frame, behind)
+
+    assert lidar_only.vertices_world[:, 2].min() < TABLE_Z - 0.05  # LiDAR alone sinks it into the table
+    assert placed.depth_source == "table"
+    assert placed.vertices_world[:, 2].min() == pytest.approx(REST_Z)
+    assert placed.vertices_world == pytest.approx(truth, abs=0.006)
+
+
+def test_an_object_the_lidar_sees_keeps_the_lidar_depth():
+    image, view, frame = _desk_camera()
+    to_world = camera_to_world(view, frame, image)
+    bottle, truth, truth_cv = _bottle(image, view, frame, standing_on=TABLE_Z + 0.01)  # on a book
+    lidar = _nearest_per_ray(truth_cv) @ to_world[:3, :3].T + to_world[:3, 3]
+
+    placed = place_mesh(truth_cv @ PYTORCH3D_TO_CV @ GLB_TO_SAM3D, bottle.faces, IDENTITY, image, view, frame, lidar, rest_z=REST_Z)
+
+    assert placed.depth_source == "lidar"
+    assert placed.vertices_world == pytest.approx(truth, abs=0.002)

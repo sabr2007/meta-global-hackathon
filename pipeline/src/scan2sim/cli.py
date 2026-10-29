@@ -137,7 +137,7 @@ def objects(args: argparse.Namespace) -> int:
             continue
         body = build_scanned_object(
             body_name(i, obj.label), obj.label, reconstruction, lifted[id(obj.mask)].points_world,
-            image, view, scene.frame, scene.boxes, obj.mask,
+            image, view, scene.frame, scene.boxes, obj.mask, surface,
         )
         bodies.append(dataclasses.replace(body, concept=obj.mask.concept))
         masks[body.name] = obj.mask
@@ -165,7 +165,7 @@ def objects(args: argparse.Namespace) -> int:
     for b in bodies:
         size = " x ".join(f"{v * 100:.1f}" for v in b.size)
         print(
-            f"  {b.label:<22} {size} cm  depth x{b.depth_scale:.2f}  levelled {b.level_deg:.1f} deg  "
+            f"  {b.label:<22} {size} cm  depth x{b.depth_scale:.2f} ({b.depth_source})  levelled {b.level_deg:.1f} deg  "
             f"photo x{b.photo_scale:.2f}  "
             f"fit {b.fit_error_m * 1000:.1f} mm  moves {moved[b.name] * 100:.1f} cm in {SETTLE_SECONDS:.0f} s"
         )

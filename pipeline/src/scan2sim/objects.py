@@ -101,11 +101,16 @@ def build_scanned_object(
     frame: WorldFrame,
     boxes: tuple[Box, ...],
     mask: ObjectMask | None = None,
+    surface: Box | None = None,
 ) -> ScannedObject:
-    """`mask` is the object's SAM 3.1 mask in `image`: the mesh is matched to it in the photo."""
+    """`mask` is the object's SAM 3.1 mask in `image` (the mesh is matched to it in the photo);
+    `surface` is the table it stands on (a mesh the LiDAR puts inside it is slid back onto it)."""
     raw = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
     light = simplify(raw)  # decimate first: placement renders and measures the mesh several times
-    placement = place_mesh(light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world, mask)
+    rest_z = surface.top_z + DROP_GAP_M if surface is not None else None
+    placement = place_mesh(
+        light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world, mask, rest_z
+    )
     world = placement.vertices_world
     low, high = world.min(axis=0), world.max(axis=0)
     # Lift objects out of the RoomPlan collider they rest on; never push them down.
@@ -128,4 +133,5 @@ def build_scanned_object(
         fit_error_m=placement.fit_error_m,
         level_deg=placement.level_deg,
         photo_scale=placement.photo_scale,
+        depth_source=placement.depth_source,
     )

@@ -135,6 +135,7 @@ def test_report_grades_every_object_of_a_bundle(scene, tmp_path):
     assert row.color_de < 3.0
     assert row.iou == 0.9
     assert row.lidar_mm is None and row.size is None  # no capture given
+    assert row.depth == "lidar"
 
 
 def test_report_command_prints_the_table_and_writes_json(scene, tmp_path, capsys):
