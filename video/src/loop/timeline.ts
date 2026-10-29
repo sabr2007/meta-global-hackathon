@@ -11,9 +11,9 @@ export const BEATS = {
   develop: { from: 336, frames: 240 },
   wipe: { from: 576, frames: 210 },
   plan: { from: 786, frames: 120 },
-  twin: { from: 906, frames: 120 },
-  receipt: { from: 1026, frames: 180 },
-  outro: { from: 1206, frames: 54 },
+  twin: { from: 906, frames: 180 },
+  receipt: { from: 1086, frames: 180 },
+  outro: { from: 1266, frames: 54 },
 } as const;
 
 export type BeatName = keyof typeof BEATS;

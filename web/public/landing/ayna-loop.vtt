@@ -24,8 +24,8 @@ The after photo: It is the plan you approve before a robot touches anything
 00:00:26.200 --> 00:00:30.200
 Muse Spark: Orders the moves and gives each one to a robot that can do it
 
-00:00:30.200 --> 00:00:34.200
+00:00:30.200 --> 00:00:36.200
 SAM 3D Objects · twin: The robots move SAM 3D bodies in a physics twin of the table
 
-00:00:34.200 --> 00:00:40.200
+00:00:36.200 --> 00:00:42.200
 Verifier: Every object is measured against the after photo

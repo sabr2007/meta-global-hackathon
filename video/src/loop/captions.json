@@ -16,7 +16,7 @@
   },
   { "key": "wipe", "from": 604, "to": 786, "chip": "The after photo", "text": "It is the plan you approve before a robot touches anything" },
   { "key": "plan", "from": 786, "to": 906, "chip": "Muse Spark", "text": "Orders the moves and gives each one to a robot that can do it" },
-  { "key": "twin", "from": 906, "to": 1026, "chip": "SAM 3D Objects · twin", "text": "The robots move SAM 3D bodies in a physics twin of the table" },
-  { "key": "receipt", "from": 1026, "to": 1206, "chip": "Verifier", "text": "Every object is measured against the after photo" }
+  { "key": "twin", "from": 906, "to": 1086, "chip": "SAM 3D Objects · twin", "text": "The robots move SAM 3D bodies in a physics twin of the table" },
+  { "key": "receipt", "from": 1086, "to": 1266, "chip": "Verifier", "text": "Every object is measured against the after photo" }
  ]
 }

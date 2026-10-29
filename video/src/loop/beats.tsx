@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Easing, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Easing, OffthreadVideo, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import {
   afterOutlines,
   beforeOutlines,
@@ -193,7 +193,9 @@ export const DevelopBeat: React.FC = () => {
         const choose = ramp(frame, DEVELOP.choose, DEVELOP.choose + 16);
         const dim = isChosen ? 1 : 1 - 0.45 * choose;
         const seconds = developSeconds(candidate.id);
-        const detail = sentence(prettify(candidate.passed ? candidate.notes[0] ?? '' : candidate.reasons.join('; ') || 'rejected'));
+        // one reason per stamp (and how many more), so two rows of versions never run into each other
+        const more = candidate.reasons.length > 1 ? ` (+${candidate.reasons.length - 1} more)` : '';
+        const detail = sentence(prettify(candidate.passed ? candidate.notes[0] ?? '' : `${candidate.reasons[0] ?? 'rejected'}${more}`));
         const score = judgeScore(candidate.id);
         return (
           <React.Fragment key={candidate.id}>
@@ -424,9 +426,15 @@ export const TwinBeat: React.FC = () => {
   const { frames } = BEATS.twin;
   const fade = beatOpacity(frame, frames, 10);
   const draw = (i: number) => ramp(frame, 18 + i * 5, 30 + i * 5);
+  // A recording of the robots at work, sped up to fill the beat; without one, the verifier's render.
+  const clip = run.twinClip;
   return (
     <AbsoluteFill style={{ opacity: fade }}>
-      {run.render ? (
+      {clip ? (
+        <AbsoluteFill style={{ background: C.bg }}>
+          <OffthreadVideo src={staticFile(clip)} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </AbsoluteFill>
+      ) : run.render ? (
         <Overlay camera={BASE_CAMERA}>
           {afterOutlines.map((o, i) => (
             <DottedPath key={o.object} d={o.d} color={o.moves ? C.lime : C.neutral} opacity={draw(i)} />
@@ -434,8 +442,12 @@ export const TwinBeat: React.FC = () => {
         </Overlay>
       ) : null}
       <div style={{ position: 'absolute', top: 176, left: 56, display: 'flex', gap: 10, opacity: ramp(frame, 8, 18) }}>
-        <Tag size={19}>{run.render ? 'The twin, rendered from the photo’s camera' : 'The after photo'}</Tag>
-        {run.render ? (
+        <Tag size={19}>{clip ? 'The robots in the twin' : run.render ? 'The twin, rendered from the photo’s camera' : 'The after photo'}</Tag>
+        {clip ? (
+          <Tag tone="lime" size={19}>
+            {`${run.executed.length} moves · 7× speed`}
+          </Tag>
+        ) : run.render ? (
           <Tag tone="lime" size={19}>
             dots: the after photo
           </Tag>

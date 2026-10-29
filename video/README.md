@@ -7,7 +7,7 @@ demo skeleton) numbers from the eval log.
 
 | Composition | Size | Length | What it is |
 |---|---|---|---|
-| `AynaLoop` | 1080 x 1350, 30 fps | 42 s | The landing page's film. One run from request to receipt: SAM 3.1 outlines, Spark's edit, the versions developing with their verdicts, the before/after wipe, the plan, the twin render, the receipt. The last frame is the first, so it loops. |
+| `AynaLoop` | 1080 x 1350, 30 fps | 44 s | The landing page's film. One run from request to receipt: SAM 3.1 outlines, Spark's edit, the versions developing with their verdicts, the before/after wipe, the plan, the robots at work in the twin (a 7× screen recording of the app replaying the run, `web/public/landing/twin-<run>.mp4`, or the verifier's render when there is none), the receipt. The last frame is the first, so it loops. |
 | `AynaDemo` | 1920 x 1080, 30 fps | 180 s | Skeleton of the 3-minute demo: the 8 beats of the video script, each with a slot labelled "screen recording goes here". Not the final edit. |
 
 ## Render the landing film
@@ -56,8 +56,14 @@ one, then the best receipt (`--run <id>` picks one). Candidates are stretched on
 pixels exactly as the app maps their masks. The eval totals come from the eval log:
 
 ```sh
-cd ../web && node scripts/landing-numbers.mjs ../.night/eval-runs.jsonl   # -> src/landing/facts/eval.json
+cd ../web && node scripts/landing-numbers.mjs [path/to/eval-runs.jsonl]   # -> src/landing/facts/eval.json
 ```
+
+The robots' beat plays a screen recording of the app replaying the featured run
+(`/app/?autoplay#/scan/<owner>/desk-sam3d/run/<id>`): its twin part, cropped to the stage at 4:5 and
+sped up to 6 s, for example
+`ffmpeg -ss 18 -t 42 -i take.mp4 -vf "crop=976:1220:283:168,setpts=PTS/7,fps=30,scale=1080:1350" -an -c:v libx264 -crf 27 ../web/public/landing/twin-<run>.mp4`.
+`prepare-assets` records it on the run when the file is there.
 
 After either step, run `npm run render` again so the film shows the same run and numbers.
 

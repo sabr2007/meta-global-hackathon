@@ -81,6 +81,7 @@ export interface Showcase {
     trace: TraceEntry[];
     verdict: { matchesRequest: boolean; text: string } | null; // Muse Spark on the result vs the goal
     render: { '720': string } | null; // the verifier's render of the twin from the photo's camera
+    twinClip?: string | null; // a sped-up recording of the robots at work in the twin (landing/twin-<run>.mp4)
     costUsd: number;
     seconds: number;
   };

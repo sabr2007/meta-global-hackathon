@@ -2,8 +2,8 @@
  "note": "Written by video/scripts/render.mjs with ayna-loop.mp4.",
  "posterFrame": 494,
  "posterSeconds": 16.466666666666665,
- "seconds": 42,
- "bytes": 1729769,
+ "seconds": 44,
+ "bytes": 2015979,
  "cues": [
   {
    "start": 0.13333333333333333,
@@ -55,13 +55,13 @@
   },
   {
    "start": 30.2,
-   "end": 34.2,
+   "end": 36.2,
    "chip": "SAM 3D Objects · twin",
    "text": "The robots move SAM 3D bodies in a physics twin of the table"
   },
   {
-   "start": 34.2,
-   "end": 40.2,
+   "start": 36.2,
+   "end": 42.2,
    "chip": "Verifier",
    "text": "Every object is measured against the after photo"
   }

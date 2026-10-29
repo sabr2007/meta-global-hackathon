@@ -10,6 +10,8 @@
 //         <source>/data/store/scans/*/<scan>/runs/*/{run.json,candidate-*.webp}
 // Writes: web/public/landing/before-{720,1080}.webp, after-<run>-<id>-{720,1080}.webp
 //         render-<run>-720.webp (the verifier's render of the twin, when saved)
+//         twin-<run>.mp4 is not written here: a sped-up screen recording of the robots replaying the run
+//         (see video/README.md); when it is in web/public/landing, the film's twin beat plays it
 //         web/src/landing/facts/showcase.json (scene facts, dotted mask outlines, the featured run, the others)
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -208,6 +210,7 @@ async function main() {
       })),
       verdict: run.verdict ? { matchesRequest: run.verdict.matches_request, text: run.verdict.verdict } : null,
       render,
+      twinClip: existsSync(path.join(PUBLIC_OUT, `twin-${run.id}.mp4`)) ? `twin-${run.id}.mp4` : null,
       costUsd: round(run.costUsd, 4),
       seconds: Math.round(run.durationMs / 1000),
     },
