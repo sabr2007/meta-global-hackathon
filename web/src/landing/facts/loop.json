@@ -3,13 +3,13 @@
  "posterFrame": 494,
  "posterSeconds": 16.466666666666665,
  "seconds": 42,
- "bytes": 1792063,
+ "bytes": 1729769,
  "cues": [
   {
    "start": 0.13333333333333333,
    "end": 3.066666666666667,
    "chip": "The request",
-   "text": "“Put the white mouse next to the keyboard and the earbud case next to the mouse”"
+   "text": "“Put all the small things together in one corner”"
   },
   {
    "start": 3.2,
@@ -27,7 +27,7 @@
    "start": 11.4,
    "end": 14.933333333333334,
    "chip": "Muse Image",
-   "text": "Develops 3 versions of the after photo"
+   "text": "Develops 6 versions of the after photo"
   },
   {
    "start": 14.933333333333334,
@@ -38,8 +38,8 @@
   {
    "start": 16.8,
    "end": 19.2,
-   "chip": "SAM 3.1",
-   "text": "Only version 1c kept every object, so it goes on"
+   "chip": "Muse Spark",
+   "text": "Picks the version that follows the request"
   },
   {
    "start": 20.133333333333333,
