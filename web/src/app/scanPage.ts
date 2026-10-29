@@ -29,6 +29,8 @@ interface PageOptions {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+
+const ONE_TAKE_SPEED = 3;
 export async function scanPage(root: HTMLElement, session: Session, owner: string, id: string, options: PageOptions): Promise<() => void> {
   const { meta, files, live } = await scans.open(session, owner, id);
   if (meta.status !== 'ready') {
@@ -194,6 +196,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     stage.setInk(ink);
     stage.setCaption(`Robots' result over the imagined photo · ${receipt.moved.done}/${receipt.moved.asked} moves done`, receipt.score >= 80 ? 'lime' : 'orange');
     stage.setScore(receipt.score);
+    twin.speed = 1;
     acting = false;
   };
 
@@ -268,7 +271,9 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       for (const r of refusals) list.append(h('li', '', `${twin.objects.find((o) => o.name === r.object)?.label ?? r.object}: ${r.reason}`));
       review.append(list);
     }
-    reveal(review);
+    // On a phone the after photo and its slider are on the stage, above the panel: show them first.
+    if (narrow()) stageWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else reveal(review);
     const actions = h('div', 'review__actions');
     const yes = h('button', 'pill pill--lime', 'Do it');
     yes.type = 'button';
@@ -302,7 +307,9 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     stage.setMode('twin');
     stage.setCaption('Out of the photo, into the twin');
     await twin.fly('orbit');
-    stage.setCaption('Robots at work · live physics');
+    // The one-take shows the robots at three times real speed, and says so.
+    twin.speed = options.autoplay ? ONE_TAKE_SPEED : 1;
+    stage.setCaption(twin.speed > 1 ? `Robots at work · live physics · ${twin.speed}× speed` : 'Robots at work · live physics');
     return list;
   };
 

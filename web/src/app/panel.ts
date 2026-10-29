@@ -64,7 +64,8 @@ export function timeline(): { root: HTMLElement; add(event: TraceEvent): void; c
         row.append(meter);
       }
       root.append(row);
-      row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // Only the log scrolls to its newest row; the page stays where the person (or the one-take) put it.
+      root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' });
     },
   };
 }

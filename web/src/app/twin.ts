@@ -18,6 +18,7 @@ import type { Physics } from '../sim/physics';
 const BACKGROUND = new THREE.Color('#1b1b1c');
 const NEAR = 0.03;
 const FAR = 60;
+const MAX_SPEED = 3; // physics steps per frame stay capped (physics.ts), so faster only means more steps per frame
 const ORBIT_FOV = 42;
 const FLIGHT_MS = 1700;
 const RENDER_WIDTH = 720; // render for the verdict and the history, at the photo's aspect
@@ -42,6 +43,8 @@ export interface Twin {
   readonly canvas: HTMLCanvasElement;
   view: View;
   playing: boolean;
+  /** Simulated seconds per second on screen (the one-take runs the robots faster; physics steps stay the same). */
+  speed: number;
   /** Where the photo is drawn inside the canvas (contain fit), CSS pixels. */
   photoRect(): { x: number; y: number; width: number; height: number };
   fly(to: View, ms?: number): Promise<void>;
@@ -204,7 +207,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   };
 
   let flight: { from: View; to: View; start: number; ms: number; done: () => void } | null = null;
-  const state = { view: 'photo' as View, playing: true };
+  const state = { view: 'photo' as View, playing: true, speed: 1 };
   const place = (blend: number): void => {
     // blend 0 = photo, 1 = orbit
     const t = easeInOut(blend);
@@ -244,7 +247,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   const frame = (now: number): void => {
     const elapsed = (now - last) / 1000;
     last = now;
-    if (state.playing) physics.advance(elapsed, control);
+    if (state.playing) physics.advance(elapsed * state.speed, control);
     for (let i = settlers.length - 1; i >= 0; i -= 1) {
       if (physics.time() >= settlers[i].at) settlers.splice(i, 1)[0].resolve();
     }
@@ -301,6 +304,12 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
     },
     set playing(v: boolean) {
       state.playing = v;
+    },
+    get speed() {
+      return state.speed;
+    },
+    set speed(v: number) {
+      state.speed = Math.min(Math.max(v, 0.25), MAX_SPEED);
     },
     photoRect,
     fly(to: View, ms = FLIGHT_MS) {
