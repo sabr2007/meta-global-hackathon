@@ -175,6 +175,8 @@ export class MobileManipulator extends RobotBase {
   }
 
   placeAt(x: number, y: number, yawDelta = 0): StepResult {
+    const invalid = this.badNumbers(x, y, yawDelta);
+    if (invalid) return invalid;
     const held = this.heldOrRefusal();
     if (!('name' in held)) return held;
     const label = this.name(held.name);
@@ -220,6 +222,8 @@ export class MobileManipulator extends RobotBase {
     const blocked = this.busyReason();
     if (blocked) return blocked;
     if (this.held) return refused(`Holding ${this.name(this.held.name)}: put it down first`);
+    const invalid = this.badNumbers(x, y, yaw);
+    if (invalid) return invalid;
     const footprint = this.info.footprint_radius;
     if (this.scene.floor && !insidePolygon(this.scene.floor, x, y)) return refused('Off the scanned floor');
     const inside = this.scene.obstacles().find((r) => rectDistance(r, x, y) < footprint);

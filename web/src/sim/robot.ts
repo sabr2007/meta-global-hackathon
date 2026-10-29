@@ -166,4 +166,9 @@ export abstract class RobotBase implements Robot {
   protected busyReason(): StepResult | null {
     return this.status.phase === 'busy' ? refused(`Busy: ${this.status.text}`) : null;
   }
+
+  /** A refusal when a command gets a coordinate that is not a finite number. */
+  protected badNumbers(...values: number[]): StepResult | null {
+    return values.every(Number.isFinite) ? null : refused(`Not a valid position: ${values.join(', ')}`);
+  }
 }

@@ -64,6 +64,8 @@ export class SceneGeometry {
   private readonly objectBodies: Map<number, string>;
   private grid: NavGrid | null = null;
   private readonly regions = new Map<number, Int32Array>();
+  private wallRects: Rect[] | null = null;
+  private obstacleRects: Rect[] | null = null;
 
   constructor(
     private readonly physics: Physics,
@@ -83,15 +85,21 @@ export class SceneGeometry {
   }
 
   /** Walls with their doors and openings cut out. */
-  walls(): Rect[] {
-    const gaps = this.elements.filter((e) => e.kind === 'door' || e.kind === 'opening').map((e) => e.rect);
-    return this.elements.filter((e) => e.kind === 'wall' && e.collides).flatMap((e) => cutOpenings(e.rect, gaps));
+  walls(): readonly Rect[] {
+    if (!this.wallRects) {
+      const gaps = this.elements.filter((e) => e.kind === 'door' || e.kind === 'opening').map((e) => e.rect);
+      this.wallRects = this.elements.filter((e) => e.kind === 'wall' && e.collides).flatMap((e) => cutOpenings(e.rect, gaps));
+    }
+    return this.wallRects;
   }
 
   /** Footprints a robot base keeps out of: walls and furniture (tables included) below its height. */
-  obstacles(): Rect[] {
-    const furniture = this.elements.filter((e) => e.kind === 'object' && e.collides && e.bottom < MAX_OBSTACLE_BOTTOM_M);
-    return [...this.walls(), ...furniture.map((e) => e.rect)];
+  obstacles(): readonly Rect[] {
+    if (!this.obstacleRects) {
+      const furniture = this.elements.filter((e) => e.kind === 'object' && e.collides && e.bottom < MAX_OBSTACLE_BOTTOM_M);
+      this.obstacleRects = [...this.walls(), ...furniture.map((e) => e.rect)];
+    }
+    return this.obstacleRects;
   }
 
   /** Surfaces an arm can stand on: RoomPlan tables (and the stands under scanned objects). */

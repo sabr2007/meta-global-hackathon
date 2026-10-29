@@ -163,6 +163,7 @@ export class NavGrid {
 
   /** Cell index of a point, or -1 outside the grid. */
   cellAt(x: number, y: number): number {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return -1;
     const i = Math.floor((x - this.originX) / this.cell);
     const j = Math.floor((y - this.originY) / this.cell);
     if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return -1;

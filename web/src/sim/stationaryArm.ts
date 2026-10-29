@@ -98,6 +98,8 @@ export class StationaryArm extends RobotBase {
   }
 
   placeAt(x: number, y: number, yawDelta = 0): StepResult {
+    const invalid = this.badNumbers(x, y, yawDelta);
+    if (invalid) return invalid;
     const held = this.heldOrRefusal();
     if (typeof held !== 'string') return held;
     const base = this.basePose();
@@ -143,6 +145,8 @@ export class StationaryArm extends RobotBase {
 
   setBasePose(x: number, y: number, yaw: number): StepResult {
     if (this.mocap < 0) return refused('This scene was built before the arm could move: rebuild it with scan2sim objects');
+    const invalid = this.badNumbers(x, y, yaw);
+    if (invalid) return invalid;
     const blocked = this.busyReason();
     if (blocked) return blocked;
     if (this.status.holding) return refused(`Holding ${this.name(this.status.holding)}: put it down first`);
