@@ -6,16 +6,15 @@ import numpy as np
 import pytest
 import trimesh
 
-from fixtures import TABLE_H, room_document
+from fixtures import CUP_SIZE, TABLE_H, cup_on_table, room_document
 from scan2sim.export import _object_metadata
 from scan2sim.mjcf import scene_to_mjcf
 from scan2sim.object_mesh import HULL_MAX_VERTICES, convex_hull, oriented_size, simplify
 from scan2sim.objects import body_name, rests_on, support_top, target_surface
 from scan2sim.roomplan import parse_room
-from scan2sim.scene import ScannedObject, build_scene
+from scan2sim.scene import build_scene
 
 SETTLE_SECONDS = 2.0
-CUP_SIZE = np.array([0.08, 0.06, 0.10])
 
 
 @pytest.fixture
@@ -26,24 +25,6 @@ def scene():
 def _table(scene):
     (table,) = [b for b in scene.boxes if b.category == "table"]
     return table
-
-
-def _cup(scene, name="obj_0_cup") -> ScannedObject:
-    """A box-shaped 'scanned object' resting just above the table centre."""
-    table = _table(scene)
-    hull = trimesh.creation.box(extents=CUP_SIZE)
-    return ScannedObject(
-        name=name,
-        label="cup",
-        position=np.array([table.center[0], table.center[1], TABLE_H + CUP_SIZE[2] / 2 + 0.003]),
-        visual_glb=hull.export(file_type="glb"),
-        hull_vertices=np.asarray(hull.vertices),
-        hull_faces=np.asarray(hull.faces),
-        size=CUP_SIZE,
-        rgba=(0.9, 0.5, 0.2, 1.0),
-        depth_scale=0.86,
-        fit_error_m=0.005,
-    )
 
 
 def test_body_names_are_mjcf_safe():
@@ -91,7 +72,7 @@ def test_an_object_on_the_floor_beside_the_table_does_not_rest_on_it(scene):
 
 
 def test_scanned_object_rests_on_the_table(scene):
-    scene = dataclasses.replace(scene, objects=(_cup(scene),))
+    scene = dataclasses.replace(scene, objects=(cup_on_table(scene),))
     model = mujoco.MjModel.from_xml_string(scene_to_mjcf(scene))
     data = mujoco.MjData(model)
     for _ in range(int(SETTLE_SECONDS / model.opt.timestep)):
@@ -126,7 +107,7 @@ def test_oriented_size_ignores_rotation_in_the_ground_plane():
 
 
 def test_bundle_lists_scanned_objects(scene):
-    meta = _object_metadata(_cup(scene))
+    meta = _object_metadata(cup_on_table(scene))
     assert meta["mesh"] == "objects/obj_0_cup.glb"
     assert meta["size_m"] == pytest.approx(CUP_SIZE.tolist())
     json.dumps(meta)  # serialisable

@@ -1,4 +1,4 @@
-"""Command line: scan2sim build | perceive | objects <capture.zip | capture dir> ..."""
+"""Command line: scan2sim build | perceive | objects <capture.zip | capture dir> ..., scan2sim report <bundle>"""
 
 from __future__ import annotations
 
@@ -22,11 +22,10 @@ from scan2sim.meta_client import load_settings
 from scan2sim.mount import choose_mount, footprint, reachable
 from scan2sim.objects import body_name, build_scanned_object, fit_top, rests_on, stand_under, target_surface
 from scan2sim.perceive import perceive_photo, write_perception
+from scan2sim.quality import SETTLE_SECONDS, format_table, report, rows_json, settle_drift
 from scan2sim.scene import build_scene
 from scan2sim.stages import sam3d_objects, verified_objects
 from scan2sim.views import views_of
-
-SETTLE_SECONDS = 2.0
 
 
 def _resolve_capture(source: Path, workdir: Path | None) -> Path:
@@ -88,19 +87,6 @@ def perceive(args: argparse.Namespace) -> int:
     print(f"SAM 3.1: {len(perception.masks)} masks in {perception.timings_s['segmentation']} s")
     print(f"wrote {overlay} and {summary}")
     return 0
-
-
-def _settle_distances(mjcf: Path, bodies: list[str]) -> dict[str, float]:
-    """How far each body moves in the first seconds: a few mm means it rests where it was scanned."""
-    model = mujoco.MjModel.from_xml_path(str(mjcf))
-    data = mujoco.MjData(model)
-    if model.nkey:
-        mujoco.mj_resetDataKeyframe(model, data, 0)
-    mujoco.mj_forward(model, data)
-    start = {name: data.body(name).xpos.copy() for name in bodies}
-    for _ in range(int(SETTLE_SECONDS / model.opt.timestep)):
-        mujoco.mj_step(model, data)
-    return {name: float(np.linalg.norm(data.body(name).xpos - start[name])) for name in bodies}
 
 
 def objects(args: argparse.Namespace) -> int:
@@ -169,7 +155,7 @@ def objects(args: argparse.Namespace) -> int:
         capture, room, scene, read_lidar_mesh(room.mesh_ply, room.mesh_colors), Path(args.out),
         hero=lambda out: write_hero(out, image, camera, scene.objects, masks, concepts),
     )
-    moved = _settle_distances(paths.mjcf, [b.name for b in bodies] + ([arm.LINK_NAMES[-1]] if mount else []))
+    moved = settle_drift(paths.mjcf, [b.name for b in bodies] + ([arm.LINK_NAMES[-1]] if mount else []))
 
     where = f" on {surface.name}" if surface is not None else ""
     print(
@@ -203,6 +189,23 @@ def objects(args: argparse.Namespace) -> int:
     return 0
 
 
+def quality_report(args: argparse.Namespace) -> int:
+    bundle = Path(args.bundle)
+    if not (bundle / "scene.json").exists():
+        print(f"not a scene bundle: {bundle}", file=sys.stderr)
+        return 2
+    if bool(args.capture) != bool(args.photo):
+        print("--capture and --photo go together", file=sys.stderr)
+        return 2
+    capture = _resolve_capture(Path(args.capture), None) if args.capture else None
+    rows = report(bundle, capture, args.photo)
+    print(format_table(rows))
+    if args.json:
+        Path(args.json).write_text(rows_json(rows))
+        print(f"wrote {args.json}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="scan2sim")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -233,6 +236,13 @@ def main(argv: list[str] | None = None) -> int:
     objects_cmd.add_argument("--cache", help="keep paid results (masks, SAM 3D meshes) here and reuse them")
     objects_cmd.add_argument("--no-arm", action="store_true", help="leave the robot arm out of the scene")
     objects_cmd.set_defaults(handler=objects)
+
+    report_cmd = commands.add_parser("report", help="per-object quality of a scene bundle against its capture")
+    report_cmd.add_argument("bundle", help="bundle directory written by `scan2sim objects`")
+    report_cmd.add_argument("--capture", help="the capture it was built from (adds the LiDAR fit and size columns)")
+    report_cmd.add_argument("--photo", help="hero photo stem used for the bundle, e.g. 0019 (with --capture)")
+    report_cmd.add_argument("--json", help="also write the rows to this JSON file")
+    report_cmd.set_defaults(handler=quality_report)
 
     args = parser.parse_args(argv)
     return args.handler(args)

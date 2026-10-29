@@ -64,7 +64,7 @@ def project_points(view: CameraView, points: np.ndarray) -> tuple[np.ndarray, np
     return np.column_stack([u, v]), depth
 
 
-def _erode(mask: np.ndarray, iterations: int) -> np.ndarray:
+def erode(mask: np.ndarray, iterations: int) -> np.ndarray:
     out = mask.copy()
     for _ in range(iterations):
         shrunk = out.copy()
@@ -126,7 +126,7 @@ def lift_masks(
 
     lifted = []
     for mask in masks:
-        eroded = _erode(mask.mask, MASK_ERODE_PX)
+        eroded = erode(mask.mask, MASK_ERODE_PX)
         x0, y0 = mask.mask_origin
         local_x, local_y = px[:, 0] - x0, px[:, 1] - y0
         within = (local_x >= 0) & (local_x < eroded.shape[1]) & (local_y >= 0) & (local_y < eroded.shape[0])

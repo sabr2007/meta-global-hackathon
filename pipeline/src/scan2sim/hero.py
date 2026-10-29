@@ -28,6 +28,8 @@ MASKS_FILE = "masks.json"
 HERO_JPEG_QUALITY = 88
 MIN_DEPTH_M = 0.02
 GL_TO_CV = np.diag([1.0, -1.0, -1.0])  # OpenGL camera axes (y up, z back) <-> computer vision (y down, z forward)
+DEPTH_CELL_PX = 3  # z-buffer resolution for visibility tests
+VISIBLE_SLACK_M = 0.004  # a point this close behind the nearest surface in its cell is still seen
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,30 @@ class PhotoCamera:
             "cy": round(self.cy, 3),
             "camera_to_world": np.round(self.camera_to_world, 6).tolist(),
         }
+
+    @classmethod
+    def from_metadata(cls, block: dict[str, Any]) -> PhotoCamera:
+        """The camera of a bundle's scene.json `camera` block."""
+        return cls(
+            int(block["width"]), int(block["height"]), float(block["fx"]), float(block["fy"]),
+            float(block["cx"]), float(block["cy"]), np.asarray(block["camera_to_world"], dtype=np.float64),
+        )
+
+    def seen(self, points_world: np.ndarray, surface_world: np.ndarray, cell_px: int = DEPTH_CELL_PX) -> np.ndarray:
+        """Which points the photo shows: in front, inside the frame, and not hidden behind `surface_world`
+        (dense samples of everything that can occlude them, e.g. the object's own surface)."""
+        cells_w = self.width // cell_px + 1
+        nearest = np.full(cells_w * (self.height // cell_px + 1), np.inf)
+        cells, depth, inside = self._cells(surface_world, cell_px, cells_w)
+        np.minimum.at(nearest, cells[inside], depth[inside])
+        cells, depth, inside = self._cells(points_world, cell_px, cells_w)
+        return inside & (depth <= nearest[np.where(inside, cells, 0)] + VISIBLE_SLACK_M)
+
+    def _cells(self, points_world: np.ndarray, cell_px: int, cells_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        pixels, depth = self.project(points_world)
+        inside = (depth > MIN_DEPTH_M) & (pixels[:, 0] >= 0) & (pixels[:, 0] < self.width) & (pixels[:, 1] >= 0) & (pixels[:, 1] < self.height)
+        cell = np.where(inside[:, None], pixels, 0.0).astype(np.int64) // cell_px
+        return cell[:, 1] * cells_w + cell[:, 0], depth, inside
 
 
 def upright_camera(view: CameraView, image: UprightImage, frame: WorldFrame) -> PhotoCamera:
@@ -96,6 +122,25 @@ def encode_rle(mask: ObjectMask) -> dict[str, Any]:
         counts = [0, *counts]
     height, width = mask.mask.shape
     return {"x": int(mask.mask_origin[0]), "y": int(mask.mask_origin[1]), "w": int(width), "h": int(height), "counts": counts}
+
+
+def decode_rle(rle: dict[str, Any]) -> np.ndarray:
+    """The mask raster of an `encode_rle` entry (its origin is rle["x"], rle["y"])."""
+    values = np.arange(len(rle["counts"])) % 2 == 1
+    return np.repeat(values, rle["counts"]).reshape(int(rle["h"]), int(rle["w"]))
+
+
+def load_masks(bundle: Path) -> dict[str, ObjectMask]:
+    """The SAM 3.1 mask of every object in a bundle's masks.json, by body name."""
+    path = bundle / MASKS_FILE
+    if not path.exists():
+        return {}
+    masks = {}
+    for entry in json.loads(path.read_text())["masks"]:
+        rle = entry["rle"]
+        origin = (int(rle["x"]), int(rle["y"]))
+        masks[entry["object"]] = ObjectMask(entry["concept"], entry["object"], tuple(entry["box"]), None, origin, decode_rle(rle))
+    return masks
 
 
 def full_raster(mask: ObjectMask, size: tuple[int, int]) -> np.ndarray:

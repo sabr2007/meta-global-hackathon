@@ -1,4 +1,5 @@
-"""Mesh processing for scanned objects: a light visual mesh for the browser, a convex collider for MuJoCo."""
+"""Mesh processing for scanned objects: a light visual mesh for the browser, a convex collider for
+MuJoCo, and the geometry measures used to place and grade them."""
 
 from __future__ import annotations
 
@@ -9,6 +10,10 @@ from scipy.spatial import cKDTree
 
 VISUAL_FACES = 20_000  # raw SAM 3D meshes have ~800k faces, far too heavy for a browser scene
 HULL_MAX_VERTICES = 96  # raw hulls reach ~3000 vertices; contact cost grows with them
+BASE_CONE_DEG = 30.0  # convex hull faces this close to straight down form the base an object stands on
+NEAREST_FACES = 16  # candidate triangles per point for exact point-to-surface distances
+SURFACE_SAMPLES = 60_000  # dense enough for a 3 px z-buffer of a laptop-sized object in the photo
+SAMPLE_SEED = 0
 
 
 def simplify(mesh: trimesh.Trimesh, target_faces: int = VISUAL_FACES) -> trimesh.Trimesh:
@@ -60,3 +65,38 @@ def oriented_size(vertices: np.ndarray) -> np.ndarray:
 def mean_color(mesh: trimesh.Trimesh) -> tuple[float, float, float, float]:
     rgb = np.asarray(mesh.visual.vertex_colors)[:, :3].mean(axis=0) / 255.0
     return (float(rgb[0]), float(rgb[1]), float(rgb[2]), 1.0)
+
+
+def surface_samples(mesh: trimesh.Trimesh, count: int = SURFACE_SAMPLES) -> np.ndarray:
+    """Area-uniform points on the surface (fixed seed, so reports and bakes repeat exactly)."""
+    points, _ = trimesh.sample.sample_surface(mesh, count, seed=SAMPLE_SEED)
+    return np.asarray(points, dtype=np.float64)
+
+
+def up_axis(vertices: np.ndarray) -> np.ndarray:
+    """The mesh's up axis: the normal of the base it stands on, i.e. minus the area-weighted mean
+    normal of the convex hull faces that look down (within BASE_CONE_DEG of -Z)."""
+    hull = trimesh.convex.convex_hull(np.asarray(vertices, dtype=np.float64))
+    normals, areas = hull.face_normals, hull.area_faces
+    down = normals[:, 2] < -np.cos(np.radians(BASE_CONE_DEG))
+    if not down.any():
+        return np.array([0.0, 0.0, 1.0])
+    base = -(normals[down] * areas[down, None]).sum(axis=0)
+    return base / np.linalg.norm(base)
+
+
+def tilt_deg(up: np.ndarray) -> float:
+    """Angle between a direction and +Z (the normal of every scanned table)."""
+    up = np.asarray(up, dtype=np.float64)
+    return float(np.degrees(np.arccos(np.clip(up[2] / np.linalg.norm(up), -1.0, 1.0))))
+
+
+def surface_distances(vertices: np.ndarray, faces: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """Distance from every point to the mesh surface (exact over the faces with the nearest centroids)."""
+    triangles = np.asarray(vertices, dtype=np.float64)[np.asarray(faces)]
+    points = np.asarray(points, dtype=np.float64)
+    count = min(NEAREST_FACES, len(triangles))
+    _, candidates = cKDTree(triangles.mean(axis=1)).query(points, k=count)
+    queries = np.repeat(points, count, axis=0)
+    closest = trimesh.triangles.closest_point(triangles[np.asarray(candidates).reshape(-1)], queries)
+    return np.linalg.norm(closest - queries, axis=1).reshape(len(points), count).min(axis=1)
