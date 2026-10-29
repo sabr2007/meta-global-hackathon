@@ -330,6 +330,30 @@ body {
   color: var(--orange);
 }
 
+/* The room toggle: RoomPlan's boxes by default, the LiDAR scan when pressed. Only the twin has a room. */
+.stage__room {
+  --pill-bg: rgb(27 27 28 / 0.78);
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 6;
+  backdrop-filter: blur(10px);
+}
+
+.stage__room[aria-pressed='true'] {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.stage__room:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.stage:not([data-mode='twin']) .stage__room {
+  display: none;
+}
+
 /* ---- composer ---- */
 
 .composer {

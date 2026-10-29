@@ -1,6 +1,5 @@
 // The mirror's robots: drag one onto the table or the floor and the reach map updates at once
-// (objects glow lime when some robot can take them, orange with the reason when none can). While a
-// robot is placed, the twin draws RoomPlan's boxes instead of the LiDAR scan.
+// (objects glow lime when some robot can take them, orange with the reason when none can).
 
 import type { Robot } from '../sim/robot';
 import { h } from './panel';
@@ -104,7 +103,6 @@ export function fleetPanel(twin: Twin, stage: Stage): FleetPanel {
     done.hidden = false;
     stage.setMode('twin');
     await stage.showAfter(null);
-    twin.setRoomView('boxes');
     await twin.fly('orbit');
     twin.setOrbitEnabled(false);
     stage.root.classList.add('stage--placing');
@@ -118,7 +116,6 @@ export function fleetPanel(twin: Twin, stage: Stage): FleetPanel {
     done.hidden = true;
     stage.root.classList.remove('stage--placing');
     twin.setOrbitEnabled(true);
-    twin.setRoomView('scan');
     twin.tintObjects(new Map());
     stage.setCaption('Twin · live physics');
     robotRows();

@@ -65,7 +65,7 @@ export interface Twin {
   pointOnPlane(clientX: number, clientY: number, z: number): [number, number] | null;
   tintObjects(colors: ReadonlyMap<string, string>): void;
   setOrbitEnabled(enabled: boolean): void;
-  /** Placing a robot reads better on RoomPlan's clean boxes than on the lumpy LiDAR scan. */
+  /** RoomPlan's clean boxes (the default) or the lumpy LiDAR scan. */
   setRoomView(view: RoomView): void;
   /** Centre of the scanned objects (robots face it when placed). */
   readonly focus: [number, number];
@@ -184,9 +184,9 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
     material.needsUpdate = true;
   });
 
-  // The other room: RoomPlan's boxes, cut to the same stage, on a floor with a 25 cm grid (hidden until asked
-  // for). The table is solid, the surface the robots and objects share; other furniture and the walls stay
-  // see-through, so they never hide it.
+  // The room shown by default: RoomPlan's boxes, cut to the same stage, on a floor with a 25 cm grid. The
+  // table is solid, the surface the robots and objects share; other furniture and the walls stay
+  // see-through, so they never hide it. The LiDAR scan comes back only when asked for.
   geoms.clip(ROOM_BOXES, clip);
   geoms.paint(GROUP.furniture, FURNITURE_LOOK.color, FURNITURE_LOOK.opacity);
   geoms.paint(GROUP.furniture, TABLE_COLOR, 1, /^table_/);
@@ -202,8 +202,15 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   grid.position.z = 0.002;
   boxFloor.add(floor, grid);
   boxFloor.position.set(centre.x, centre.y, 0);
-  boxFloor.visible = false;
   scene.add(boxFloor);
+  let roomView: RoomView = 'boxes';
+  const showRoom = (view: RoomView): void => {
+    const boxes = view === 'boxes';
+    room.root.visible = !boxes;
+    boxFloor.visible = boxes;
+    for (const group of ROOM_BOXES) geoms.setGroupVisible(group, boxes);
+  };
+  showRoom(roomView);
 
   const camera = new THREE.PerspectiveCamera(ORBIT_FOV, 1, NEAR, FAR);
   const photoPose = new THREE.Matrix4();
@@ -359,8 +366,12 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
       snapshot.updateMatrixWorld(true);
       snapshot.projectionMatrix.copy(photoProjection(photoCamera, { x: 0, y: 0, width: w, height: h }, w, h));
       snapshot.projectionMatrixInverse.copy(snapshot.projectionMatrix).invert();
+      // Muse Spark's verdict reads this render next to the photos: it keeps the LiDAR scan it has always
+      // shown, whatever room the screen shows.
+      showRoom('scan');
       renderer.setRenderTarget(target);
       renderer.render(scene, snapshot);
+      showRoom(roomView);
       const pixels = new Uint8Array(w * h * 4);
       renderer.readRenderTargetPixels(target, 0, 0, w, h, pixels);
       renderer.setRenderTarget(null);
@@ -395,10 +406,8 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
       controls.enablePan = enabled;
     },
     setRoomView(view: RoomView) {
-      const boxes = view === 'boxes';
-      room.root.visible = !boxes;
-      boxFloor.visible = boxes;
-      for (const group of ROOM_BOXES) geoms.setGroupVisible(group, boxes);
+      roomView = view;
+      showRoom(view);
     },
     focus: [centre.x, centre.y],
     onFrame(listener: () => void) {

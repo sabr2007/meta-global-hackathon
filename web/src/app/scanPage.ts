@@ -135,6 +135,18 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   if (import.meta.env.DEV) Object.assign(window, { __ayna: { twin, stage } });
   const fleet: FleetPanel = fleetPanel(twin, stage);
   panel.insertBefore(fleet.root, historyBlock);
+  // The twin's room is RoomPlan's boxes; the raw LiDAR scan only on request (and never in the one-take).
+  if (!options.autoplay) {
+    const lidar = h('button', 'pill pill--small pill--outline stage__room', 'LiDAR scan');
+    lidar.type = 'button';
+    lidar.setAttribute('aria-pressed', 'false');
+    lidar.addEventListener('click', () => {
+      const on = lidar.getAttribute('aria-pressed') !== 'true';
+      twin.setRoomView(on ? 'scan' : 'boxes');
+      lidar.setAttribute('aria-pressed', String(on));
+    });
+    stage.root.append(lidar);
+  }
   robotsTag.textContent = `${twin.robots.robots.length} robot${twin.robots.robots.length === 1 ? '' : 's'}`;
   stage.setInk(twin.before.map((b) => ({ key: b.object, rle: b.rle, style: 'found' })));
 
