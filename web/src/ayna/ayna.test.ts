@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { hitPlane, pixelRay, project, type PhotoCamera } from './camera';
+import { hitPlane, pixelRay, project, type PhotoCamera, type Vec3 } from './camera';
 import { checkPlan } from './dispatch';
 import type { FleetRobot } from './fleet';
-import { checkCandidate, headingDelta, type BeforeMask, type SceneObject, type Segmented } from './goals';
+import { boxArea, checkCandidate, headingDelta, type BeforeMask, type SceneObject, type Segmented } from './goals';
+import type { TriangleMesh } from './glb';
 import { imageSize } from './images';
+import { silhouette } from './raster';
 import { decodeRle, encodeRle, iou, maskStats, scaleRle, type Rle } from './rle';
 
 // A camera 1 m above the table origin looking straight down; image x = world +x, image y = world -y.
@@ -177,7 +179,63 @@ describe('size check', () => {
     const shrunk = checkCandidate({ camera: tilted, objects, before, segmented: at(near.x, near.y, 6), imageSize: { width: 400, height: 400 } });
     expect(shrunk.reasons.join(' ')).toMatch(/changed size/);
   });
+
+  test('a flat object moved back looks thinner as well as smaller, and still passes', () => {
+    // A phone held low over the table: a 1 cm thick calculator, rendered at its start and 30 cm back.
+    const eye: Vec3 = [0, -0.6, 0.35];
+    const z = unit(eye);
+    const x = unit([-z[1], z[0], 0]); // (0, 0, 1) x z
+    const y: Vec3 = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+    const low: PhotoCamera = { ...camera, camera_to_world: [0, 1, 2].map((i) => [x[i], y[i], z[i], eye[i]]).concat([[0, 0, 0, 1]]) };
+    const size: Vec3 = [0.16, 0.08, 0.01];
+    const start: Vec3 = [0, 0, 0.005];
+    const goal: Vec3 = [0, 0.3, 0.005];
+    const startMask = silhouette(low, boxMesh(size), { position: start, rotation: IDENTITY });
+    const goalMask = silhouette(low, boxMesh(size), { position: goal, rotation: IDENTITY });
+    const raw = maskStats(goalMask).area / maskStats(startMask).area;
+    expect(boxArea(low, size, goal) / boxArea(low, size, start)).toBeCloseTo(raw, 1);
+    // distance alone expects ×0.62 here and would read the faithful move as a shrink to ×0.81
+    expect(raw * (Math.hypot(...goal.map((v, k) => v - eye[k])) / Math.hypot(...start.map((v, k) => v - eye[k]))) ** 2).toBeLessThan(0.85);
+    const flat: SceneObject[] = [{ name: 'a', label: 'calculator', concept: 'calculator', size_m: size, start }];
+    const check = checkCandidate({
+      camera: low,
+      objects: flat,
+      before: [{ object: 'a', concept: 'calculator', area_px: maskStats(startMask).area, rle: startMask }],
+      segmented: [{ name: 'a', source: 'concept', masks: [{ objectId: '0', confidence: 0.9, area: maskStats(goalMask).area, rle: goalMask }] }],
+      imageSize: { width: 400, height: 400 },
+    });
+    expect(check.passed).toBe(true);
+    expect(check.goals[0].areaRatio).toBeGreaterThan(0.93);
+    expect(check.goals[0].areaRatio).toBeLessThan(1.07);
+    expect(check.goals[0].to[1]).toBeCloseTo(0.3, 1);
+  });
 });
+
+const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+function unit(v: Vec3): Vec3 {
+  const n = Math.hypot(...v);
+  return [v[0] / n, v[1] / n, v[2] / n];
+}
+
+/** An axis-aligned box as a triangle mesh in its own frame. */
+function boxMesh([sx, sy, sz]: Vec3): TriangleMesh {
+  const positions = new Float32Array(24);
+  for (let i = 0; i < 8; i += 1) {
+    positions[i * 3] = (i & 1 ? 0.5 : -0.5) * sx;
+    positions[i * 3 + 1] = (i & 2 ? 0.5 : -0.5) * sy;
+    positions[i * 3 + 2] = (i & 4 ? 0.5 : -0.5) * sz;
+  }
+  const quads = [
+    [0, 1, 3, 2],
+    [4, 5, 7, 6],
+    [0, 1, 5, 4],
+    [2, 3, 7, 6],
+    [0, 2, 6, 4],
+    [1, 3, 7, 5],
+  ];
+  return { positions, indices: Uint32Array.from(quads.flatMap(([a, b, c, d]) => [a, b, c, a, c, d])) };
+}
 
 describe('feasibility', () => {
   const goal = (name: string, moves: boolean, to: [number, number, number]) => ({

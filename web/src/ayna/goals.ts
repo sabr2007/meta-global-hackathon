@@ -1,7 +1,7 @@
 // From an imagined "after" photo to metric goals: find every scanned object in it (SAM 3.1 masks),
 // check that nothing vanished, appeared or changed size, and turn each mask into a target on the table.
 
-import { hitPlane, pixelRay, cameraPosition, type PhotoCamera, type Vec3 } from './camera';
+import { hitPlane, pixelRay, project, type PhotoCamera, type Vec3 } from './camera';
 import { forEachPixel, iou, maskStats, scaleRle, type Rle } from './rle';
 
 // SAM 3.1 alone varies by about ±8% on the unedited photo (0.92-0.99 on the desk); the image model
@@ -50,7 +50,7 @@ export interface ObjectGoal {
   found: boolean;
   source: Segmented['source'];
   mask: Rle | null; // in hero photo pixels
-  areaRatio: number; // after/before pixel area, or the same corrected for the new distance (whichever is closer to 1)
+  areaRatio: number; // after/before pixel area, or the same corrected for the new spot (whichever is closer to 1)
   from: Vec3;
   to: Vec3;
   distanceM: number;
@@ -124,6 +124,48 @@ export function headingDelta(from: number, to: number): number {
 
 const distance2d = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
+/** Area of the convex hull of 2D points (monotone chain, then the shoelace formula). */
+function hullArea(points: [number, number][]): number {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (sorted.length < 3) return 0;
+  const cross = (o: [number, number], a: [number, number], b: [number, number]): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const chain = (list: [number, number][]): [number, number][] => {
+    const out: [number, number][] = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], p) <= 0) out.pop();
+      out.push(p);
+    }
+    return out.slice(0, -1);
+  };
+  const hull = [...chain(sorted), ...chain([...sorted].reverse())];
+  let twice = 0;
+  for (let i = 0; i < hull.length; i += 1) {
+    const [x1, y1] = hull[i];
+    const [x2, y2] = hull[(i + 1) % hull.length];
+    twice += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(twice) / 2;
+}
+
+/**
+ * Pixel area of an object's bounding box seen through the photo camera with its centre at `center`:
+ * the hull of the eight projected corners. It carries distance, the angle the object is seen at (a
+ * flat object at the back of a table looks thinner, not just smaller) and the lens's stretch towards
+ * the image edges, so the ratio between two spots is how much a faithfully moved object should change.
+ */
+export function boxArea(camera: PhotoCamera, size: Vec3, center: Vec3): number {
+  const corners: [number, number][] = [];
+  for (const dx of [-0.5, 0.5]) {
+    for (const dy of [-0.5, 0.5]) {
+      for (const dz of [-0.5, 0.5]) {
+        const p = project(camera, [center[0] + dx * size[0], center[1] + dy * size[1], center[2] + dz * size[2]]);
+        if (p.depth > 0) corners.push([p.x, p.y]);
+      }
+    }
+  }
+  return hullArea(corners);
+}
+
 export interface CheckInput {
   camera: PhotoCamera;
   objects: SceneObject[];
@@ -138,7 +180,6 @@ export function checkCandidate(input: CheckInput): CandidateCheck {
   const { camera, objects } = input;
   const sx = camera.width / input.imageSize.width;
   const sy = camera.height / input.imageSize.height;
-  const eye = cameraPosition(camera);
   const reasons: string[] = [];
   const notes: string[] = [];
 
@@ -158,16 +199,19 @@ export function checkCandidate(input: CheckInput): CandidateCheck {
     const before = beforeOf.get(object.name);
     const found = input.segmented.find((s) => s.name === object.name);
     if (!before || !found) continue;
+    const beforeCenter = placeOnPlane(camera, before.rle, object.start[2]).center;
+    const startArea = boxArea(camera, object.size_m, object.start);
     for (const instance of found.masks) {
       const rle = scaleRle(instance.rle, sx, sy);
       const { center, heading } = placeOnPlane(camera, rle, object.start[2]);
-      const startDistance = Math.hypot(...object.start.map((v, k) => v - eye[k]));
-      const goalDistance = center ? Math.hypot(...center.map((v, k) => v - eye[k])) : startDistance;
-      // Image area falls with the square of the distance, so a moved object may rightly grow or
-      // shrink. Image editors also often move an object at its old pixel size. Either reading is a
-      // faithful edit; an object that matches neither was resized (or is something else).
+      // A moved object may rightly look bigger or smaller: its box, seen from the photo's camera at
+      // the new spot, says by how much. Image editors also often move an object at its old pixel
+      // size. Either reading is a faithful edit; an object that matches neither was resized (or is
+      // something else).
+      const goal: Vec3 | null = center && beforeCenter ? [center[0] + object.start[0] - beforeCenter[0], center[1] + object.start[1] - beforeCenter[1], object.start[2]] : null;
+      const expected = goal && startArea > 0 ? boxArea(camera, object.size_m, goal) / startArea : 1;
       const raw = maskStats(rle).area / before.area_px;
-      const corrected = raw * (goalDistance / startDistance) ** 2;
+      const corrected = expected > 0 ? raw / expected : raw;
       const ratio = Math.abs(Math.log(raw)) < Math.abs(Math.log(corrected)) ? raw : corrected;
       const score = Math.abs(Math.log(ratio)) + 0.2 * (1 - (instance.confidence ?? 0.5));
       options.push({ object, instance, rle, ratio, center, heading, score, source: found.source });
