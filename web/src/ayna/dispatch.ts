@@ -33,10 +33,10 @@ export interface SparkPlan {
 
 const cm = (m: number): string => `${(m * 100).toFixed(0)} cm`;
 
-function overlaps(a: [number, number][], shift: [number, number], b: [number, number][]): boolean {
+function overlaps(a: [number, number][], shift: [number, number], b: [number, number][], clearance = CLEARANCE_M): boolean {
   for (const [ax, ay] of a) {
     for (const [bx, by] of b) {
-      if (Math.hypot(ax + shift[0] - bx, ay + shift[1] - by) < CLEARANCE_M) return true;
+      if (Math.hypot(ax + shift[0] - bx, ay + shift[1] - by) < clearance) return true;
     }
   }
   return false;
@@ -62,7 +62,7 @@ export function planFacts(goals: ObjectGoal[], objects: SceneObject[], fleet: Fl
     robots.push(`- robot ${robot.id} (${robot.kind}, ${robot.label}), gripper opens ${cm(robot.gripWidthM)}:`);
     for (const g of moving) {
       const pick = robot.reachOf(g.name);
-      const put = robot.reachPoint(g.to[0], g.to[1]);
+      const put = robot.reachPoint(g.to[0], g.to[1], g.name);
       const verdict = pick.ok && put.ok ? 'can do it' : `cannot: ${!pick.ok ? `object ${pick.reason}` : `target ${put.reason}`}`;
       robots.push(`    ${g.name}: ${verdict}`);
     }
@@ -83,13 +83,13 @@ export function planFacts(goals: ObjectGoal[], objects: SceneObject[], fleet: Fl
 }
 
 /** Objects that must be moved before each object, because its target covers where they stand now. */
-export function blockers(goals: ObjectGoal[], footprints: Footprints): Map<string, string[]> {
+export function blockers(goals: ObjectGoal[], footprints: Footprints, clearance = CLEARANCE_M): Map<string, string[]> {
   const result = new Map<string, string[]>();
   for (const g of goals) {
     const mine = footprints.get(g.name);
     if (!g.moves || !mine) continue;
     const shift: [number, number] = [g.to[0] - g.from[0], g.to[1] - g.from[1]];
-    const blocking = goals.filter((other) => other.name !== g.name && footprints.has(other.name) && overlaps(mine, shift, footprints.get(other.name)!));
+    const blocking = goals.filter((other) => other.name !== g.name && footprints.has(other.name) && overlaps(mine, shift, footprints.get(other.name)!, clearance));
     result.set(g.name, blocking.map((b) => b.name));
   }
   return result;
@@ -123,12 +123,12 @@ export function checkPlan(
   const refusals: Refusal[] = [];
   const fixes: string[] = [];
   const handled = new Set<string>();
-  const capable = (g: ObjectGoal): FleetRobot[] => fleet.filter((r) => r.reachOf(g.name).ok && r.reachPoint(g.to[0], g.to[1]).ok);
+  const capable = (g: ObjectGoal): FleetRobot[] => fleet.filter((r) => r.reachOf(g.name).ok && r.reachPoint(g.to[0], g.to[1], g.name).ok);
   const blocker = (g: ObjectGoal): string =>
     fleet
       .map((r) => {
         const pick = r.reachOf(g.name);
-        const put = r.reachPoint(g.to[0], g.to[1]);
+        const put = r.reachPoint(g.to[0], g.to[1], g.name);
         return `${r.label}: ${!pick.ok ? pick.reason : put.reason}`;
       })
       .join('; ');
@@ -176,4 +176,28 @@ export function checkPlan(
   const ordered = orderSteps(steps, blockers(goals, footprints));
   for (const label of ordered.moved) fixes.push(`${label}: moved earlier, its spot had to be cleared first`);
   return { steps: ordered.steps, refusals, fixes };
+}
+
+const LANDING_CLEARANCE_M = 0.005; // a goal whose footprint comes this close to an object that stays lands on it
+
+/** Why the robots could not carry out this after photo, one line per move they could not do. */
+export function infeasible(goals: ObjectGoal[], fleet: FleetRobot[], footprints: Footprints): string[] {
+  const reasons: string[] = [];
+  const moving = goals.filter((g) => g.found && g.moves);
+  for (const g of moving) {
+    const why = fleet.map((r) => {
+      const pick = r.reachOf(g.name);
+      const put = pick.ok ? r.reachPoint(g.to[0], g.to[1], g.name) : pick;
+      return { robot: r, ok: pick.ok && put.ok, reason: put.reason };
+    });
+    if (!why.some((w) => w.ok)) reasons.push(`no robot can move the ${g.label} there (${why.map((w) => `${w.robot.label}: ${w.reason}`).join('; ')})`);
+  }
+  const landing = blockers(goals, footprints, LANDING_CLEARANCE_M);
+  for (const g of moving) {
+    for (const name of landing.get(g.name) ?? []) {
+      const other = goals.find((o) => o.name === name);
+      if (other && !other.moves) reasons.push(`the ${g.label} would land on the ${other.label}, which stays`);
+    }
+  }
+  return reasons;
 }

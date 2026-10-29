@@ -35,7 +35,8 @@ export interface FleetRobot {
   readonly label: string;
   readonly gripWidthM: number;
   reachOf(object: string): Reach;
-  reachPoint(x: number, y: number): Reach;
+  /** Can it put something down at (x, y)? With `object`, the exact test for that object's footprint. */
+  reachPoint(x: number, y: number, object?: string): Reach;
   run(step: MoveStep): Promise<StepResult>;
   /** Called before every physics step. */
   update(): void;
@@ -72,8 +73,17 @@ class RegistryRobot implements FleetRobot {
     return { ok: r.ok, reason: r.reason, distanceM: r.distance_m };
   }
 
-  reachPoint(x: number, y: number): Reach {
-    const r = this.robot.reachPoint(x, y);
+  reachPoint(x: number, y: number, object?: string): Reach {
+    let [px, py] = [x, y];
+    if (object) {
+      const { mujoco, model } = this.physics;
+      const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, object);
+      const radius = objectShape(this.physics, object).radius * FOOTPRINT_SHARE;
+      [px, py] = this.placeable(x, y, radius, body);
+      const surface = this.scene.placeSurface(px, py, radius, body);
+      if (typeof surface === 'string') return { ok: false, reason: `can't put it down there: ${surface}`, distanceM: 0 };
+    }
+    const r = this.robot.reachPoint(px, py);
     return { ok: r.ok, reason: r.reason, distanceM: r.distance_m };
   }
 

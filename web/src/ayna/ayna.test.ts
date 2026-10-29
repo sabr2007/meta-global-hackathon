@@ -178,3 +178,50 @@ describe('size check', () => {
     expect(shrunk.reasons.join(' ')).toMatch(/changed size/);
   });
 });
+
+describe('feasibility', () => {
+  const goal = (name: string, moves: boolean, to: [number, number, number]) => ({
+    name,
+    label: name,
+    found: true,
+    source: 'concept' as const,
+    mask: null,
+    areaRatio: 1,
+    from: [0, 0, 0] as [number, number, number],
+    to,
+    distanceM: 0.1,
+    yawDelta: 0,
+    moves,
+  });
+  const reachUpTo = (limit: number): FleetRobot => ({
+    id: 'arm',
+    kind: 'arm',
+    label: 'Arm',
+    gripWidthM: 0.11,
+    reachOf: () => ({ ok: true, reason: 'ok', distanceM: 0.3 }),
+    reachPoint: (x: number) => (x <= limit ? { ok: true, reason: 'ok', distanceM: x } : { ok: false, reason: `${x.toFixed(2)} m away, reach ${limit} m`, distanceM: x }),
+    run: async () => ({ ok: true, reason: 'done' }),
+    update: () => {},
+    reset: () => {},
+    status: () => 'Ready',
+  });
+
+  test('a goal out of every robot reach makes the version infeasible', async () => {
+    const { infeasible } = await import('./dispatch');
+    const reasons = infeasible([goal('cup', true, [0.9, 0, 0])], [reachUpTo(0.76)], new Map());
+    expect(reasons[0]).toMatch(/no robot can move the cup there \(Arm: 0.90 m away/);
+    expect(infeasible([goal('cup', true, [0.5, 0, 0])], [reachUpTo(0.76)], new Map())).toEqual([]);
+  });
+
+  test('a goal on top of an object that stays is infeasible, one that moves away is not', async () => {
+    const { infeasible } = await import('./dispatch');
+    const footprints = new Map<string, [number, number][]>([
+      ['cup', [[0, 0]]],
+      ['book', [[0.2, 0]]],
+    ]);
+    const onBook = [goal('cup', true, [0.2, 0, 0]), goal('book', false, [0, 0, 0])];
+    expect(infeasible(onBook, [reachUpTo(0.76)], footprints).join(' ')).toMatch(/cup would land on the book/);
+    const bookMoves = [goal('cup', true, [0.2, 0, 0]), { ...goal('book', true, [0.4, 0, 0]), from: [0.2, 0, 0] as [number, number, number] }];
+    expect(infeasible(bookMoves, [reachUpTo(0.76)], footprints)).toEqual([]);
+  });
+});

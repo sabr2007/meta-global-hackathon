@@ -2,7 +2,7 @@
 // Node eval share it; `trace` reports each step (which model, what it did, how long, what it cost).
 
 import type { PhotoCamera } from './camera';
-import { checkPlan, planFacts, type PlannedStep, type Refusal, type SparkPlan } from './dispatch';
+import { checkPlan, infeasible, planFacts, type Footprints, type PlannedStep, type Refusal, type SparkPlan } from './dispatch';
 import type { FleetRobot, StepResult } from './fleet';
 import { checkCandidate, conceptCounts, footprint, type BeforeMask, type CandidateCheck, type ObjectGoal, type SceneObject, type Segmented } from './goals';
 import { imageSize } from './images';
@@ -73,6 +73,8 @@ export interface Candidate {
   width: number;
   height: number;
   check: CandidateCheck;
+  /** Moves of this version no robot can carry out (it kept every object, but the robots cannot do it). */
+  infeasible: string[];
 }
 
 export interface Imagined {
@@ -95,6 +97,16 @@ function where(camera: PhotoCamera, mask: BeforeMask): string {
   const column = x < camera.width / 3 ? 'left' : x > (2 * camera.width) / 3 ? 'right' : 'centre';
   const row = y < camera.height / 3 ? 'back' : y > (2 * camera.height) / 3 ? 'front' : 'middle';
   return `${row} ${column} of the photo`;
+}
+
+/** Where each object stands on its table, from its mask on the real photo. */
+export function footprintsOf(ctx: SceneContext): Footprints {
+  return new Map(
+    ctx.before.map((b) => {
+      const object = ctx.objects.find((o) => o.name === b.object);
+      return [b.object, object ? footprint(ctx.camera, b.rle, object.start[2] - object.size_m[2] / 2) : []] as [string, [number, number][]];
+    }),
+  );
 }
 
 export function briefs(ctx: SceneContext, fleet: FleetRobot[]): SceneObjectBrief[] {
@@ -126,7 +138,8 @@ export function robotLines(fleet: FleetRobot[]): string[] {
 
 function candidateFacts(c: Candidate): string {
   const moved = c.check.goals.filter((g) => g.moves).map((g) => `${g.label} ${(g.distanceM * 100).toFixed(0)} cm`);
-  return moved.length ? `moves ${moved.join(', ')}; ${c.check.notes.filter((n) => n.includes('drift') || n.includes('stayed')).join('; ')}` : 'nothing moved';
+  const notes = c.check.notes.filter((n) => n.includes('drift') || n.includes('stayed'));
+  return moved.length ? `moves ${moved.join(', ')}; the robots can do every move${notes.length ? `; ${notes.join('; ')}` : ''}` : 'nothing moved';
 }
 
 /** Steps 1-4: Spark writes the edit, Muse Image draws candidates, SAM 3.1 checks them, Spark judges. */
@@ -139,6 +152,7 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
     return conceptCounts(ctx.objects, b.objects);
   });
   const objectBriefs = briefs(ctx, fleet);
+  const footprints = footprintsOf(ctx);
   const feedback: string[] = [];
   const candidates: Candidate[] = [];
   let instruction: Instruction | null = null;
@@ -169,9 +183,18 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
             beforeCounts: await counts,
             intent,
           });
-          const verdict = check.passed ? `Version ${id} keeps all ${ctx.objects.length} objects` : `Version ${id} rejected: ${check.reasons.join('; ')}`;
+          // A version that keeps every object must also be something the robots can do: each move needs a
+          // robot that reaches the object and can put it down at its goal, never on top of an object that stays.
+          const blocked = check.passed ? infeasible(check.goals, fleet, footprints) : [];
+          if (blocked.length) {
+            check.passed = false;
+            check.reasons.push(...blocked);
+          }
+          const verdict = check.passed
+            ? `Version ${id} keeps all ${ctx.objects.length} objects, and the robots can do every move`
+            : `Version ${id} rejected: ${check.reasons.join('; ')}`;
           trace({ step: 'check', state: check.passed ? 'done' : 'fail', text: verdict, usage: segmented.usage, candidate: id, check: { passed: check.passed, reasons: check.reasons } });
-          return { id, round, image, ...size, check };
+          return { id, round, image, ...size, check, infeasible: blocked };
         } catch (error) {
           trace({ step: 'imagine', state: 'fail', text: `Version ${id} failed: ${error instanceof Error ? error.message : String(error)}`, candidate: id });
           return null;
@@ -201,6 +224,12 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
     feedback.push(reasons.length ? reasons.join('; ') : 'the image model failed to answer');
     trace({ step: 'judge', state: 'fail', text: round < options.rounds ? `No version passed (${feedback.at(-1)}); drawing again` : 'No version passed the check' });
   }
+  // Nothing fully doable: take the version that kept every object and leaves the fewest moves to refuse.
+  const doable = candidates.filter((c) => c.infeasible.length > 0).sort((a, b) => a.infeasible.length - b.infeasible.length)[0];
+  if (doable) {
+    trace({ step: 'judge', state: 'info', text: `No version can be done in full; version ${doable.id} keeps every object, so the robots will do what they can and refuse ${doable.infeasible.length} move${doable.infeasible.length === 1 ? '' : 's'}` });
+    return { instruction: instruction!, feedback, candidates, chosen: doable, judgement: null };
+  }
   return { instruction: instruction!, feedback, candidates, chosen: null, judgement: null };
 }
 
@@ -217,12 +246,7 @@ export function dispatch(ctx: SceneContext, request: string, chosen: Candidate, 
 }
 
 export async function dispatchGoals(ctx: SceneContext, request: string, goals: ObjectGoal[], fleet: FleetRobot[], models: Models, trace: Trace, label = ''): Promise<Dispatch> {
-  const footprints = new Map(
-    ctx.before.map((b) => {
-      const object = ctx.objects.find((o) => o.name === b.object);
-      return [b.object, object ? footprint(ctx.camera, b.rle, object.start[2] - object.size_m[2] / 2) : []] as [string, [number, number][]];
-    }),
-  );
+  const footprints = footprintsOf(ctx);
   const facts = planFacts(goals, ctx.objects, fleet, footprints);
   if (!facts.moves.length) {
     trace({ step: 'plan', state: 'done', text: 'Nothing needs to move' });
