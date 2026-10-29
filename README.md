@@ -257,7 +257,8 @@ xcodebuild -project Ayna.xcodeproj -scheme Ayna -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath build -allowProvisioningUpdates build
 ```
 
-**Deploy:** `cd web && vercel deploy --prod`. One Vercel Function serves `/api`; accounts, scans and runs
+**Deploy:** push to `main`. The Vercel project is connected to this repository with Root Directory `web`,
+so each push to `main` builds and ships production. One Vercel Function serves `/api`; accounts, scans and runs
 live in a private Cloudflare R2 bucket, reached over its S3 API with a token scoped to that one bucket.
 Browsers get presigned links (the bucket's CORS rule allows the site's origins) and the phone uploads with a
 presigned PUT, so no file passes through the function. Set `META_API_KEY`, `META_API_BASE`, `AUTH_SECRET`,
