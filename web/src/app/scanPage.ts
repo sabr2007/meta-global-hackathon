@@ -132,8 +132,11 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   stage.setInk(twin.before.map((b) => ({ key: b.object, rle: b.rle, style: 'found' })));
 
   // In the one-take (?autoplay) the panel follows the run, so a screen recording needs no scrolling.
+  // On a phone the stage and the panel stack, so while the robots work the stage stays in view instead.
+  const narrow = (): boolean => window.matchMedia('(max-width: 980px)').matches;
+  let acting = false;
   const reveal = (node: HTMLElement): void => {
-    if (options.autoplay && !node.hidden) node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (options.autoplay && !node.hidden && !(acting && narrow())) node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   const versionImages = new Map<string, string>();
@@ -191,6 +194,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     stage.setInk(ink);
     stage.setCaption(`Robots' result over the imagined photo · ${receipt.moved.done}/${receipt.moved.asked} moves done`, receipt.score >= 80 ? 'lime' : 'orange');
     stage.setScore(receipt.score);
+    acting = false;
   };
 
   const refreshHistory = async (): Promise<RunCard[]> => {
@@ -289,7 +293,10 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     planBlock.hidden = false;
     const list = stepsList(steps, refusals, robotLabel);
     planBlock.replaceChildren(h('h2', 'eyebrow block__title', `Muse Spark's plan · ${steps.length} step${steps.length === 1 ? '' : 's'}`), list.root);
-    reveal(planBlock);
+    if (narrow()) {
+      acting = true;
+      stageWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else reveal(planBlock);
     stage.setInk([]);
     await stage.showAfter(null);
     stage.setMode('twin');
@@ -415,7 +422,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
     const chosen = run.candidates.find((c) => c.id === run.chosen)!;
     await showResult(receipt, goals, url(chosen.file));
-    window.setTimeout(() => reveal(receiptSlot), 300);
+    window.setTimeout(() => reveal(receiptSlot), narrow() ? 2500 : 300); // on a phone, hold the result on the photo first
     receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true, usage: run.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${runId}/episode` }));
     endRun();
     document.body.dataset.autoplay = 'done';

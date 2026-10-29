@@ -121,6 +121,11 @@ export function renderEval(): void {
     ', summarised by ',
     h('code', {}, 'web/scripts/landing-numbers.mjs'),
     ` on ${formatDate(e.generated)}. The robots are scripted controllers that read exact poses from the simulator, so these numbers grade the goals and the plans, not a learned policy.`,
+    e.allTime
+      ? ` Every run on this desk since the first round, including the code we fixed along the way: ${e.allTime.moves.done}/${e.allTime.moves.asked} requested moves done in ${e.allTime.measured} measured runs; ${e.allTime.stopped} more stopped because no version passed, and ${e.allTime.zero} scored 0. Each round and what it taught us: `
+      : null,
+    e.allTime ? h('a', { href: 'https://github.com/sabr2007/meta-global-hackathon/blob/main/docs/eval-log.md', rel: 'noopener' }, 'docs/eval-log.md') : null,
+    e.allTime ? '.' : null,
   );
 }
 

@@ -43,7 +43,8 @@ const logged = lines.map((line, i) => {
     throw new Error(`${input}:${i + 1} is not JSON`);
   }
 });
-const all = logged.filter((r) => (scan === 'all' || r.scan === scan) && (!since || (r.at ?? '') >= since));
+const ofScan = logged.filter((r) => scan === 'all' || r.scan === scan);
+const all = ofScan.filter((r) => !since || (r.at ?? '') >= since);
 // done: robots ran and the verifier measured; no-after: SAM 3.1 rejected every version, nothing moved
 const done = all.filter((r) => r.status === 'done' && !r.error && typeof r.total === 'number' && r.total > 0);
 const stopped = all.filter((r) => r.status === 'no-after' && !r.error);
@@ -76,6 +77,18 @@ const numbers = {
     median: Math.round(median(done.map((r) => r.seconds))),
     min: Math.min(...done.map((r) => r.seconds)),
     max: Math.max(...done.map((r) => r.seconds)),
+  },
+  // every logged run of the scan, all rounds and all versions of the code, next to the latest round
+  allTime: {
+    since: ofScan.map((r) => r.at ?? '').filter(Boolean).sort()[0] ?? null,
+    attempted: ofScan.filter((r) => !r.error).length,
+    measured: ofScan.filter((r) => r.status === 'done' && !r.error && r.total > 0).length,
+    stopped: ofScan.filter((r) => r.status === 'no-after' && !r.error).length,
+    moves: {
+      asked: sum(ofScan.filter((r) => r.status === 'done' && r.moved).map((r) => r.moved.asked)),
+      done: sum(ofScan.filter((r) => r.status === 'done' && r.moved).map((r) => r.moved.done)),
+    },
+    zero: ofScan.filter((r) => r.status === 'done' && r.score === 0).length,
   },
   list: finished.map((r) => ({
     run: r.run,

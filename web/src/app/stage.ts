@@ -7,6 +7,7 @@ import { outline, type Rle } from '../ayna/rle';
 export type InkStyle = 'found' | 'ghost' | 'match' | 'miss';
 export type StageMode = 'photo' | 'twin';
 
+const LABEL_LINE = 13; // px between stacked labels
 const INK: Record<InkStyle, { color: string; size: number; step: number }> = {
   found: { color: 'rgba(255,255,255,0.9)', size: 1.6, step: 5 },
   ghost: { color: 'rgba(255,255,255,0.75)', size: 1.3, step: 9 },
@@ -84,13 +85,23 @@ export function createStage(photoUrl: string, size: { width: number; height: num
         context.arc(r.x + x * sx, r.y + y * sy, style.size, 0, Math.PI * 2);
         context.fill();
       }
-      if (layer.label) {
-        const top = r.y + layer.rle.y * sy;
-        const left = r.x + (layer.rle.x + layer.rle.w / 2) * sx;
-        context.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-        context.textAlign = 'center';
-        context.fillText(layer.label, left, Math.max(12, top - 6));
-      }
+    }
+    // Labels sit above their object; one that would cover a label already placed moves up a line
+    // (objects grouped in a corner would otherwise print their centimetres on top of each other).
+    context.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+    context.textAlign = 'center';
+    const placed: { left: number; right: number; top: number; bottom: number }[] = [];
+    for (const layer of layers) {
+      if (!layer.label) continue;
+      const half = context.measureText(layer.label).width / 2 + 3;
+      const cx = r.x + (layer.rle.x + layer.rle.w / 2) * sx;
+      let y = Math.max(12, r.y + layer.rle.y * sy - 6);
+      const box = (): { left: number; right: number; top: number; bottom: number } => ({ left: cx - half, right: cx + half, top: y - 11, bottom: y + 2 });
+      const hits = (): boolean => placed.some((p) => box().left < p.right && box().right > p.left && box().top < p.bottom && box().bottom > p.top);
+      while (hits() && y > LABEL_LINE + 12) y -= LABEL_LINE;
+      placed.push(box());
+      context.fillStyle = INK[layer.style].color;
+      context.fillText(layer.label, cx, y);
     }
   };
 

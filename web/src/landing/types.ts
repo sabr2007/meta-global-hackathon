@@ -131,6 +131,7 @@ export interface EvalFacts {
   failedSteps: number;
   costUsd: { median: number; total: number };
   seconds: { median: number; min: number; max: number };
+  allTime?: { since: string | null; attempted: number; measured: number; stopped: number; moves: { asked: number; done: number }; zero: number };
   list: EvalRun[];
 }
 
