@@ -22,3 +22,5 @@ __pycache__/
 
 # Local bundles built from private captures
 out/
+# a private copy of the store deployed inside the server function (AYNA_STORE=snapshot)
+web/snapshot/

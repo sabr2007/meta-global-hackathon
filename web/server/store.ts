@@ -1,8 +1,11 @@
 // Private storage for users, scans and runs: a private Vercel Blob store in production, a folder on
-// disk in local development. Browsers never get store credentials, only short-lived file URLs.
+// disk in local development, or (AYNA_STORE=snapshot) a read-only copy deployed inside the server
+// function with writes kept on the instance's temporary disk. Browsers never get store credentials,
+// only short-lived file URLs.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const URL_TTL_MS = 60 * 60 * 1000;
@@ -120,6 +123,24 @@ function diskStore(root: string): Store {
   };
 }
 
+/** A read-only snapshot with a writable layer on top: reads see the layer first, writes and removals
+ * go to it. Used when the Blob store is unavailable (the free plan's quota): everything works, but
+ * what is written lasts only as long as the server instance. */
+function overlayStore(snapshot: string, layer: string): Store {
+  const lower = diskStore(snapshot);
+  const upper = diskStore(layer);
+  return {
+    kind: 'disk',
+    getBytes: async (key) => (await upper.getBytes(key)) ?? lower.getBytes(key),
+    exists: async (key) => (await upper.exists(key)) || lower.exists(key),
+    putBytes: (key, bytes, type) => upper.putBytes(key, bytes, type),
+    list: async (prefix) => [...new Set([...(await lower.list(prefix)), ...(await upper.list(prefix))])].sort(),
+    remove: (key) => upper.remove(key),
+    readUrl: (key) => upper.readUrl(key),
+    uploadTarget: (key, type, max) => upper.uploadTarget(key, type, max),
+  };
+}
+
 function blobStore(): Store {
   // Imported lazily so local development does not need the package's credentials.
   const sdk = import('@vercel/blob');
@@ -198,8 +219,10 @@ function blobStore(): Store {
 let instance: Store | null = null;
 
 export function store(): Store {
-  instance ??= process.env.BLOB_READ_WRITE_TOKEN
-    ? blobStore()
-    : diskStore(process.env.AYNA_STORE_DIR ?? path.resolve(process.cwd(), '../data/store'));
+  if (!instance) {
+    if (process.env.AYNA_STORE === 'snapshot') instance = overlayStore(path.resolve(process.cwd(), 'snapshot'), path.join(tmpdir(), 'ayna-store'));
+    else if (process.env.BLOB_READ_WRITE_TOKEN) instance = blobStore();
+    else instance = diskStore(process.env.AYNA_STORE_DIR ?? path.resolve(process.cwd(), '../data/store'));
+  }
   return instance;
 }
