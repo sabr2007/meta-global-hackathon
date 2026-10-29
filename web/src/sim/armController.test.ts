@@ -66,10 +66,10 @@ describe.skipIf(!HAS_SCENE)('arm on a scanned desk', async () => {
   });
 
   test('explains what it cannot do', () => {
+    // The laptop is wider than the open gripper. (The yellow cylinder used to be refused too, but at
+    // its measured 9 cm instead of SAM 3D's 10.8 cm it fits the 11 cm gripper.)
     arm.pick(byLabel('laptop'));
     expect(arm.status).toMatchObject({ phase: 'idle', error: true });
-    expect(arm.status.text).toMatch(/wide|reach/);
-    arm.pick(byLabel('cylinder'));
     expect(arm.status.text).toMatch(/wide|reach/);
   });
 });
