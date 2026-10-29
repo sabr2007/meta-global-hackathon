@@ -38,3 +38,8 @@ def test_world_frame_puts_origin_at_zero_and_lifts_points_above_floor():
     one_meter_up = frame.points(np.array([[1.0, -0.2, -2.0]]))[0]
     assert np.allclose(one_meter_up, [0.0, 0.0, 1.0])
     assert np.allclose(frame.matrix @ [1.0, -0.2, -2.0, 1.0], [0.0, 0.0, 1.0, 1.0])
+
+
+def test_world_frame_rebuilds_from_its_matrix():
+    frame = WorldFrame(origin_arkit=np.array([0.7, -1.3, 2.1]))
+    assert np.allclose(WorldFrame.from_matrix(frame.matrix).origin_arkit, frame.origin_arkit)

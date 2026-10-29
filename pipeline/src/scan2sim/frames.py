@@ -67,6 +67,11 @@ class WorldFrame:
 
     origin_arkit: np.ndarray  # ARKit point that becomes the world origin (floor centre)
 
+    @classmethod
+    def from_matrix(cls, arkit_to_world: np.ndarray) -> WorldFrame:
+        """The frame whose `matrix` this is (scene.json stores it as frame.arkit_to_world)."""
+        return cls(origin_arkit=-ARKIT_TO_ZUP.T @ np.asarray(arkit_to_world, dtype=np.float64)[:3, 3])
+
     @property
     def matrix(self) -> np.ndarray:
         """4x4 homogeneous transform ARKit -> world."""

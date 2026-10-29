@@ -3,7 +3,7 @@ from PIL import Image
 
 from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
-from scan2sim.hero import GL_TO_CV, encode_rle, upright_camera
+from scan2sim.hero import GL_TO_CV, PhotoCamera, decode_rle, encode_rle, upright_camera
 from scan2sim.images import UprightImage
 from scan2sim.segmentation import ObjectMask
 
@@ -50,3 +50,17 @@ def test_rle_round_trip():
         position += count
         value = not value
     assert np.array_equal(flat.reshape(4, 5), raster)
+
+
+def test_decode_rle_inverts_encode_rle():
+    rng = np.random.default_rng(5)
+    raster = rng.random((13, 17)) > 0.6
+    rle = encode_rle(ObjectMask("x", "1", (0, 0, 17, 13), None, (3, 4), raster))
+    assert np.array_equal(decode_rle(rle), raster)
+
+
+def test_seen_needs_the_frame_and_a_clear_line_of_sight():
+    camera = PhotoCamera(100, 100, 100.0, 100.0, 50.0, 50.0, np.eye(4))  # at the origin, looking down -Z
+    wall = np.array([[x, y, -1.0] for x in np.linspace(-0.2, 0.2, 60) for y in np.linspace(-0.2, 0.2, 60)])
+    points = np.array([[0.0, 0.0, -1.0], [0.0, 0.0, -1.5], [3.0, 0.0, -1.0], [0.0, 0.0, 1.0]])
+    assert camera.seen(points, wall).tolist() == [True, False, False, False]

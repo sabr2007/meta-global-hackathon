@@ -6,15 +6,17 @@ import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
+import trimesh
 
 from scan2sim import robots
 from scan2sim.frames import quat_from_matrix
 from scan2sim.scene import Box, ScannedObject, SimScene
 
 FLOOR_MARGIN = 1.0  # extra plane size around the scanned floor (render size only)
-SCANNED_DENSITY = 600.0  # kg/m^3 until physical properties come from Muse Spark
+SCANNED_DENSITY = 600.0  # kg/m^3 for objects without a Muse Spark mass
 COLLIDER_ALPHA = 0.35
 FURNITURE_CONTYPE = 4  # collides with contype-1 bodies (objects, probes) but not the arm (arm.ARM_CONTYPE)
+SCANNED_FRICTION = (0.9, 0.005, 0.0001)  # sliding, torsional, rolling; Muse Spark can set the sliding one
 
 # Geom groups let the viewer toggle layers.
 GROUP_PROBES = 0
@@ -64,28 +66,39 @@ def _box_geom(parent: ET.Element, box: Box) -> None:
     )
 
 
+def _mesh_asset(asset: ET.Element, name: str, vertices: np.ndarray, faces: np.ndarray) -> None:
+    ET.SubElement(asset, "mesh", name=name, vertex=_fmt(vertices), face=" ".join(str(int(i)) for i in np.ravel(faces)))
+
+
 def _hull_mesh(asset: ET.Element, obj: ScannedObject) -> None:
-    ET.SubElement(
-        asset,
-        "mesh",
-        name=f"{obj.name}_hull",
-        vertex=_fmt(obj.hull_vertices),
-        face=" ".join(str(int(i)) for i in np.ravel(obj.hull_faces)),
-    )
+    _mesh_asset(asset, f"{obj.name}_hull", obj.hull_vertices, obj.hull_faces)
+    for i, (vertices, faces) in enumerate(obj.collider_pieces):
+        _mesh_asset(asset, f"{obj.name}_piece{i}", vertices, faces)
+
+
+def _physical(obj: ScannedObject, shapes: list[tuple[np.ndarray, np.ndarray]]) -> list[dict[str, str]]:
+    """Per colliding shape: its share of the object's estimated mass (by volume) and its friction."""
+    if obj.mass_kg is None:
+        return [{} for _ in shapes]
+    volumes = np.array([trimesh.Trimesh(vertices, faces).volume for vertices, faces in shapes])
+    friction = _fmt([obj.friction, *SCANNED_FRICTION[1:]])
+    return [{"mass": _fmt([obj.mass_kg * v / volumes.sum()]), "friction": friction} for v in volumes]
 
 
 def _scanned_body(parent: ET.Element, obj: ScannedObject) -> None:
     body = ET.SubElement(parent, "body", name=obj.name, pos=_fmt(obj.position))
     ET.SubElement(body, "freejoint", name=f"{obj.name}_free")
-    ET.SubElement(
-        body,
-        "geom",
-        {"class": "scanned"},
-        name=f"{obj.name}_geom",
-        type="mesh",
-        mesh=f"{obj.name}_hull",
-        rgba=_fmt([*obj.rgba[:3], COLLIDER_ALPHA]),
-    )
+    rgba = _fmt([*obj.rgba[:3], COLLIDER_ALPHA])
+    hull = ET.SubElement(body, "geom", {"class": "scanned"}, name=f"{obj.name}_geom", type="mesh", mesh=f"{obj.name}_hull", rgba=rgba)
+    if not obj.collider_pieces:
+        hull.attrib.update(_physical(obj, [(obj.hull_vertices, obj.hull_faces)])[0])
+        return
+    # The pieces collide and weigh; the whole hull stays as the object's outline (the arm plans grasps on it).
+    hull.attrib.update(contype="0", conaffinity="0", mass="0")
+    for i, physical in enumerate(_physical(obj, list(obj.collider_pieces))):
+        ET.SubElement(
+            body, "geom", {"class": "scanned", **physical}, name=f"{obj.name}_piece{i}", type="mesh", mesh=f"{obj.name}_piece{i}", rgba=rgba
+        )
 
 
 def _add_home_key(root: ET.Element, scene: SimScene) -> None:
@@ -119,7 +132,7 @@ def scene_to_mjcf(scene: SimScene, model_name: str = "scanned-room") -> str:
     ET.SubElement(probe_default, "geom", density="600", friction="0.9 0.005 0.0001", group=str(GROUP_PROBES))
     scanned_default = ET.SubElement(default, "default", {"class": "scanned"})
     ET.SubElement(
-        scanned_default, "geom", density=_fmt([SCANNED_DENSITY]), friction="0.9 0.005 0.0001", group=str(GROUP_SCANNED)
+        scanned_default, "geom", density=_fmt([SCANNED_DENSITY]), friction=_fmt(SCANNED_FRICTION), group=str(GROUP_SCANNED)
     )
 
     asset = ET.SubElement(root, "asset")

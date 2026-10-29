@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import numpy as np
+import trimesh
+
+from scan2sim.object_mesh import collider_pieces, convex_hull
+from scan2sim.scene import ScannedObject, SimScene
 
 FLOOR_Y = -1.2  # ARKit floor height (the phone starts ~1.2 m above the floor)
 ROOM_CENTER = np.array([1.0, FLOOR_Y, -2.0])
 ROOM_YAW = np.radians(30.0)
 ROOM_W, ROOM_D, ROOM_H = 4.0, 3.0, 2.6
 TABLE_W, TABLE_H, TABLE_D = 1.2, 0.75, 0.8
+CUP_SIZE = np.array([0.08, 0.06, 0.10])
+CUP_RGB = (230, 120, 30)  # orange
+DROP_GAP = 0.003
 
 
 def yaw_matrix(yaw: float) -> np.ndarray:
@@ -74,3 +81,53 @@ def room_document() -> dict:
         "objects": [table],
         "sections": [{"label": "livingRoom", "center": ROOM_CENTER.tolist(), "story": 0}],
     }
+
+
+def look_at(position, target, up=(0.0, 0.0, 1.0)) -> np.ndarray:
+    """4x4 camera-to-world pose in OpenGL axes (looks down its -Z, +Y up in the image)."""
+    position, target = np.asarray(position, dtype=np.float64), np.asarray(target, dtype=np.float64)
+    back = position - target
+    back /= np.linalg.norm(back)
+    right = np.cross(up, back)
+    right /= np.linalg.norm(right)
+    pose = np.eye(4)
+    pose[:3, :3] = np.column_stack([right, np.cross(back, right), back])
+    pose[:3, 3] = position
+    return pose
+
+
+def cup_on_table(scene: SimScene, name: str = "obj_0_cup") -> ScannedObject:
+    """A box-shaped orange 'scanned object' resting just above the table centre."""
+    (table,) = [b for b in scene.boxes if b.category == "table"]
+    hull = trimesh.creation.box(extents=CUP_SIZE)
+    visual = trimesh.Trimesh(hull.vertices, hull.faces, vertex_colors=np.tile([*CUP_RGB, 255], (len(hull.vertices), 1)), process=False)
+    return ScannedObject(
+        name=name,
+        label="cup",
+        position=np.array([table.center[0], table.center[1], TABLE_H + CUP_SIZE[2] / 2 + DROP_GAP]),
+        visual_glb=visual.export(file_type="glb"),
+        hull_vertices=np.asarray(hull.vertices),
+        hull_faces=np.asarray(hull.faces),
+        size=CUP_SIZE,
+        rgba=(0.9, 0.5, 0.2, 1.0),
+        depth_scale=0.86,
+        fit_error_m=0.005,
+    )
+
+
+def ring_mesh() -> trimesh.Trimesh:
+    """A 7.4 cm ring, 2 cm thick, with a 3.4 cm hole."""
+    return trimesh.creation.torus(major_radius=0.027, minor_radius=0.01)
+
+
+def ring_on_table(scene: SimScene, decomposed: bool) -> ScannedObject:
+    """The ring lying on the table, simulated as convex pieces around its hole or as one hull."""
+    (table,) = [b for b in scene.boxes if b.category == "table"]
+    ring = ring_mesh()
+    hull_vertices, hull_faces = convex_hull(ring.vertices)
+    return ScannedObject(
+        name="obj_0_ring", label="ring", position=np.array([table.center[0], table.center[1], TABLE_H + 0.01 + DROP_GAP]),
+        visual_glb=ring.export(file_type="glb"), hull_vertices=hull_vertices, hull_faces=hull_faces,
+        size=np.array([0.074, 0.074, 0.02]), rgba=(0.9, 0.4, 0.1, 1.0), depth_scale=0.86, fit_error_m=0.004,
+        collider_pieces=tuple(collider_pieces(ring.vertices, ring.faces)) if decomposed else (),
+    )

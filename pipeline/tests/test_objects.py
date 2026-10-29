@@ -6,16 +6,15 @@ import numpy as np
 import pytest
 import trimesh
 
-from fixtures import TABLE_H, room_document
+from fixtures import CUP_SIZE, TABLE_H, cup_on_table, ring_mesh, ring_on_table, room_document
 from scan2sim.export import _object_metadata
 from scan2sim.mjcf import scene_to_mjcf
-from scan2sim.object_mesh import HULL_MAX_VERTICES, convex_hull, oriented_size, simplify
+from scan2sim.object_mesh import HULL_MAX_VERTICES, RING_PIECES, collider_pieces, convex_hull, oriented_size, simplify, through_hole
 from scan2sim.objects import body_name, rests_on, support_top, target_surface
 from scan2sim.roomplan import parse_room
-from scan2sim.scene import ScannedObject, build_scene
+from scan2sim.scene import Probe, build_scene
 
 SETTLE_SECONDS = 2.0
-CUP_SIZE = np.array([0.08, 0.06, 0.10])
 
 
 @pytest.fixture
@@ -26,24 +25,6 @@ def scene():
 def _table(scene):
     (table,) = [b for b in scene.boxes if b.category == "table"]
     return table
-
-
-def _cup(scene, name="obj_0_cup") -> ScannedObject:
-    """A box-shaped 'scanned object' resting just above the table centre."""
-    table = _table(scene)
-    hull = trimesh.creation.box(extents=CUP_SIZE)
-    return ScannedObject(
-        name=name,
-        label="cup",
-        position=np.array([table.center[0], table.center[1], TABLE_H + CUP_SIZE[2] / 2 + 0.003]),
-        visual_glb=hull.export(file_type="glb"),
-        hull_vertices=np.asarray(hull.vertices),
-        hull_faces=np.asarray(hull.faces),
-        size=CUP_SIZE,
-        rgba=(0.9, 0.5, 0.2, 1.0),
-        depth_scale=0.86,
-        fit_error_m=0.005,
-    )
 
 
 def test_body_names_are_mjcf_safe():
@@ -91,7 +72,7 @@ def test_an_object_on_the_floor_beside_the_table_does_not_rest_on_it(scene):
 
 
 def test_scanned_object_rests_on_the_table(scene):
-    scene = dataclasses.replace(scene, objects=(_cup(scene),))
+    scene = dataclasses.replace(scene, objects=(cup_on_table(scene),))
     model = mujoco.MjModel.from_xml_string(scene_to_mjcf(scene))
     data = mujoco.MjData(model)
     for _ in range(int(SETTLE_SECONDS / model.opt.timestep)):
@@ -126,7 +107,7 @@ def test_oriented_size_ignores_rotation_in_the_ground_plane():
 
 
 def test_bundle_lists_scanned_objects(scene):
-    meta = _object_metadata(_cup(scene))
+    meta = _object_metadata(cup_on_table(scene))
     assert meta["mesh"] == "objects/obj_0_cup.glb"
     assert meta["size_m"] == pytest.approx(CUP_SIZE.tolist())
     json.dumps(meta)  # serialisable
@@ -142,3 +123,47 @@ def test_reduced_hull_stays_inside_the_mesh():
     assert vertices[:, 2].min() >= points[:, 2].min() - 1e-9
     assert vertices[:, 2].max() <= points[:, 2].max() + 1e-9
     assert np.all(np.abs(vertices).max(axis=0) <= np.abs(points).max(axis=0) + 1e-9)
+
+
+def _inside(pieces, point) -> bool:
+    for vertices, faces in pieces:
+        hull = trimesh.Trimesh(vertices, faces)
+        if np.all(np.einsum("ij,ij->i", hull.face_normals, point - hull.triangles[:, 0]) <= 1e-9):
+            return True
+    return False
+
+
+def test_a_ring_has_a_hole_straight_through_it_and_a_box_does_not():
+    ring = ring_mesh()
+    grid, hole = through_hole(ring.vertices, ring.faces)
+    assert grid.center(hole) == pytest.approx([0.0, 0.0], abs=1e-3)
+    assert hole.sum() * grid.cell**2 == pytest.approx(np.pi * 0.017**2, rel=0.05)
+    box = trimesh.creation.box(extents=[0.06, 0.04, 0.02])
+    assert through_hole(box.vertices, box.faces) is None
+    assert collider_pieces(box.vertices, box.faces) == []
+
+
+def test_ring_pieces_cover_the_ring_and_leave_its_hole_open():
+    ring = ring_mesh()
+    pieces = collider_pieces(ring.vertices, ring.faces)
+    assert len(pieces) == RING_PIECES
+    assert not _inside(pieces, np.zeros(3))
+    assert not _inside(pieces, np.array([0.015, 0.0, 0.0]))  # 2 mm short of the hole's rim
+    core = [np.array([0.027 * np.cos(a), 0.027 * np.sin(a), 0.0]) for a in np.linspace(0, 2 * np.pi, 72, endpoint=False)]
+    assert all(_inside(pieces, p) for p in core)
+
+
+@pytest.mark.parametrize("decomposed", [True, False])
+def test_a_marble_dropped_into_a_scanned_ring_falls_through_its_hole(scene, decomposed):
+    ring = ring_on_table(scene, decomposed)
+    marble = Probe("probe_0", "sphere", (0.008,), ring.position + [0.0, 0.0, 0.05], (0.2, 0.5, 0.9, 1.0))
+    model = mujoco.MjModel.from_xml_string(scene_to_mjcf(dataclasses.replace(scene, objects=(ring,), probes=(marble,))))
+    data = mujoco.MjData(model)
+    for _ in range(int(1.5 / model.opt.timestep)):
+        mujoco.mj_step(model, data)
+    resting_z = data.body("probe_0").xpos[2]
+    if decomposed:
+        assert resting_z == pytest.approx(TABLE_H + 0.008, abs=2e-3)  # on the table, inside the ring
+        assert model.geom("obj_0_ring_geom").contype == 0 and model.body("obj_0_ring").mass[0] > 0
+    else:
+        assert resting_z > TABLE_H + 0.02  # one convex hull: the marble rests on a lid over the hole

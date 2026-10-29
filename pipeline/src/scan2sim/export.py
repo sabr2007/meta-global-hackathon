@@ -124,7 +124,12 @@ def _object_metadata(obj: ScannedObject) -> dict[str, Any]:
         "size_m": [round(v, 3) for v in obj.size.tolist()],
         "start": [round(v, 4) for v in obj.position.tolist()],
         "depth_scale": round(obj.depth_scale, 3),
+        "depth_source": obj.depth_source,
         "fit_error_mm": round(obj.fit_error_m * 1000, 1),
+        "convex_pieces": max(1, len(obj.collider_pieces)),
+        "physical": None
+        if obj.mass_kg is None
+        else {"mass_kg": round(obj.mass_kg, 4), "friction": round(obj.friction, 3), "reason": obj.physics_reason},
     }
 
 

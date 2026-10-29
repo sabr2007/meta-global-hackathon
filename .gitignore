@@ -19,3 +19,6 @@ __pycache__/
 
 # Night-run journal (local only)
 .night/
+
+# Local bundles built from private captures
+out/

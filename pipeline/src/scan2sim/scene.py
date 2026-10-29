@@ -76,6 +76,13 @@ class ScannedObject:
     depth_scale: float  # metric / SAM 3D depth used to place it
     fit_error_m: float  # mean LiDAR-to-mesh distance after placement
     concept: str = ""  # the SAM 3.1 noun phrase that finds it in a photo
+    level_deg: float = 0.0  # tilt of its SAM 3D pose that placement removed
+    photo_scale: float = 1.0  # size correction that matched its silhouette to the photo mask
+    depth_source: str = "lidar"  # "lidar", or "table" when it was slid along its camera rays onto the table
+    collider_pieces: tuple[tuple[np.ndarray, np.ndarray], ...] = ()  # body-local convex pieces; () = the hull
+    mass_kg: float | None = None  # estimated by Muse Spark (scan2sim objects --physics); None = uniform density
+    friction: float | None = None  # sliding friction on the table, with mass_kg
+    physics_reason: str = ""  # Muse Spark's one-line reason for both
 
 
 @dataclass(frozen=True)

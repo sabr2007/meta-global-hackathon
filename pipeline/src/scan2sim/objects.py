@@ -10,13 +10,16 @@ import re
 import numpy as np
 import trimesh
 
+from scan2sim.bake import bake_photo_colors
 from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
+from scan2sim.hero import full_raster, upright_camera
 from scan2sim.images import UprightImage
-from scan2sim.object_mesh import convex_hull, mean_color, oriented_size, simplify
-from scan2sim.placement import place_mesh
+from scan2sim.object_mesh import collider_pieces, convex_hull, mean_color, oriented_size, simplify
+from scan2sim.placement import level_rotation, place_mesh
 from scan2sim.reconstruct import ObjectReconstruction
 from scan2sim.scene import Box, ScannedObject
+from scan2sim.segmentation import ObjectMask
 
 DROP_GAP_M = 0.003  # start just above the support so the drop is gentle
 SUPPORT_TOLERANCE_M = 0.05  # RoomPlan tops can sit a few cm above the real surface
@@ -99,28 +102,52 @@ def build_scanned_object(
     view: CameraView,
     frame: WorldFrame,
     boxes: tuple[Box, ...],
+    mask: ObjectMask | None = None,
+    surface: Box | None = None,
 ) -> ScannedObject:
-    mesh = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
-    placement = place_mesh(mesh.vertices, reconstruction.pose, image, view, frame, lidar_points_world)
+    """`mask` is the object's SAM 3.1 mask in `image` (the mesh is matched to it in the photo and
+    takes the photo's colours inside it); `surface` is the table it stands on (a mesh the LiDAR puts
+    inside it is slid back onto it)."""
+    raw = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
+    light = simplify(raw)  # decimate first: placement renders and measures the mesh several times
+    rest_z = surface.top_z + DROP_GAP_M if surface is not None else None
+    placement = place_mesh(
+        light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world, mask, rest_z
+    )
     world = placement.vertices_world
+    colors = light.visual.vertex_colors
+    if mask is not None:  # where the photo sees the mesh, before any lift moves it off its pixels
+        camera = upright_camera(view, image, frame)
+        placed = trimesh.Trimesh(world, light.faces, vertex_colors=colors, process=False)
+        colors = bake_photo_colors(placed, camera, np.asarray(image.image), full_raster(mask, (camera.width, camera.height)))
+    # Settle the collider itself onto the face below its centre of mass (its vertices move with the
+    # mesh: picking them again after turning could pick a slightly different, tilted, base).
+    hull_vertices, hull_faces = convex_hull(world)
+    settle = level_rotation(hull_vertices)
+    pivot = hull_vertices.mean(axis=0)
+    world, hull_vertices = ((points - pivot) @ settle.T + pivot for points in (world, hull_vertices))
     low, high = world.min(axis=0), world.max(axis=0)
     # Lift objects out of the RoomPlan collider they rest on; never push them down.
     support = support_top(boxes, (low[:2] + high[:2]) / 2, low[2])
-    world = world + np.array([0.0, 0.0, max(0.0, support + DROP_GAP_M - low[2])])
+    lift = np.array([0.0, 0.0, max(0.0, support + DROP_GAP_M - low[2])])
+    world, hull_vertices = world + lift, hull_vertices + lift
     low, high = world.min(axis=0), world.max(axis=0)
     origin = (low + high) / 2
-    local = trimesh.Trimesh(world - origin, mesh.faces, vertex_colors=mesh.visual.vertex_colors, process=False)
-    visual = simplify(local)
-    hull_vertices, hull_faces = convex_hull(visual.vertices)
+    visual = trimesh.Trimesh(world - origin, light.faces, vertex_colors=colors, process=False)
+    settled_deg = float(np.degrees(np.arccos(np.clip((np.trace(settle) - 1) / 2, -1.0, 1.0))))
     return ScannedObject(
         name=name,
         label=label,
         position=origin,
         visual_glb=visual.export(file_type="glb"),
-        hull_vertices=hull_vertices,
+        hull_vertices=hull_vertices - origin,
         hull_faces=hull_faces,
         size=oriented_size(visual.vertices),
         rgba=mean_color(visual),
         depth_scale=placement.depth_scale,
         fit_error_m=placement.fit_error_m,
+        level_deg=placement.level_deg + settled_deg,
+        photo_scale=placement.photo_scale,
+        depth_source=placement.depth_source,
+        collider_pieces=tuple(collider_pieces(visual.vertices, visual.faces)),
     )

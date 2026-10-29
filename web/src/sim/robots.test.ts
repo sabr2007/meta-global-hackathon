@@ -59,12 +59,10 @@ describe.skipIf(!HAS_ROBOTS)('robots on a scanned desk', async () => {
     rest(physics, fleet, 0.5); // let the objects settle
   });
 
-  test('the mobile manipulator takes the yellow cylinder the arm cannot', async () => {
+  test('the mobile manipulator takes the yellow cylinder', async () => {
     const cylinder = byLabel('cylinder');
-    const armCheck = arm.reachOf(cylinder);
-    expect(armCheck.ok).toBe(false);
-    expect(armCheck.reason).toMatch(/0\.7\d m away, reach 0\.76 m/);
-    expect(armCheck.reason).toMatch(/1\d\.\d cm wide, gripper opens to 11 cm/);
+    // At its measured 9 cm (SAM 3D alone made it 10.8 cm) the cylinder fits the arm's gripper too.
+    expect(arm.reachOf(cylinder)).toMatchObject({ ok: true });
     expect(rover.reachOf(cylinder)).toMatchObject({ ok: true });
 
     const start = objectShape(physics, cylinder);
