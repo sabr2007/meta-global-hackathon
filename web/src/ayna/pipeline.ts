@@ -62,9 +62,16 @@ export function refusedInEdit(instruction: Instruction, objects: SceneObject[]):
 }
 
 export function resultLines(receipt: Receipt): string[] {
-  return receipt.results.map(
-    (r) =>
-      `- ${r.label}: ${r.wanted === 'move' ? 'should move' : 'should stay'}, off by ${(r.errorM * 100).toFixed(1)} cm${r.headingErrorDeg !== null ? `, heading off ${r.headingErrorDeg.toFixed(0)}°` : ''}, ${r.ok ? 'matches' : 'does not match'}${r.note ? ` (${r.note})` : ''}`,
+  return receipt.results.map((r) =>
+    /^refused before the edit/.test(r.note)
+      ? `- ${r.label}: the request implied a move, but no robot could do it, so the edit left it where it was (${r.note.replace(/^refused before the edit: /, '')})`
+      : resultLine(r),
+  );
+}
+
+function resultLine(r: Receipt['results'][number]): string {
+  return (
+    `- ${r.label}: ${r.wanted === 'move' ? 'should move' : 'should stay'}, off by ${(r.errorM * 100).toFixed(1)} cm${r.headingErrorDeg !== null ? `, heading off ${r.headingErrorDeg.toFixed(0)}°` : ''}, ${r.ok ? 'matches' : 'does not match'}${r.note ? ` (${r.note})` : ''}`
   );
 }
 

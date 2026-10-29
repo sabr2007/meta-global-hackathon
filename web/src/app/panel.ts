@@ -159,6 +159,14 @@ export function modelSummary(usage: Usage[]): { model: string; calls: number; ms
   return [...byModel.values()];
 }
 
+/** Moves done out of those the plan carried, and apart from them the ones Spark refused before drawing
+ * (they still count against the score: the request asked for them). */
+function movesLine(receipt: Receipt): string {
+  const early = receipt.results.filter((r) => /^refused before the edit/.test(r.note)).length;
+  if (!early) return `${receipt.moved.done} of ${receipt.moved.asked} requested moves done`;
+  return `${receipt.moved.done} of ${receipt.moved.asked - early} planned moves done · ${early} more the request implied were refused before the edit`;
+}
+
 function wantedLabel(r: Receipt['results'][number]): string {
   if (r.wanted === 'stay') return 'stays';
   if (/^refused/.test(r.note)) return 'move refused';
@@ -176,7 +184,7 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
   const overlap = receipt.overlap === null ? '' : ` · independent check against the imagined photo: contours overlap ${Math.round(receipt.overlap * 100)}%`;
   const inPhoto = receipt.photoMedianErrorCm === null || receipt.photoMedianErrorCm === undefined ? '' : `, centres ${receipt.photoMedianErrorCm.toFixed(1)} cm apart (median)`;
   summary.append(
-    h('p', 'receipt__line', `${receipt.moved.done} of ${receipt.moved.asked} requested moves done`),
+    h('p', 'receipt__line', movesLine(receipt)),
     h('p', 'receipt__sub', `${receipt.stayed.kept} of ${receipt.stayed.total} other objects left in place · requested moves off their goals by ${receipt.medianErrorCm.toFixed(1)} cm (median of the moves that got a goal), tolerance 3 cm${overlap}${inPhoto}`),
   );
   head.append(score, summary);
