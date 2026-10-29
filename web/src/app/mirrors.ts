@@ -136,7 +136,7 @@ export function loginPage(root: HTMLElement, session: Session, onSignedIn: (user
   error.setAttribute('role', 'alert');
   const submit = h('button', 'pill pill--lime', 'Sign in');
   submit.type = 'submit';
-  form.append(h('span', 'eyebrow', 'Live runs call Meta models'), title, email, password, error, submit, h('p', 'login__note', 'Judges: the credentials are in the submission. Without an account you can replay saved runs.'));
+  form.append(h('span', 'eyebrow', 'For pairing the iPhone scanner'), title, email, password, error, submit, h('p', 'login__note', 'Every mirror, its replays and live runs are open without an account.'));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
