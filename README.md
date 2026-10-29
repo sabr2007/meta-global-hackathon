@@ -35,10 +35,10 @@ automatic check is also a ready evaluation episode for a robot policy in a real 
 | Model | Where | Its job in the loop |
 |---|---|---|
 | **Muse Voice Transcribe** `muse-voice-transcribe-1.0` | `web/server/meta.ts` | Push-to-talk request (English or Russian) from a 16 kHz WAV recorded in the browser |
-| **Muse Spark** `muse-spark-1.3` | `web/server/ayna.ts`, `pipeline/…/discovery.py`, `verify.py` | Writes the edit instruction for this photo from the scene (objects, sizes, robot reach); judges the versions that pass; orders the moves and assigns robots with honest refusals; says in words whether the result matches. In the scan pipeline it lists the objects and reviews SAM's crops |
+| **Muse Spark** `muse-spark-1.3` | `web/server/ayna.ts`, `pipeline/…/discovery.py`, `verify.py` | Writes the edit instruction for this photo from the scene (objects, sizes, robot reach); judges the versions that pass; orders the moves and assigns robots with honest refusals; says in words whether the result matches. In the scan pipeline it lists the objects and reviews SAM's crops and, with `--physics`, estimates each object's mass and friction |
 | **Muse Image** `muse-image-1.0` | `web/server/meta.ts` | Develops 3 versions of the after photo in parallel by editing the real hero photo (same camera, same lighting) |
 | **SAM 3.1** `sam-3.1` | `web/server/meta.ts`, `pipeline/…/segmentation.py` | Finds every scanned object in the real photo and in each version; the conservation check rejects versions where an object vanished, appeared or changed size; the after masks become metric goals |
-| **SAM 3D Objects** (open weights, hosted on fal) | `pipeline/…/reconstruct.py` | A full 3D mesh and pose for every object mask; placed on the LiDAR points and simulated as a body |
+| **SAM 3D Objects** (open weights, hosted on fal) | `pipeline/…/reconstruct.py` | A full 3D mesh and pose for every object mask; levelled, matched to its silhouette in the photo, placed on the LiDAR points (or on the table when LiDAR sees through it), painted with the photo's colours and simulated as a body |
 
 Remove any of them and the loop breaks: there is no goal without Muse Image, no trusted goal without
 SAM 3.1, no plan without Spark, and no objects to move without SAM 3D.
@@ -139,7 +139,10 @@ uv run pytest
 `scan2sim objects` runs Spark + SAM 3.1 + review, lifts masks with LiDAR depth, gets SAM 3D meshes from fal
 (one request for all masks), places them, and writes the bundle: `scene.xml` (MJCF), `scene.json`,
 `room_mesh.glb`, `objects/*.glb`, `hero.jpg`, `masks.json`. `--cache` keeps every paid result, so rebuilds
-are free (~5 s).
+are free (~10 s). `--physics` adds Muse Spark's mass and friction per object (one call, cached too).
+`uv run scan2sim report ../data/scenes/mirror --capture ~/Downloads/Mirror.zip --photo 0036` grades every
+object against the capture: LiDAR distance, size against the LiDAR extents, tilt, drift in the first 2 s of
+physics, colour difference from the photo, photo IoU, how open a ring's hole stays, and mass.
 
 **Web app + API (Node 22+)**
 
@@ -184,9 +187,9 @@ deployed app reads scans from a private store through one-hour signed URLs.
 - One hero photo per table: objects outside it are not in the twin.
 - Muse Image moves things modestly and sometimes drops or duplicates a small object; that is what the
   SAM 3.1 check is for, and in our runs it rejects about half of the versions (see Numbers).
-- Our parallel gripper opens to 11 cm, so the laptop, the keyboard and the 10.8 cm yellow cylinder are
-  refused by the stationary arm.
-- Transparent objects (a clear bottle) are badly measured by LiDAR.
+- Our parallel gripper opens to 11 cm, so the laptop and the keyboard are refused by the stationary arm.
+- LiDAR sees through transparent objects (a clear bottle) and flattens small ones; such objects are placed
+  by resting them on the table along their camera rays, and their size comes from the photo, not LiDAR.
 - The iPhone upload path was tested in the iOS simulator against the API contract, not yet on a device.
 
 ## Hackathon rules and what is new
