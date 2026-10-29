@@ -82,8 +82,12 @@ flowchart LR
 - **Plans are checked, not trusted.** Spark's order and robot assignment are validated against each
   robot's reach and gripper; objects that block another object's target move first.
 - **Receipt.** An object matches when it rests within **3 cm** of its goal (and within 15° when it has a
-  clear long axis). 3 cm is half the smallest object on our desks; Meta's Habitat "tidy house" uses 15 cm
-  at room scale.
+  clear long axis); 3 cm is half the smallest object on our desks, Meta's Habitat "tidy house" uses 15 cm
+  at room scale. The score is *requested moves done × objects left in place*, so a refused or failed move
+  always costs points. Positions are checked against the goals the robots were sent to; the independent
+  check is how well the twin, rendered from the photo's camera, overlaps the imagined photo's masks.
+- **Closing the loop.** A slipped grasp is retried once; objects still off goal get a second plan from
+  where they are now.
 
 ## Robots
 
@@ -109,7 +113,22 @@ written here (`pipeline/src/scan2sim/arm.py`, `mobile.py`, `robots.py`; `web/src
 ## Numbers
 
 <!-- numbers:start -->
-Numbers are filled from `.night`-style eval logs by `npm run eval`; see the table below.
+**Scan → twin quality** (`uv run scan2sim report <bundle>`, medians over the objects of each scene; before = the
+pipeline at the start of the night, after = now):
+
+| | Desk (7 objects) before → after | Mirror-02 (6 objects) before → after |
+|---|---|---|
+| Mesh silhouette vs SAM mask, seen from the photo camera (IoU) | 0.55 → **0.93** | 0.65 → **0.86** |
+| Size across the line of sight vs LiDAR | 1.23 → **1.06** | 1.21 → **1.09** |
+| Tilt against the table | 2.9° → **0.0°** | 4.0° → **0.0°** |
+| Drift in the first 2 s of physics | 0.71 → **0.32 cm** | 0.84 → **0.34 cm** |
+| Colour difference vs the photo (ΔE) | 15.3 → **2.9** | 11.7 → **1.6** |
+
+The ring's hole stays open (a ring of convex pieces instead of one hull), the clear bottle no longer tips
+over (5.2 → 0.5 cm), and masses and friction come from Muse Spark with a one-line reason per object.
+
+**The loop** (live Meta models through the deployed API, robots in MuJoCo, the app's own verifier;
+`npm run eval`): EVAL_TABLE
 <!-- numbers:end -->
 
 ## Try it
@@ -195,8 +214,9 @@ deployed app reads scans from a private store through one-hour signed URLs.
 ## Limitations and honest failures
 
 - One hero photo per table: objects outside it are not in the twin.
-- Muse Image moves things modestly and sometimes drops or duplicates a small object; that is what the
-  SAM 3.1 check is for, and in our runs it rejects about half of the versions (see Numbers).
+- Muse Image sometimes drops, duplicates or resizes an object; that is what the SAM 3.1 check is for, and
+  it rejects most versions on cluttered requests (see Numbers). When no version keeps every object, Ayna
+  does not plan from one.
 - Our parallel gripper opens to 11 cm, so the laptop and the keyboard are refused by the stationary arm.
 - LiDAR sees through transparent objects (a clear bottle) and flattens small ones; such objects are placed
   by resting them on the table along their camera rays, and their size comes from the photo, not LiDAR.

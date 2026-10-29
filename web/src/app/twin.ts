@@ -152,8 +152,22 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
     new THREE.Plane(new THREE.Vector3(0, -1, 0), centre.y + ROOM_CLIP_HALF_M),
     new THREE.Plane(new THREE.Vector3(0, 0, -1), ROOM_CLIP_TOP_M),
   ];
+  // Out of the photo, the scanned room turns to clay and only the objects keep their colours.
+  const clay = { value: 0 };
   room.root.traverse((node) => {
-    if (node instanceof THREE.Mesh) (node.material as THREE.Material).clippingPlanes = clip;
+    if (!(node instanceof THREE.Mesh)) return;
+    const material = node.material as THREE.MeshStandardMaterial;
+    material.clippingPlanes = clip;
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uClay = clay;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uClay;')
+        .replace(
+          '#include <color_fragment>',
+          '#include <color_fragment>\n  float clayTone = dot(vColor.rgb, vec3(0.2126, 0.7152, 0.0722));\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05 + clayTone * 0.42), uClay);',
+        );
+    };
+    material.needsUpdate = true;
   });
 
   const camera = new THREE.PerspectiveCamera(ORBIT_FOV, 1, NEAR, FAR);
@@ -194,6 +208,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   const place = (blend: number): void => {
     // blend 0 = photo, 1 = orbit
     const t = easeInOut(blend);
+    clay.value = t;
     const position = photoPosition.clone().lerp(orbitPosition, t);
     const quaternion = photoQuaternion.clone().slerp(orbitQuaternion, t);
     camera.position.copy(position);
