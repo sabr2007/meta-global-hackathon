@@ -357,7 +357,7 @@ export class MobileManipulator extends RobotBase {
 
   private widthProblem(shape: ObjectShape): string | null {
     const max = this.info.gripper.max_width;
-    return shape.width > max - WIDTH_MARGIN_M ? `${(shape.width * 100).toFixed(1)} cm wide, gripper opens to ${(max * 100).toFixed(0)} cm` : null;
+    return shape.width > max - WIDTH_MARGIN_M ? `${(shape.width * 100).toFixed(1)} cm wide, needs ${((shape.width + WIDTH_MARGIN_M) * 100).toFixed(1)} cm with clearance, gripper opens ${(max * 100).toFixed(0)} cm` : null;
   }
 
   // --- execution ------------------------------------------------------------------------------

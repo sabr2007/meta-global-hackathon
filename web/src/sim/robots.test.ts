@@ -124,7 +124,7 @@ describe.skipIf(!HAS_ROBOTS)('robots on a scanned desk', async () => {
     const laptop = byLabel('laptop');
     const check = rover.reachOf(laptop);
     expect(check.ok).toBe(false);
-    expect(check.reason).toMatch(/cm wide, gripper opens to 16 cm/);
+    expect(check.reason).toMatch(/cm wide, needs [0-9.]+ cm with clearance, gripper opens 16 cm/);
     expect(rover.pick(laptop)).toMatchObject({ ok: false });
     expect(rover.status.error).toBe(true);
     expect(rover.placeAt(-1, 2.5)).toEqual({ ok: false, reason: 'Not holding anything' });

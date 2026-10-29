@@ -81,7 +81,7 @@ export class StationaryArm extends RobotBase {
     else if (below > HIGHEST_REACH_M) problems.push(`${below.toFixed(2)} m above the arm's base`);
     const maxWidth = this.info.gripper.max_width;
     if (shape.width > maxWidth - WIDTH_MARGIN_M) {
-      problems.push(`${(shape.width * 100).toFixed(1)} cm wide, gripper opens to ${(maxWidth * 100).toFixed(0)} cm`);
+      problems.push(`${(shape.width * 100).toFixed(1)} cm wide, needs ${((shape.width + WIDTH_MARGIN_M) * 100).toFixed(1)} cm with clearance, gripper opens ${(maxWidth * 100).toFixed(0)} cm`);
     }
     if (problems.length > 0) return { ok: false, reason: problems.join('; '), distance_m: distance };
     return { ok: true, reason: `${distance.toFixed(2)} m away, within reach`, distance_m: distance };

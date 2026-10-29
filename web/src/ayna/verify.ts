@@ -39,7 +39,7 @@ export interface Receipt {
   score: number; // 0-100: moves done / asked × objects left in place / objects that should stay
   matched: number; // objects that match the imagined photo
   total: number;
-  medianErrorCm: number;
+  medianErrorCm: number; // over the requested moves (all objects when nothing had to move)
   moved: { done: number; asked: number };
   stayed: { kept: number; total: number };
   overlap: number | null; // mean contour overlap of the moved objects (independent of the goals)
@@ -112,7 +112,9 @@ export function measure(input: MeasureInput): Receipt {
       note: input.notes.get(goal.name) ?? '',
     };
   });
-  const errors = results.map((r) => r.errorM * 100).sort((a, b) => a - b);
+  // The headline error is over the requested moves; objects that only had to stay would flatter it.
+  const moving = results.filter((r) => r.wanted === 'move');
+  const errors = (moving.length ? moving : results).map((r) => r.errorM * 100).sort((a, b) => a - b);
   const mid = errors.length >> 1;
   const medianErrorCm = errors.length ? (errors.length % 2 ? errors[mid] : (errors[mid - 1] + errors[mid]) / 2) : 0;
   const matched = results.filter((r) => r.ok).length;

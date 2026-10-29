@@ -41,7 +41,7 @@ const extension = (dataUrl: string): string => dataUrl.slice(5, dataUrl.indexOf(
 
 export function receiptLine(receipt: Receipt): string {
   const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}%`;
-  return `${receipt.moved.done}/${receipt.moved.asked} moves done · ${receipt.stayed.kept}/${receipt.stayed.total} others left in place · median error ${receipt.medianErrorCm.toFixed(1)} cm${overlap}`;
+  return `${receipt.moved.done}/${receipt.moved.asked} moves done · ${receipt.stayed.kept}/${receipt.stayed.total} others left in place · moved objects off by ${receipt.medianErrorCm.toFixed(1)} cm (median)${overlap}`;
 }
 
 export function resultLines(receipt: Receipt): string[] {
