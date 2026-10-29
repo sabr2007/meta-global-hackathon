@@ -1,7 +1,7 @@
 WEBVTT
 
 00:00:00.133 --> 00:00:03.067
-The request: “Put the white mouse next to the keyboard and the earbud case next to the mouse”
+The request: “Put all the small things together in one corner”
 
 00:00:03.200 --> 00:00:07.200
 SAM 3.1: Finds every object on your photo
@@ -10,13 +10,13 @@ SAM 3.1: Finds every object on your photo
 Muse Spark: Writes the edit for this exact photo
 
 00:00:11.400 --> 00:00:14.933
-Muse Image: Develops 3 versions of the after photo
+Muse Image: Develops 6 versions of the after photo
 
 00:00:14.933 --> 00:00:16.800
 SAM 3.1: Checks every object in every version
 
 00:00:16.800 --> 00:00:19.200
-SAM 3.1: Only version 1c kept every object, so it goes on
+Muse Spark: Picks the version that follows the request
 
 00:00:20.133 --> 00:00:26.200
 The after photo: It is the plan you approve before a robot touches anything
