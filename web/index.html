@@ -204,8 +204,9 @@
               <div class="station__copy">
                 <h3 class="title station__model">SAM 3.1</h3>
                 <p>
-                  Finds every object in every version. A version where something vanished, appeared or changed size is
-                  rejected with the reason, and Spark redraws it with a corrected instruction.
+                  Finds every object in every version. A version where something vanished, appeared or changed size, or
+                  that asks a move no robot can do, is rejected with the reason. When a whole round fails, Spark reads the
+                  reasons and decides: redraw with its own note to the editor, narrow the request, or stop.
                 </p>
               </div>
               <div class="station__artifact">
