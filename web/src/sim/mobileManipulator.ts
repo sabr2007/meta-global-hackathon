@@ -111,14 +111,14 @@ export class MobileManipulator extends RobotBase {
   reset(): void {
     this.abandon('Reset');
     this.held = null;
-    this.teleport(this.home);
-    this.motion.clear(true);
+    this.teleport(this.home); // also takes the targets the simulation was reset to
     this.setStatus('idle', 'Ready');
   }
 
   basePose(): BasePose {
     const qpos = this.physics.data.qpos;
-    return { x: qpos[this.qposAdr.x], y: qpos[this.qposAdr.y], z: 0, yaw: qpos[this.qposAdr.yaw] };
+    const yaw = qpos[this.qposAdr.yaw]; // the joint turns freely; report it in (-pi, pi]
+    return { x: qpos[this.qposAdr.x], y: qpos[this.qposAdr.y], z: 0, yaw: Math.atan2(Math.sin(yaw), Math.cos(yaw)) };
   }
 
   reachOf(objectName: string): ReachCheck {
