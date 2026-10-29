@@ -122,12 +122,26 @@ The upstream sources that the new code calls (`PreviewModel`, `PreviewScene.scen
   folder: no rooms, no `endedAt`, nothing in its manifest. Scans whose room was saved are kept
   even if the session never finished.
 
+**Send to Ayna** (built without a device; tested in the iOS 27 simulator against a local HTTPS
+mock of the API: pairing, a wrong code, upload with progress, the app killed mid-upload, 401,
+a storage 403, a failed `complete` retried at the next launch, Cancel)
+
+- The first *Send to Ayna* opens the pairing sheet with the keyboard up. A code from the web's
+  *Mirrors* page pairs and starts the upload (*Pair and send*); the chip shows the account.
+- The percentage climbs in Doto, then *Queued* turns lime. *Open on the web* opens the server.
+- Lock the phone or switch apps during a large upload: it should finish, and the card should say
+  *Queued* when you come back. Closing Ayna from the app switcher stops it (an iOS rule); the
+  card then explains that and offers *Retry*.
+- Unpair from the sheet's menu, then send again: the sheet asks for a new code.
+- On cellular, a multi-hundred-MB mirror uploads without asking; check the data cost first.
+
 **Debug builds:** run `-selftest`. It should still pass, because the house model, export and
 coverage scoring are unchanged.
 
 ## Known limitations
 
-- *Send to Ayna* is a disabled placeholder. There is no upload, server, voice or AR robot.
+- There is no voice or AR robot. *Send to Ayna* needs the web side's pairing and upload API;
+  the app never checks what the server does with the scan after `complete`.
 - Each mirror still saves an ARKit world map (often 10–40 MB), in the session folder and as a
   copy for its tracking group. It is kept for later relocalization on the same table (an AR
   robot) but costs storage and up to 6 s when finishing. To drop it, skip `saveWorldMap` in
