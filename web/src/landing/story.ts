@@ -104,7 +104,14 @@ function stationRequest(): void {
     bar.style.setProperty('--h', String(height));
     wave.append(bar);
   }
-  fillSlot('request', wave, h('p', { class: 'request__text' }, `“${run.request}”`), h('p', { class: 'eyebrow' }, 'The request of this run'));
+  // This run was typed; the waveform only stands in for a spoken request.
+  const spoken = (run as { source?: string }).source === 'voice';
+  fillSlot(
+    'request',
+    spoken ? wave : null,
+    h('p', { class: 'request__text' }, `“${run.request}”`),
+    h('p', { class: 'eyebrow' }, spoken ? 'Spoken in this run' : 'Typed in this run · spoken requests go through Voice Transcribe'),
+  );
 }
 
 function stationEdit(): void {

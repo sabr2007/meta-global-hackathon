@@ -4,7 +4,7 @@
 import { objectShape, type ObjectShape } from '../sim/objectShape';
 import type { Physics } from '../sim/physics';
 import type { Robot } from '../sim/robot';
-import { PLACE_HEADROOM_M, type SceneGeometry } from '../sim/sceneGeometry';
+import { PLACE_HEADROOM_M, spoken, type SceneGeometry } from '../sim/sceneGeometry';
 
 const NUDGE_STEP_M = 0.01; // a goal projected just off the table edge is moved onto it in 1 cm steps
 const NUDGE_MAX_M = 0.06;
@@ -84,10 +84,10 @@ class RegistryRobot implements FleetRobot {
       const surface = this.scene.placeSurface(px, py, landing.shape.radius * FOOTPRINT_SHARE, landing.body, landing.shape.bottom + PLACE_HEADROOM_M);
       if (typeof surface === 'string') return { ok: false, reason: `can't put it down there: ${surface}`, distanceM: 0 };
       if (!surface.object && Math.abs(surface.z - landing.shape.bottom) > SAME_SURFACE_M) {
-        return { ok: false, reason: `can't put it down there: (${px.toFixed(2)}, ${py.toFixed(2)}) is off the ${surface.name.replace(/_\d+$/, '')} it stands on`, distanceM: 0 };
+        return { ok: false, reason: `can't put it down there: (${px.toFixed(2)}, ${py.toFixed(2)}) is off ${spoken(surface.name)} it stands on`, distanceM: 0 };
       }
       if (landing.nudgedM > NUDGE_FEASIBLE_M) {
-        return { ok: false, reason: `can't put it down there: the spot is ${(landing.nudgedM * 100).toFixed(0)} cm past the edge of the ${surface.name.replace(/_\d+$/, '')}`, distanceM: 0 };
+        return { ok: false, reason: `can't put it down there: the spot is ${(landing.nudgedM * 100).toFixed(0)} cm past the edge of ${spoken(surface.name)}`, distanceM: 0 };
       }
     }
     const r = this.robot.reachPoint(px, py);

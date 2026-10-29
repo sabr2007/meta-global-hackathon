@@ -5,7 +5,7 @@ import { canPark, distanceField, insidePolygon, parkingSpots, pathTo, rectDistan
 import { objectShape, perceivedShape, type ObjectShape } from './objectShape';
 import type { Physics } from './physics';
 import { RobotBase, ok, refused, type BasePose, type ReachCheck, type RobotPhase, type RobotStatus, type StepResult } from './robot';
-import { PLACE_HEADROOM_M, type SceneGeometry } from './sceneGeometry';
+import { PLACE_HEADROOM_M, spoken, type SceneGeometry } from './sceneGeometry';
 
 // The mobile manipulator: plans where to park next to the surface (navigation.ts), drives there
 // along an A* path, raises the lift so the arm works at the surface height, and picks or places
@@ -196,7 +196,7 @@ export class MobileManipulator extends RobotBase {
     const shape = objectShape(this.physics, held.name);
     const surface = this.scene.placeSurface(x, y, shape.radius * FOOTPRINT_SHARE, this.bodyOf(held.name), held.origin[2] + PLACE_HEADROOM_M);
     if (typeof surface === 'string') return this.refuse(`Can't put ${label} down: ${surface}`);
-    const where = `on ${surface.object ? this.name(surface.object) : surface.name} at (${x.toFixed(2)}, ${y.toFixed(2)}) m`;
+    const where = `on ${surface.object ? this.name(surface.object) : spoken(surface.name)} at (${x.toFixed(2)}, ${y.toFixed(2)}) m`;
     return this.release([x, y], surface.z, held.yaw + yawDelta, where);
   }
 

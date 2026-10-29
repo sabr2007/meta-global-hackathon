@@ -18,6 +18,11 @@ const NOT_SURFACES = new Set(['chair', 'sofa', 'television', 'toilet', 'bathtub'
 const FLAT_M = 0.015; // a footprint rests flat when the surface under it varies less than this
 const FOOTPRINT_SAMPLES = 8;
 
+/** How messages name a surface or object: "table_0" -> "the table", "obj_3_orange_figurine" -> "the orange figurine". */
+export function spoken(name: string): string {
+  return `the ${name.replace(/^obj_\d+_/, '').replace(/_\d+$/, '').replace(/_/g, ' ')}`;
+}
+
 export interface ElementBox {
   name: string;
   kind: string;
@@ -161,8 +166,8 @@ export class SceneGeometry {
     for (let k = 0; k < FOOTPRINT_SAMPLES; k += 1) {
       const angle = (2 * Math.PI * k) / FOOTPRINT_SAMPLES;
       const rim = this.surfaceUnder(x + radius * Math.cos(angle), y + radius * Math.sin(angle), exclude, ceiling);
-      if (!rim || rim.z < center.z - FLAT_M) return `${where} is at the edge of ${center.name}`;
-      if (rim.z > center.z + FLAT_M) return `${where} is too close to ${rim.object ?? rim.name}`;
+      if (!rim || rim.z < center.z - FLAT_M) return `${where} is at the edge of ${spoken(center.name)}`;
+      if (rim.z > center.z + FLAT_M) return `${where} is too close to ${spoken(rim.object ?? rim.name)}`;
     }
     return center;
   }

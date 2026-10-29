@@ -3,7 +3,7 @@ import { ArmController } from './armController';
 import { objectShape } from './objectShape';
 import type { Physics } from './physics';
 import { RobotBase, ok, refused, type BasePose, type ReachCheck, type RobotStatus, type StepResult } from './robot';
-import { discOnRect, PLACE_HEADROOM_M, type SceneGeometry } from './sceneGeometry';
+import { discOnRect, PLACE_HEADROOM_M, spoken, type SceneGeometry } from './sceneGeometry';
 
 // The stationary arm as a Robot: ArmController does the manipulation; this adds the shared API
 // (reach checks, run(), placeAt on another surface) and moving its mocap base across the table.
@@ -175,7 +175,7 @@ export class StationaryArm extends RobotBase {
       if (tables.length === 0) return refused('Not on a table: the arm stands on a table top');
       const table = tables.reduce((a, b) => (b.top > a.top ? b : a));
       z = table.top;
-      support = table.name;
+      support = spoken(table.name);
     }
     for (const object of this.objectNames()) {
       const shape = objectShape(this.physics, object);

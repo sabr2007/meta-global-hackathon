@@ -139,7 +139,7 @@ describe.skipIf(!HAS_ROBOTS)('robots on a scanned desk', async () => {
     expect(rover.placeAt(chair.x, chair.y).reason).toMatch(/RoomPlan box around a chair/);
     const desk = fleet.scene.element('table_0')!.rect;
     const edge: [number, number] = [desk.x + desk.ux * desk.hu, desk.y + desk.uy * desk.hu];
-    expect(rover.placeAt(...edge).reason).toMatch(/edge of table_0/);
+    expect(rover.placeAt(...edge).reason).toMatch(/edge of the table/);
     expect(rover.status).toMatchObject({ phase: 'holding', holding: cylinder });
   });
 
