@@ -1,0 +1,69 @@
+{
+ "note": "Written by video/scripts/render.mjs with ayna-loop.mp4.",
+ "posterFrame": 494,
+ "posterSeconds": 16.466666666666665,
+ "seconds": 42,
+ "bytes": 1792063,
+ "cues": [
+  {
+   "start": 0.13333333333333333,
+   "end": 3.066666666666667,
+   "chip": "The request",
+   "text": "“Put the white mouse next to the keyboard and the earbud case next to the mouse”"
+  },
+  {
+   "start": 3.2,
+   "end": 7.2,
+   "chip": "SAM 3.1",
+   "text": "Finds every object on your photo"
+  },
+  {
+   "start": 7.2,
+   "end": 11.2,
+   "chip": "Muse Spark",
+   "text": "Writes the edit for this exact photo"
+  },
+  {
+   "start": 11.4,
+   "end": 14.933333333333334,
+   "chip": "Muse Image",
+   "text": "Develops 3 versions of the after photo"
+  },
+  {
+   "start": 14.933333333333334,
+   "end": 16.8,
+   "chip": "SAM 3.1",
+   "text": "Checks every object in every version"
+  },
+  {
+   "start": 16.8,
+   "end": 19.2,
+   "chip": "SAM 3.1",
+   "text": "Only version 1c kept every object, so it goes on"
+  },
+  {
+   "start": 20.133333333333333,
+   "end": 26.2,
+   "chip": "The after photo",
+   "text": "It is the plan you approve before a robot touches anything"
+  },
+  {
+   "start": 26.2,
+   "end": 30.2,
+   "chip": "Muse Spark",
+   "text": "Orders the moves and gives each one to a robot that can do it"
+  },
+  {
+   "start": 30.2,
+   "end": 34.2,
+   "chip": "SAM 3D Objects · twin",
+   "text": "The robots move SAM 3D bodies in a physics twin of the table"
+  },
+  {
+   "start": 34.2,
+   "end": 40.2,
+   "chip": "Verifier",
+   "text": "Every object is measured against the after photo"
+  }
+ ]
+}

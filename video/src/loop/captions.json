@@ -1,0 +1,22 @@
+{
+ "note": "On-screen captions of AynaLoop, also written to web/public/landing/ayna-loop.vtt by scripts/render.mjs. Frames at 30 fps; {placeholders} come from the featured run. 'single' replaces a cue when only one version passed SAM 3.1, so Muse Spark had nothing to choose between.",
+ "cues": [
+  { "key": "request", "from": 4, "to": 92, "chip": "The request", "text": "“{request}”" },
+  { "key": "segment", "from": 96, "to": 216, "chip": "SAM 3.1", "text": "Finds every object on your photo" },
+  { "key": "instruct", "from": 216, "to": 336, "chip": "Muse Spark", "text": "Writes the edit for this exact photo" },
+  { "key": "develop", "from": 342, "to": 448, "chip": "Muse Image", "text": "Develops {versions} versions of the after photo" },
+  { "key": "check", "from": 448, "to": 504, "chip": "SAM 3.1", "text": "Checks every object in every version" },
+  {
+   "key": "choose",
+   "from": 504,
+   "to": 576,
+   "chip": "Muse Spark",
+   "text": "Picks the version that follows the request",
+   "single": { "chip": "SAM 3.1", "text": "Only version {chosen} kept every object, so it goes on" }
+  },
+  { "key": "wipe", "from": 604, "to": 786, "chip": "The after photo", "text": "It is the plan you approve before a robot touches anything" },
+  { "key": "plan", "from": 786, "to": 906, "chip": "Muse Spark", "text": "Orders the moves and gives each one to a robot that can do it" },
+  { "key": "twin", "from": 906, "to": 1026, "chip": "SAM 3D Objects · twin", "text": "The robots move SAM 3D bodies in a physics twin of the table" },
+  { "key": "receipt", "from": 1026, "to": 1206, "chip": "Verifier", "text": "Every object is measured against the after photo" }
+ ]
+}

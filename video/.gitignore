@@ -1,0 +1,4 @@
+node_modules/
+out/
+recordings/*
+!recordings/README.md

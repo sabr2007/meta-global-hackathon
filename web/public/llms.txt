@@ -1,0 +1,9 @@
+# Ayna
+
+> Show your robot the after. Ayna turns an iPhone LiDAR scan of a table into a MuJoCo physics twin where every object is a SAM 3D body. Muse Spark writes an edit instruction for the owner's own photo, Muse Image develops versions of the "after" photo, SAM 3.1 rejects versions where an object vanished, appeared or changed size, Muse Spark picks one and assigns the moves to robots (or refuses, with the measurement), and a verifier measures every object against the photo in centimetres.
+
+Built for the Meta Global AI Developer Hackathon (Indie track).
+
+- [Landing page](/): the idea, one real run from request to receipt, and the eval numbers
+- [Demo](/app/): the app in the browser
+- [Source code](https://github.com/sabr2007/meta-global-hackathon): iPhone scanner, scan-to-sim pipeline, web app and eval

@@ -4,7 +4,482 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ayna — show your robot the after</title>
-    <meta http-equiv="refresh" content="0; url=/app/" />
+    <meta
+      name="description"
+      content="Ayna turns an iPhone scan of a table into a physics twin, edits your own photo into the after you asked for, checks every object in it with SAM 3.1, and measures the robot's result against that photo in centimetres."
+    />
+    <meta name="theme-color" content="#1b1b1c" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ayna — show your robot the after" />
+    <meta
+      property="og:description"
+      content="Your photo, edited into the after. Checked object by object, rehearsed by robots in a physics twin, measured in centimetres."
+    />
+    <meta property="og:image" content="/landing/ayna-loop-poster.webp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/landing/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/src/styles/fonts/Michroma-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <script type="module" src="/src/landing/main.ts"></script>
   </head>
-  <body></body>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="top">
+      <div class="wrap top__row">
+        <a class="logo logo--nav" href="/" aria-label="Ayna, home">
+          <span class="logo__row logo__solid" aria-hidden="true"><span>A</span><span>Y</span><span>N</span><span>A</span></span>
+          <span class="logo__row logo__mirror" aria-hidden="true"><span>A</span><span>Y</span><span>N</span><span>A</span></span>
+        </a>
+        <nav class="top__nav" aria-label="Sections">
+          <a href="#how">How it works</a>
+          <a href="#numbers">Numbers</a>
+          <a href="#robots">Robots</a>
+          <a href="#scanner">Scanner</a>
+          <a href="#why-now">Why now</a>
+        </nav>
+        <div class="top__actions">
+          <a class="pill pill--outline pill--small" href="/app/#/login">Sign in</a>
+          <a class="pill pill--lime pill--small" href="/app/">Try the demo</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- 1. hero -->
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="wrap hero__grid">
+          <div class="hero__copy">
+            <span class="logo logo--hero" role="img" aria-label="Ayna">
+              <span class="logo__row logo__solid" aria-hidden="true"><span>A</span><span>Y</span><span>N</span><span>A</span></span>
+              <span class="logo__row logo__mirror" aria-hidden="true"><span>A</span><span>Y</span><span>N</span><span>A</span></span>
+            </span>
+            <p class="eyebrow hero__kicker">Ayna means “mirror” in Kazakh</p>
+            <h1 id="hero-title" class="title hero__title">Show your robot the <span class="hero__after">after</span>.</h1>
+            <p class="hero__lede">
+              Scan a table with your iPhone and say what you want. Ayna edits your own photo into the after, checks every
+              object in it, lets robots rehearse it in a physics twin, and measures the result against that photo in
+              centimetres.
+            </p>
+            <div class="hero__actions">
+              <a class="pill pill--lime pill--big" href="/app/">Try the demo</a>
+              <a class="pill pill--outline pill--big" href="https://github.com/sabr2007/meta-global-hackathon">
+                <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+                  />
+                </svg>
+                GitHub
+              </a>
+            </div>
+            <div class="hero__models">
+              <p class="eyebrow">Five Meta models, one loop</p>
+              <ul class="model-list" role="list">
+                <li><span class="tag">Muse Voice Transcribe</span></li>
+                <li><span class="tag">Muse Spark</span></li>
+                <li><span class="tag">Muse Image</span></li>
+                <li><span class="tag">SAM 3.1</span></li>
+                <li><span class="tag">SAM 3D Objects</span></li>
+              </ul>
+            </div>
+          </div>
+
+          <figure class="film" aria-labelledby="film-caption">
+            <div class="film__frame">
+              <img
+                class="film__poster"
+                src="/landing/ayna-loop-poster-540.webp"
+                srcset="/landing/ayna-loop-poster-540.webp 540w, /landing/ayna-loop-poster.webp 1080w"
+                sizes="(min-width: 960px) 460px, (min-width: 560px) 480px, calc(100vw - 32px)"
+                width="1080"
+                height="1350"
+                fetchpriority="high"
+                alt="A frame of the film: the versions of the after photo that Muse Image developed for a real desk, with the verdicts SAM 3.1 stamped on them."
+              />
+              <video class="film__video" muted loop playsinline preload="none" aria-hidden="true" tabindex="-1">
+                <track kind="captions" src="/landing/ayna-loop.vtt" srclang="en" label="English" />
+              </video>
+            </div>
+            <div class="film__mirror" aria-hidden="true"></div>
+            <figcaption id="film-caption" class="film__caption">
+              <span data-slot="film-caption">One real run on a real desk, from request to receipt.</span>
+              <div class="film__controls">
+                <button class="film__toggle" type="button" hidden>
+                  <span class="film__toggle-icon" aria-hidden="true"></span>
+                  <span class="film__toggle-label">Play the film</span>
+                </button>
+                <details class="film__transcript">
+                  <summary>What the film shows</summary>
+                  <ol data-slot="film-transcript"></ol>
+                </details>
+              </div>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 2. the problem -->
+      <section class="problem section" id="problem" aria-labelledby="problem-title">
+        <div class="wrap problem__grid">
+          <div class="problem__copy">
+            <p class="section__eyebrow"><span class="num">01</span><span class="eyebrow">The problem</span></p>
+            <h2 id="problem-title" class="title section__title">“Tidy up” hides a hundred decisions.</h2>
+            <p class="section__lede">
+              Which things move. Where each one ends up. What stays put. What no gripper can hold. A text plan never says
+              where anything goes, so a robot guesses, and you find out after it has touched your things.
+            </p>
+            <div class="problem__blind">
+              <span class="problem__blind-dot" aria-hidden="true"></span>
+              <div>
+                <h3 class="title problem__blind-title">Robots touch things blindly.</h3>
+                <p>
+                  You cannot see what a robot is about to do to your desk, or check the result when it is done. Today, for
+                  chores a home robot cannot do yet, owners can
+                  <a href="https://www.1x.tech/neo" rel="noopener">schedule a remote 1X Expert to guide NEO</a>.
+                </p>
+              </div>
+            </div>
+          </div>
+          <figure class="problem__figure" data-reveal>
+            <div class="photo-crop" data-slot="problem-photo"></div>
+            <figcaption>
+              <ol class="questions" data-slot="questions"></ol>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 3. how it works -->
+      <section class="how section" id="how" aria-labelledby="how-title">
+        <div class="wrap">
+          <header class="section__head">
+            <p class="section__eyebrow"><span class="num">02</span><span class="eyebrow">How it works</span></p>
+            <h2 id="how-title" class="title section__title">One photo in. A checked plan out.</h2>
+            <p class="section__lede">
+              Five Meta models pass the work around a loop, and every step leaves something you can see: the words, the
+              pictures, the verdicts, the plan. Everything below comes from one real run on the desk above.
+            </p>
+          </header>
+
+          <ol class="loop" role="list">
+            <li class="station" data-reveal>
+              <div class="station__index"><span class="num">1</span></div>
+              <div class="station__copy">
+                <h3 class="title station__model">Muse Voice Transcribe</h3>
+                <p>Hears what you want, in your own words. Typing works too.</p>
+              </div>
+              <div class="station__artifact">
+                <blockquote class="request" data-slot="request"></blockquote>
+              </div>
+            </li>
+
+            <li class="station" data-reveal>
+              <div class="station__index"><span class="num">2</span></div>
+              <div class="station__copy">
+                <h3 class="title station__model">Muse Spark</h3>
+                <p>Writes the edit for this exact photo: what moves, where to, and what must stay where it is.</p>
+              </div>
+              <div class="station__artifact">
+                <div class="edit" data-slot="edit"></div>
+              </div>
+            </li>
+
+            <li class="station station--wide" data-reveal>
+              <div class="station__index"><span class="num">3</span></div>
+              <div class="station__copy">
+                <h3 class="title station__model">Muse Image</h3>
+                <p>Develops several versions of the after photo from your own picture, not a stock scene.</p>
+              </div>
+              <div class="station__artifact">
+                <ul class="versions" role="list" data-slot="versions"></ul>
+              </div>
+            </li>
+
+            <li class="station station--check" data-reveal>
+              <div class="station__index"><span class="num">4</span></div>
+              <div class="station__copy">
+                <h3 class="title station__model">SAM 3.1</h3>
+                <p>
+                  Finds every object in every version. A version where something vanished, appeared or changed size is
+                  rejected with the reason, and Spark redraws it with a corrected instruction.
+                </p>
+              </div>
+              <div class="station__artifact">
+                <ul class="verdicts" role="list" data-slot="verdicts"></ul>
+                <p class="station__note" data-slot="rejections">Rejected versions never reach a robot.</p>
+              </div>
+            </li>
+
+            <li class="station" data-reveal>
+              <div class="station__index"><span class="num">5</span></div>
+              <div class="station__copy">
+                <h3 class="title station__model">Muse Spark</h3>
+                <p>
+                  Picks the version that follows the request best, orders the moves and gives each one to a robot that can
+                  do it, or refuses with the measurement.
+                </p>
+              </div>
+              <div class="station__artifact">
+                <div class="pick" data-slot="pick"></div>
+              </div>
+            </li>
+
+            <li class="station" data-reveal>
+              <div class="station__index"><span class="num">6</span></div>
+              <div class="station__copy">
+                <h3 class="title station__model">SAM 3D Objects</h3>
+                <p>
+                  Every scanned object is a full 3D body in a MuJoCo twin of the table, so robots rehearse on the real
+                  shapes before anything real moves.
+                </p>
+              </div>
+              <div class="station__artifact">
+                <div class="bodies" data-slot="bodies"></div>
+              </div>
+            </li>
+          </ol>
+          <p class="loop__end">
+            Then the verifier renders the twin from the photo’s own camera and measures every object against the after
+            photo, in centimetres.
+          </p>
+        </div>
+      </section>
+
+      <!-- 4. the after photo -->
+      <section class="after section" id="after" aria-labelledby="after-title">
+        <div class="wrap">
+          <header class="section__head section__head--split">
+            <div>
+              <p class="section__eyebrow"><span class="num">03</span><span class="eyebrow">The after photo</span></p>
+              <h2 id="after-title" class="title section__title">The picture is the plan you approve.</h2>
+            </div>
+            <p class="section__lede">
+              Before a robot touches anything, you see your own desk the way it will be, and say yes or no. Drag to
+              compare.
+            </p>
+          </header>
+          <div class="compare" data-slot="compare" data-reveal></div>
+          <blockquote class="summary" data-slot="summary"></blockquote>
+        </div>
+      </section>
+
+      <!-- 5. live numbers -->
+      <section class="numbers section" id="numbers" aria-labelledby="numbers-title">
+        <div class="wrap numbers__grid">
+          <header class="numbers__head">
+            <p class="section__eyebrow"><span class="num">04</span><span class="eyebrow">Measured, not claimed</span></p>
+            <h2 id="numbers-title" class="title section__title">Every run ends with a receipt.</h2>
+            <p class="section__lede">
+              An object matches when it rests within 3 cm of where the after photo puts it: five times stricter than the
+              <a href="https://arxiv.org/abs/2106.14405" rel="noopener">15 cm rule of Meta’s Habitat Tidy House</a>.
+            </p>
+          </header>
+          <div class="receipt" data-slot="receipt" data-reveal></div>
+          <div class="eval" data-reveal>
+            <div class="eval__grid" data-slot="eval"></div>
+            <p class="eval__source" data-slot="eval-source"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. robots -->
+      <section class="robots section" id="robots" aria-labelledby="robots-title">
+        <div class="wrap robots__grid">
+          <div class="robots__copy">
+            <p class="section__eyebrow"><span class="num">05</span><span class="eyebrow">Robots</span></p>
+            <h2 id="robots-title" class="title section__title">Two robots. Honest answers.</h2>
+            <p class="section__lede">
+              Muse Spark orders the moves and gives each one to a robot that can reach and grip it. When none can, Ayna
+              says so, with the measurement, instead of trying.
+            </p>
+            <dl class="fleet">
+              <div class="fleet__robot">
+                <dt class="title">Our 7-DoF arm</dt>
+                <dd>
+                  <span>Placed on the scanned table where it reaches the objects. Its gripper opens 11 cm.</span>
+                  <span data-slot="fleet-arm"></span>
+                </dd>
+              </div>
+              <div class="fleet__robot">
+                <dt class="title">A mobile manipulator</dt>
+                <dd>
+                  <span>
+                    Plans where to park beside the surface, drives there along an A* path, raises its lift and picks from
+                    above, like the arm.
+                  </span>
+                  <span data-slot="fleet-mobile"></span>
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div class="robots__refusals" data-reveal>
+            <h3 class="eyebrow robots__refusals-title">Refusals from real runs</h3>
+            <ul class="refusals" role="list" data-slot="refusals"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. the iOS scanner -->
+      <section class="scanner section" id="scanner" aria-labelledby="scanner-title">
+        <div class="wrap scanner__grid">
+          <figure class="phone" data-reveal>
+            <div class="phone__body">
+              <img
+                class="phone__photo"
+                src="/landing/before-720.webp"
+                srcset="/landing/before-720.webp 720w, /landing/before-1080.webp 1080w"
+                sizes="(min-width: 960px) 300px, 62vw"
+                width="720"
+                height="960"
+                loading="lazy"
+                decoding="async"
+                alt="The hero shot the Ayna app took of the desk: a laptop, a keyboard, a mouse, an earbud case and three toys on a black table."
+              />
+            </div>
+            <figcaption>The hero shot from this desk’s scan, untouched.</figcaption>
+          </figure>
+          <div class="scanner__copy">
+            <p class="section__eyebrow"><span class="num">06</span><span class="eyebrow">The Ayna iPhone app</span></p>
+            <h2 id="scanner-title" class="title section__title">Scan once. Get a twin.</h2>
+            <p class="section__lede">
+              Walk around the table with a LiDAR iPhone. The app records the table and its room, then asks for one hero
+              shot: the before photo every after is edited from.
+            </p>
+            <ul class="scan-steps" role="list">
+              <li>
+                <span class="scan-steps__mark scan-steps__mark--mesh" aria-hidden="true"></span>
+                <p>The LiDAR mesh is drawn over the camera: orange triangles still need photos, lime ones are covered.</p>
+              </li>
+              <li>
+                <span class="scan-steps__mark scan-steps__mark--done" aria-hidden="true"></span>
+                <p>Photos are taken automatically. <em>Done</em> turns lime at 3 walls, 8 photos and 85% photo detail.</p>
+              </li>
+              <li>
+                <span class="scan-steps__mark scan-steps__mark--level" aria-hidden="true"></span>
+                <p>
+                  For the hero shot, a level turns lime within 1.5°, and the still comes from the same ARKit session as the
+                  scan.
+                </p>
+              </li>
+            </ul>
+            <div class="scan-facts" data-slot="scan-facts"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. who it is for -->
+      <section class="who section" id="who" aria-labelledby="who-title">
+        <div class="wrap">
+          <header class="section__head">
+            <p class="section__eyebrow"><span class="num">07</span><span class="eyebrow">Who it is for</span></p>
+            <h2 id="who-title" class="title section__title">The homes robots come to, and the teams who build them.</h2>
+          </header>
+          <div class="who__mirror">
+            <article class="audience" data-reveal>
+              <svg class="cluster" viewBox="-1.3 -0.5 2.6 1" aria-hidden="true" focusable="false">
+                <circle cx="-0.95" cy="0.05" r="0.30" />
+                <circle cx="-0.45" cy="-0.05" r="0.42" />
+                <circle cx="0.15" cy="0.08" r="0.36" />
+                <circle cx="1.02" cy="0.12" r="0.20" />
+                <circle class="cluster__accent" cx="0.62" cy="-0.10" r="0.26" />
+              </svg>
+              <h3 class="title audience__title">People a robot comes home to</h3>
+              <p>
+                They see the after photo and a rehearsal in their own twin, then approve or decline before anything moves.
+                The picture is the consent screen.
+              </p>
+            </article>
+            <div class="who__line" aria-hidden="true"></div>
+            <article class="audience audience--mirror" data-reveal>
+              <svg class="cluster cluster--lime" viewBox="-1.3 -0.5 2.6 1" aria-hidden="true" focusable="false">
+                <circle cx="-0.95" cy="0.05" r="0.30" />
+                <circle cx="-0.45" cy="-0.05" r="0.42" />
+                <circle cx="0.15" cy="0.08" r="0.36" />
+                <circle cx="1.02" cy="0.12" r="0.20" />
+                <circle class="cluster__accent" cx="0.62" cy="-0.10" r="0.26" />
+              </svg>
+              <h3 class="title audience__title">Robotics teams testing policies in real homes</h3>
+              <p>
+                Each scan, after photo and verifier is an evaluation episode in a real home, with an automatic success
+                check instead of hand-written task code.
+              </p>
+              <p class="audience__note">
+                Goal-conditioned planners need a goal image: Meta’s
+                <a href="https://ai.meta.com/blog/v-jepa-2-world-model-benchmarks/" rel="noopener">V-JEPA 2-AC</a> and
+                FAIR’s <a href="https://arxiv.org/abs/2610.10515" rel="noopener">RoboJEPA</a> both plan toward one. In a
+                stranger’s home nobody has it. Ayna makes it from the owner’s own photo and checks it first.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. why now -->
+      <section class="why section" id="why-now" aria-labelledby="why-title">
+        <div class="wrap">
+          <header class="section__head">
+            <p class="section__eyebrow"><span class="num">08</span><span class="eyebrow">Why now</span></p>
+            <h2 id="why-title" class="title section__title">Home robots are on sale. Every home is different.</h2>
+          </header>
+          <ul class="why__stats" role="list">
+            <li class="stat" data-reveal>
+              <span class="num stat__value">$20,000</span>
+              <p class="stat__label">The price of a 1X NEO home robot, taking orders now.</p>
+              <a class="stat__source" href="https://www.1x.tech/order" rel="noopener">Source: 1X</a>
+            </li>
+            <li class="stat" data-reveal>
+              <span class="num stat__value">~100</span>
+              <p class="stat__label">Training environments before π0.5 approached a model trained in the test home itself.</p>
+              <a class="stat__source" href="https://www.pi.website/blog/pi05" rel="noopener">Source: Physical Intelligence</a>
+            </li>
+            <li class="stat" data-reveal>
+              <span class="num stat__value">1,030</span>
+              <p class="stat__label">Rollouts needed to pin a 90% success rate within ±2 points.</p>
+              <a
+                class="stat__source"
+                href="https://developer.nvidia.com/blog/how-to-evaluate-general-purpose-robot-policies-for-real-world-deployment/"
+                rel="noopener"
+                >Source: NVIDIA</a
+              >
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 10. call to action -->
+      <section class="cta section" id="try" aria-labelledby="cta-title">
+        <div class="wrap cta__inner">
+          <h2 id="cta-title" class="title cta__title">See it on a real desk.</h2>
+          <p class="cta__lede">The demo runs in your browser. The code, the scanner and the eval are on GitHub.</p>
+          <div class="cta__actions">
+            <a class="pill pill--lime pill--big" href="/app/">Try the demo</a>
+            <a class="pill pill--outline pill--big" href="https://github.com/sabr2007/meta-global-hackathon">Read the code</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot__row">
+        <span class="logo logo--foot" role="img" aria-label="Ayna">
+          <span class="logo__row logo__solid" aria-hidden="true"><span>A</span><span>Y</span><span>N</span><span>A</span></span>
+          <span class="logo__row logo__mirror" aria-hidden="true"><span>A</span><span>Y</span><span>N</span><span>A</span></span>
+        </span>
+        <p class="foot__about">
+          Built for the Meta Global AI Developer Hackathon, Indie track. Every photo, version, number and refusal from
+          Ayna on this page comes from a real run on the desk shown.
+        </p>
+        <nav class="foot__links" aria-label="Footer">
+          <a href="/app/">Try the demo</a>
+          <a href="/app/#/login">Sign in</a>
+          <a href="https://github.com/sabr2007/meta-global-hackathon">GitHub</a>
+        </nav>
+        <p class="foot__fine">Michroma and Doto are used under the SIL Open Font License.</p>
+      </div>
+    </footer>
+  </body>
 </html>

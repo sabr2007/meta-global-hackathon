@@ -1,0 +1,27 @@
+{
+  "name": "ayna-video",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Ayna product videos in Remotion: the landing loop (AynaLoop) and the 3-minute demo skeleton (AynaDemo).",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "prepare-assets": "node scripts/prepare-assets.mjs",
+    "render": "node scripts/render.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.535",
+    "@remotion/cli": "4.0.535",
+    "@remotion/fonts": "4.0.535",
+    "@remotion/renderer": "4.0.535",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "sharp": "0.34.4",
+    "typescript": "5.9.3"
+  }
+}

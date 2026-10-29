@@ -1,0 +1,505 @@
+/* Ayna landing page. Tokens, fonts, pills, tags and the logo come from ../styles/ayna.css (the iOS
+   app's language); this file only lays the page out. Lime = done / verified / matches, orange =
+   needs attention / refused / no match. Michroma for titles, Doto only for numbers. */
+
+/* Michroma is wide; the fallback is stretched to roughly its width so the swap barely moves text. */
+@font-face {
+  font-family: 'Michroma Fallback';
+  src: local('Arial'), local('Helvetica Neue'), local('Helvetica');
+  size-adjust: 121%;
+  ascent-override: 84%;
+  descent-override: 22%;
+}
+
+:root {
+  --font-title: 'Michroma', 'Michroma Fallback', ui-sans-serif, system-ui, sans-serif;
+  --gutter: 16px;
+  --wrap: 1200px;
+  --section-space: clamp(72px, 6vw + 48px, 152px);
+  --title-section: clamp(1.5rem, 1rem + 2.1vw, 2.6rem);
+  --title-hero: clamp(2rem, 0.85rem + 4.6vw, 4.5rem);
+  --dot-grid: radial-gradient(circle, rgb(255 255 255 / 0.06) 1px, transparent 1.6px);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --gutter: 48px;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 84px;
+}
+
+body {
+  overflow-x: clip;
+  background: var(--bg);
+}
+
+p,
+h1,
+h2,
+h3,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+.wrap {
+  width: min(100% - 2 * var(--gutter), var(--wrap));
+  margin-inline: auto;
+}
+
+.section {
+  position: relative;
+  padding-block: var(--section-space);
+}
+
+a:not(.pill):not(.logo) {
+  text-decoration: underline;
+  text-decoration-color: rgb(184 255 94 / 0.55);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color var(--fast) var(--ease-out);
+}
+
+a:not(.pill):not(.logo):hover {
+  color: var(--lime);
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  z-index: 50;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--on-lime);
+  font-weight: 600;
+  transform: translateY(-160%);
+  transition: transform var(--fast) var(--ease-out);
+}
+
+.skip:focus-visible {
+  transform: none;
+}
+
+.num {
+  font-family: var(--font-number);
+  font-weight: 900;
+}
+
+.title {
+  text-wrap: balance;
+}
+
+/* ---- the logo, in static markup (column widths = Michroma advances, as logo.ts sets them) ---- */
+
+.logo__row span {
+  width: calc(var(--size) * 1.062);
+}
+
+.logo__row span:nth-child(3) {
+  width: calc(var(--size) * 1.133);
+}
+
+/* Doto's ink sits 0.05 em left of its advance centre (AynaDesign.swift) */
+.logo__mirror span {
+  transform: translateX(calc(var(--size) * 0.0535));
+}
+
+.logo--nav {
+  --size: 18px;
+}
+
+.logo--hero {
+  --size: clamp(40px, 5vw + 22px, 76px);
+}
+
+.logo--foot {
+  --size: 22px;
+}
+
+/* ---- header ---- */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgb(27 27 28 / 0.94);
+  border-bottom: 1px solid var(--line);
+}
+
+.top__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.top__nav {
+  display: none;
+  gap: 28px;
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+
+.top__nav a:not(.pill) {
+  color: var(--neutral);
+  text-decoration: none;
+}
+
+.top__nav a:not(.pill):hover {
+  color: var(--text);
+}
+
+.top__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.top .pill--small {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+@media (min-width: 420px) {
+  .logo--nav {
+    --size: 20px;
+  }
+
+  .top .pill--small {
+    padding: 0 var(--space-4);
+  }
+}
+
+@media (min-width: 1040px) {
+  .top__nav {
+    display: flex;
+  }
+
+  .top__actions {
+    margin-left: 12px;
+  }
+}
+
+.pill--big {
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: var(--text-base);
+}
+
+.pill--lime:hover {
+  box-shadow: 0 10px 30px -12px rgb(184 255 94 / 0.55);
+}
+
+.pill--outline:hover {
+  border-color: var(--neutral);
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* ---- hero ---- */
+
+.hero {
+  position: relative;
+  padding-block: clamp(36px, 3vw + 24px, 88px) clamp(56px, 5vw + 32px, 120px);
+  overflow: clip;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 10% -10% -20% 40%;
+  background: radial-gradient(closest-side, rgb(184 255 94 / 0.08), transparent 70%);
+  pointer-events: none;
+}
+
+.hero__grid {
+  position: relative;
+  display: grid;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (min-width: 960px) {
+  .hero__grid {
+    grid-template-columns: minmax(0, 1fr) 460px;
+    gap: clamp(48px, 5vw, 88px);
+  }
+}
+
+.hero__copy {
+  display: grid;
+  gap: 22px;
+  justify-items: start;
+}
+
+.hero__kicker {
+  margin-top: -4px;
+}
+
+.hero__title {
+  font-size: var(--title-hero);
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  max-width: 12ch;
+}
+
+.hero__after {
+  color: var(--lime);
+}
+
+.hero__lede {
+  max-width: 54ch;
+  color: var(--neutral);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero__models {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.model-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* the film: poster first, the video fades in once it plays */
+
+.film {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+  justify-self: center;
+}
+
+@media (min-width: 960px) {
+  .film {
+    justify-self: end;
+  }
+}
+
+.film__frame {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 40px 80px -48px rgb(0 0 0 / 0.9);
+}
+
+/* the frame's reflection: a band of points, like the logo's mirror */
+.film__mirror {
+  height: 44px;
+  margin-top: -6px;
+  background-image: radial-gradient(circle, var(--reflection) 1.4px, transparent 1.9px);
+  background-size: 9px 9px;
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.75), transparent);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.film__poster,
+.film__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.film__video {
+  opacity: 0;
+  transition: opacity 700ms var(--ease-out);
+}
+
+.film.is-playing .film__video {
+  opacity: 1;
+}
+
+.film__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+
+.film__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--raised);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: 600 var(--text-xs) / 1 var(--font-body);
+  cursor: pointer;
+  transition:
+    transform var(--fast) var(--ease-out),
+    opacity var(--fast) var(--ease-out);
+}
+
+.film__toggle:hover {
+  transform: translateY(-1px);
+}
+
+.film__toggle:active {
+  transform: scale(0.97);
+}
+
+.film__toggle-icon {
+  width: 12px;
+  height: 12px;
+  background: var(--lime);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.film.is-wanted .film__toggle-icon {
+  clip-path: polygon(0 0, 35% 0, 35% 100%, 0 100%, 0 0, 65% 0, 100% 0, 100% 100%, 65% 100%, 65% 0);
+}
+
+.film__caption {
+  display: grid;
+  gap: 8px;
+  color: var(--secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.film__transcript {
+  flex: 1 1 200px;
+}
+
+.film__transcript summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--neutral);
+  cursor: pointer;
+}
+
+.film__transcript ol {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 1.25em;
+}
+
+/* ---- section heads ---- */
+
+.section__head {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+}
+
+.section__head--split {
+  max-width: none;
+}
+
+@media (min-width: 960px) {
+  .section__head--split {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 64px;
+  }
+}
+
+.section__eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.section__eyebrow .num {
+  color: var(--lime);
+  font-size: 1.125rem;
+}
+
+.section__title {
+  font-size: var(--title-section);
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+}
+
+.section__lede {
+  max-width: 60ch;
+  color: var(--neutral);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+}
+
+/* ---- footer ---- */
+
+.foot {
+  padding-block: 48px 56px;
+  border-top: 1px solid var(--line);
+  color: var(--secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.foot__row {
+  display: grid;
+  gap: 22px;
+}
+
+@media (min-width: 900px) {
+  .foot__row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 22px 48px;
+  }
+
+  .foot__fine {
+    grid-column: 2 / -1;
+  }
+}
+
+.foot__about {
+  max-width: 62ch;
+}
+
+.foot__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
+
+.foot__links a:not(.pill) {
+  color: var(--neutral);
+}
