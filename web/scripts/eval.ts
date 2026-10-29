@@ -95,6 +95,7 @@ async function main(): Promise<void> {
       at: new Date().toISOString(),
       scan: scanId,
       request,
+      source: spoken.has(request) ? 'voice' : 'text',
       run: record.id,
       status: record.status,
       score: record.score,
