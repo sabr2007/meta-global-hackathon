@@ -90,11 +90,6 @@ export interface RunOptions {
 
 export const DEFAULT_OPTIONS: RunOptions = { candidates: 3, rounds: 2 };
 
-const total = (usage: Usage[]): { ms: number; costUsd: number } => ({
-  ms: Math.max(0, ...usage.map((u) => u.ms)),
-  costUsd: usage.reduce((s, u) => s + u.costUsd, 0),
-});
-
 function where(camera: PhotoCamera, mask: BeforeMask): string {
   const [x, y] = [mask.rle.x + mask.rle.w / 2, mask.rle.y + mask.rle.h / 2];
   const column = x < camera.width / 3 ? 'left' : x > (2 * camera.width) / 3 ? 'right' : 'centre';
@@ -261,8 +256,4 @@ export async function execute(steps: PlannedStep[], fleet: FleetRobot[], trace: 
     done.push({ step, result });
   }
   return done;
-}
-
-export function costOf(usage: Usage[]): number {
-  return total(usage).costUsd;
 }
