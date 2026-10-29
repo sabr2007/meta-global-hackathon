@@ -7,7 +7,6 @@ import {
   chosen,
   developSeconds,
   editSentences,
-  evalNumbers,
   formatCm,
   judgeScore,
   moves,
@@ -526,14 +525,6 @@ export const ReceiptBeat: React.FC = () => {
             <span style={{ fontFamily: FONT.body, fontSize: 25, lineHeight: 1.35, color: C.text }}>“{run.verdict.text}”</span>
           </div>
         ) : null}
-        <div style={{ marginTop: 16, display: 'flex', alignItems: 'baseline', gap: 10, opacity: ramp(frame, 96, 112) }}>
-          <Num size={28} color={C.lime}>
-            {evalNumbers.objects.matched}/{evalNumbers.objects.checked}
-          </Num>
-          <span style={{ fontFamily: FONT.body, fontSize: 22, color: C.neutral }}>
-            objects within 3 cm across {evalNumbers.runs} measured eval runs{evalNumbers.scans.length === 1 ? ' on this desk' : ''}
-          </span>
-        </div>
       </AbsoluteFill>
       <Caption {...caption('receipt')} opacity={1} />
     </AbsoluteFill>

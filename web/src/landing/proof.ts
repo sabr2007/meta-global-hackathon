@@ -101,17 +101,17 @@ export function renderReceipt(): void {
 
 export function renderEval(): void {
   const e = evalFacts;
-  const tile = (value: string, label: string, modifier = '') =>
-    h('div', { class: `stat-tile${modifier ? ` stat-tile--${modifier}` : ''}` }, h('span', { class: 'num' }, value), h('p', {}, label));
+  const tile = (value: string, label: string, modifier = '', unit = '') =>
+    h('div', { class: `stat-tile${modifier ? ` stat-tile--${modifier}` : ''}` }, h('span', {}, num(value, unit || undefined)), h('p', {}, label));
   fillSlot(
     'eval',
     tile(`${e.objects.matched}/${e.objects.checked}`, `objects ended within 3 cm of where the after photo put them, across ${e.runs} measured runs of the full loop`, 'hero'),
-    tile(`${e.medianErrorCm.median.toFixed(2)}`, 'cm median placement error (the median of each run’s median)'),
+    tile(`${e.medianErrorCm.median.toFixed(2)}`, 'median placement error (the median of each run’s median)', '', 'cm'),
     tile(`${e.versions.rejected}/${e.versions.developed}`, 'versions of the after photo rejected by SAM 3.1 before any robot moved', 'orange'),
     tile(String(e.stopped), `runs stopped with nothing moved, because no version passed the check`, 'orange'),
     tile(String(e.refusals.count), `honest refusals, each with its reason, in ${e.refusals.runsWithRefusals} of ${e.runs} measured runs`, 'orange'),
     tile(String(e.failedSteps), 'robot steps that were tried and failed; the receipt shows each one'),
-    tile(`${e.seconds.median} s`, `median run, request to receipt, at a median $${e.costUsd.median.toFixed(3)} in Meta model calls`),
+    tile(`${e.seconds.median}`, `median run, request to receipt, at a median $${e.costUsd.median.toFixed(3)} in Meta model calls`, '', 's'),
   );
   fillSlot(
     'eval-source',
