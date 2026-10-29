@@ -105,10 +105,11 @@ export function renderEval(): void {
     h('div', { class: `stat-tile${modifier ? ` stat-tile--${modifier}` : ''}` }, h('span', {}, num(value, unit || undefined)), h('p', {}, label));
   fillSlot(
     'eval',
-    tile(`${e.objects.matched}/${e.objects.checked}`, `objects ended within 3 cm of where the after photo put them, across ${e.runs} measured runs of the full loop`, 'hero'),
-    tile(`${e.medianErrorCm.median.toFixed(2)}`, 'median placement error (the median of each run’s median)', '', 'cm'),
+    tile(`${e.moves.done}/${e.moves.asked}`, `requested moves done, each object within 3 cm of where the after photo put it, across ${e.runs} measured runs of the full loop`, 'hero'),
+    tile(`${e.stays.kept}/${e.stays.total}`, 'objects the after photo left alone that the robots left alone too'),
+    tile(`${e.medianErrorCm.median.toFixed(1)}`, 'median distance of the moved objects from their goals (the median of each run’s median)', '', 'cm'),
+    tile(`${e.runs}/${e.attempted}`, 'runs that got an after photo SAM 3.1 approved; in the others no version passed and no robot moved', e.stopped ? 'orange' : ''),
     tile(`${e.versions.rejected}/${e.versions.developed}`, 'versions of the after photo rejected by SAM 3.1 before any robot moved', 'orange'),
-    tile(String(e.stopped), `runs stopped with nothing moved, because no version passed the check`, 'orange'),
     tile(String(e.refusals.count), `honest refusals, each with its reason, in ${e.refusals.runsWithRefusals} of ${e.runs} measured runs`, 'orange'),
     tile(String(e.failedSteps), 'robot steps that were tried and failed; the receipt shows each one'),
     tile(`${e.seconds.median}`, `median run, request to receipt, at a median $${e.costUsd.median.toFixed(3)} in Meta model calls`, '', 's'),
@@ -119,7 +120,7 @@ export function renderEval(): void {
     h('code', {}, 'web/scripts/eval.ts'),
     ', summarised by ',
     h('code', {}, 'web/scripts/landing-numbers.mjs'),
-    ` on ${formatDate(e.generated)}.`,
+    ` on ${formatDate(e.generated)}. The robots are scripted controllers that read exact poses from the simulator, so these numbers grade the goals and the plans, not a learned policy.`,
   );
 }
 

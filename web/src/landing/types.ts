@@ -125,6 +125,7 @@ export interface EvalFacts {
   medianErrorCm: { median: number; min: number; max: number };
   versions: { developed: number; rejected: number };
   moves: { asked: number; done: number };
+  stays: { total: number; kept: number }; // objects the after photo left in place
   refusals: { count: number; runsWithRefusals: number };
   failedSteps: number;
   costUsd: { median: number; total: number };

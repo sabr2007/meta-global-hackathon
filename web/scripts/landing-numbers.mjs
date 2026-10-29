@@ -67,6 +67,8 @@ const numbers = {
   },
   versions: { developed: sum(finished.map((r) => r.candidates)), rejected: sum(finished.map((r) => r.rejected)) },
   moves: { asked: sum(done.map((r) => r.moved.asked)), done: sum(done.map((r) => r.moved.done)) },
+  // matched counts every object that ended where it should: the moves done plus the objects kept
+  stays: { total: sum(done.map((r) => r.total - r.moved.asked)), kept: sum(done.map((r) => r.matched - r.moved.done)) },
   refusals: { count: sum(done.map((r) => r.refusals.length)), runsWithRefusals: done.filter((r) => r.refusals.length).length },
   failedSteps: sum(done.map((r) => r.failedSteps.length)),
   costUsd: { median: round(median(done.map((r) => r.costUsd)), 3), total: round(sum(finished.map((r) => r.costUsd)), 2) },

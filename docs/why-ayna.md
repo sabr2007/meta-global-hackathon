@@ -27,7 +27,7 @@ We found no other system that joins a phone-scanned twin, a goal edited from a p
 
 ## What we measure
 
-- **Placement error per object, in centimetres,** between the twin's final state, rendered from the photo's camera, and the after-photo. An episode succeeds only if every object lands [within 15 cm, the rule Meta's Habitat 2.0 uses for Tidy House](https://arxiv.org/abs/2106.14405).
+- **Placement error per object, in centimetres,** between the twin's final state, rendered from the photo's camera, and the after-photo. An object counts as placed within 3 cm, about half the smallest object on the desk; [Meta's Habitat 2.0 allows 15 cm for Tidy House](https://arxiv.org/abs/2106.14405) at room scale. The score is requested moves done times objects left in place, so a refused move always costs points.
 - **Conservation.** Objects that vanished or appeared between before and after, found with SAM masks. Any such object rejects the edit, since editors often [get object position and scale wrong](https://arxiv.org/abs/2604.07230).
 - **Placement, not looks.** Robot success tracks whether an edit moved the right object to the right state [(Spearman ρ ≈ 0.9); photorealism does not predict it (ρ ≈ 0)](https://arxiv.org/abs/2610.24885).
 - **Success rate and refusals,** with a reason for each declined goal. For scale: the best team in the [NeurIPS 2023 HomeRobot challenge reached 10.8% success](https://arxiv.org/abs/2407.06939), and [TidyBot put away 85.0% of objects in real tests](https://arxiv.org/abs/2305.05658).
