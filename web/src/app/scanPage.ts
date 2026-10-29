@@ -131,14 +131,21 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   robotsTag.textContent = `${twin.robots.robots.length} robot${twin.robots.robots.length === 1 ? '' : 's'}`;
   stage.setInk(twin.before.map((b) => ({ key: b.object, rle: b.rle, style: 'found' })));
 
+  // In the one-take (?autoplay) the panel follows the run, so a screen recording needs no scrolling.
+  const reveal = (node: HTMLElement): void => {
+    if (options.autoplay && !node.hidden) node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
   const versionImages = new Map<string, string>();
   const versionViews = new Map<string, VersionView>();
   const goalsByVersion = new Map<string, ObjectGoal[]>();
   let busy = false;
 
   const renderVersions = (): void => {
+    const appearing = versionsBlock.hidden && versionViews.size > 0;
     versionsBlock.hidden = versionViews.size === 0;
     versionList.set([...versionViews.values()]);
+    if (appearing) reveal(versionsBlock);
   };
 
   async function showVersion(vid: string): Promise<void> {
@@ -183,6 +190,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     }
     stage.setInk(ink);
     stage.setCaption(`Robots' result over the imagined photo · ${receipt.moved.done}/${receipt.moved.asked} moves done`, receipt.score >= 80 ? 'lime' : 'orange');
+    stage.setScore(receipt.score);
   };
 
   const refreshHistory = async (): Promise<RunCard[]> => {
@@ -206,6 +214,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     planBlock.hidden = true;
     receiptSlot.replaceChildren();
     stage.setSlider(false);
+    stage.setScore(null);
   };
   const endRun = (): void => {
     busy = false;
@@ -255,6 +264,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       for (const r of refusals) list.append(h('li', '', `${twin.objects.find((o) => o.name === r.object)?.label ?? r.object}: ${r.reason}`));
       review.append(list);
     }
+    reveal(review);
     const actions = h('div', 'review__actions');
     const yes = h('button', 'pill pill--lime', 'Do it');
     yes.type = 'button';
@@ -279,6 +289,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     planBlock.hidden = false;
     const list = stepsList(steps, refusals, robotLabel);
     planBlock.replaceChildren(h('h2', 'eyebrow block__title', `Muse Spark's plan · ${steps.length} step${steps.length === 1 ? '' : 's'}`), list.root);
+    reveal(planBlock);
     stage.setInk([]);
     await stage.showAfter(null);
     stage.setMode('twin');
@@ -403,6 +414,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
     const chosen = run.candidates.find((c) => c.id === run.chosen)!;
     await showResult(receipt, goals, url(chosen.file));
+    window.setTimeout(() => reveal(receiptSlot), 300);
     receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true, usage: run.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${runId}/episode` }));
     endRun();
     document.body.dataset.autoplay = 'done';

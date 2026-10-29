@@ -30,6 +30,8 @@ export interface Stage {
   showAfter(url: string | null, develop?: boolean): Promise<void>;
   setSlider(enabled: boolean): void;
   setInk(layers: InkLayer[]): void;
+  /** The run's score stamped on the photo (null hides it). */
+  setScore(score: number | null): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, attrs: Record<string, string> = {}): HTMLElementTagNameMap[K] {
@@ -50,7 +52,8 @@ export function createStage(photoUrl: string, size: { width: number; height: num
   const slider = el('div', 'stage__slider', { role: 'slider', tabindex: '0', 'aria-label': 'Before and after', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '50' });
   slider.innerHTML = '<span class="stage__handle" aria-hidden="true"></span>';
   const caption = el('figcaption', 'stage__caption');
-  root.append(canvas, before, after, ink, slider, caption);
+  const score = el('div', 'stage__score', { 'aria-hidden': 'true' });
+  root.append(canvas, before, after, ink, slider, caption, score);
 
   let layers: InkLayer[] = [];
   let split = 50;
@@ -152,6 +155,11 @@ export function createStage(photoUrl: string, size: { width: number; height: num
     setInk(next) {
       layers = next;
       drawInk();
+    },
+    setScore(value) {
+      score.textContent = value === null ? '' : String(value);
+      score.dataset.tone = value !== null && value >= 80 ? 'lime' : 'orange';
+      root.classList.toggle('stage--scored', value !== null);
     },
   };
 }

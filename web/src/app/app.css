@@ -290,6 +290,37 @@ body {
   display: none;
 }
 
+.stage__score {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-5);
+  z-index: 6;
+  font-family: var(--font-number);
+  font-weight: 900;
+  font-size: clamp(3rem, 2rem + 4vw, 6rem);
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity var(--slow) var(--ease-out),
+    transform var(--slow) var(--ease-out);
+  text-shadow: 0 4px 24px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}
+
+.stage--scored .stage__score {
+  opacity: 1;
+  transform: none;
+}
+
+.stage__score[data-tone='lime'] {
+  color: var(--lime);
+}
+
+.stage__score[data-tone='orange'] {
+  color: var(--orange);
+}
+
 .stage__caption[data-tone='lime'] {
   color: var(--lime);
 }
