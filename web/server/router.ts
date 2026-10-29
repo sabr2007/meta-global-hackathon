@@ -54,6 +54,14 @@ const modelRoutes: Route[] = [
   },
   {
     method: 'POST',
+    path: '/api/ayna/decide',
+    run: async (request) => {
+      await liveGate(request, 'step');
+      return json(await ayna.decide(await readJson<ayna.DecideInput>(request, ['request', 'prompt', 'round', 'roundsLeft', 'rejections', 'objects'])));
+    },
+  },
+  {
+    method: 'POST',
     path: '/api/ayna/plan',
     run: async (request) => {
       await liveGate(request, 'step');

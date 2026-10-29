@@ -36,12 +36,21 @@ export interface Judgement {
   ranking: { id: string; follows_request: number; plausible: number; note: string }[];
 }
 
+/** Muse Spark's call after a round where every version was rejected. */
+export interface Decision {
+  action: 'redraw' | 'narrow' | 'stop';
+  reason: string; // for the person
+  editor_note: string; // what the next edit must do differently
+  keep: string[]; // objects to leave in place from now on (narrow)
+}
+
 /** The server's model endpoints (see server/router.ts). */
 export interface Models {
   instruct(input: { request: string; photo: string; objects: SceneObjectBrief[]; robots: string[]; feedback?: string }): Promise<{ instruction: Instruction; usage: Usage[] }>;
   imagine(input: { photo: string; prompt: string }): Promise<{ image: string; usage: Usage[] }>;
   segment(input: { image: string; width: number; height: number; objects: { name: string; concept: string; label: string }[] }): Promise<{ objects: Segmented[]; usage: Usage[] }>;
   judge(input: { request: string; prompt: string; before: string; candidates: { id: string; image: string; facts: string }[] }): Promise<{ judgement: Judgement; usage: Usage[] }>;
+  decide(input: { request: string; prompt: string; round: number; roundsLeft: number; rejections: { id: string; reasons: string[] }[]; objects: { name: string; label: string }[] }): Promise<{ decision: Decision; usage: Usage[] }>;
   plan(input: { request: string; moves: string[]; robots: string[]; facts: string[] }): Promise<{ plan: SparkPlan; usage: Usage[] }>;
 }
 
@@ -90,7 +99,9 @@ export interface RunOptions {
   rounds: number;
 }
 
-export const DEFAULT_OPTIONS: RunOptions = { candidates: 3, rounds: 2 };
+// Up to three rounds of versions; after a round where every version is rejected, Muse Spark decides
+// whether to redraw, narrow the request or stop.
+export const DEFAULT_OPTIONS: RunOptions = { candidates: 3, rounds: 3 };
 
 function where(camera: PhotoCamera, mask: BeforeMask): string {
   const [x, y] = [mask.rle.x + mask.rle.w / 2, mask.rle.y + mask.rle.h / 2];
@@ -221,8 +232,15 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
       return { instruction, feedback, candidates, chosen, judgement: judged.judgement };
     }
     const reasons = [...new Set(roundCandidates.flatMap((c) => c.check.reasons))];
-    feedback.push(reasons.length ? reasons.join('; ') : 'the image model failed to answer');
-    trace({ step: 'judge', state: 'fail', text: round < options.rounds ? `No version passed (${feedback.at(-1)}); drawing again` : 'No version passed the check' });
+    const said = reasons.length ? reasons.join('; ') : 'the image model failed to answer';
+    if (round >= options.rounds) {
+      feedback.push(said);
+      trace({ step: 'judge', state: 'fail', text: 'No version passed the check' });
+      break;
+    }
+    const next = await decideNext(ctx, request, instruction, round, options.rounds - round, roundCandidates, said, models, trace);
+    feedback.push(next.feedback);
+    if (next.stop) break;
   }
   // Nothing fully doable: take the version that kept every object and leaves the fewest moves to refuse.
   const doable = candidates.filter((c) => c.infeasible.length > 0).sort((a, b) => a.infeasible.length - b.infeasible.length)[0];
@@ -231,6 +249,41 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
     return { instruction: instruction!, feedback, candidates, chosen: doable, judgement: null };
   }
   return { instruction: instruction!, feedback, candidates, chosen: null, judgement: null };
+}
+
+/** Muse Spark reads why every version of a round was rejected and picks the next step; if it cannot be
+ * asked, the loop redraws with the reasons as they are. */
+async function decideNext(
+  ctx: SceneContext,
+  request: string,
+  instruction: Instruction,
+  round: number,
+  roundsLeft: number,
+  rejected: Candidate[],
+  said: string,
+  models: Models,
+  trace: Trace,
+): Promise<{ feedback: string; stop: boolean }> {
+  trace({ step: 'judge', state: 'start', text: 'Muse Spark is deciding what to change' });
+  try {
+    const { decision, usage } = await models.decide({
+      request,
+      prompt: instruction.edit_prompt,
+      round,
+      roundsLeft,
+      rejections: rejected.map((c) => ({ id: c.id, reasons: c.check.reasons })),
+      objects: ctx.objects.map((o) => ({ name: o.name, label: o.label })),
+    });
+    const kept = ctx.objects.filter((o) => decision.keep.includes(o.name)).map((o) => o.label);
+    const verb = { redraw: 'Draw again', narrow: `Narrow the request${kept.length ? ` (leave the ${kept.join(', the ')})` : ''}`, stop: 'Stop' }[decision.action];
+    trace({ step: 'judge', state: decision.action === 'stop' ? 'fail' : 'info', text: `${verb}: ${decision.reason}`, usage });
+    if (decision.action === 'stop') return { feedback: `stopped: ${decision.reason}`, stop: true };
+    const keep = kept.length ? ` No robot can do the moves of the ${kept.join(', the ')}: list them in refusals and keep them exactly where they are.` : '';
+    return { feedback: `${decision.editor_note || said}${keep} (Rejected before: ${said}.)`, stop: false };
+  } catch {
+    trace({ step: 'judge', state: 'fail', text: `No version passed (${said}); drawing again` });
+    return { feedback: said, stop: false };
+  }
 }
 
 export interface Dispatch {

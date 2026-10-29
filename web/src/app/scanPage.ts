@@ -343,7 +343,8 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
         await showResult(out.receipt, out.imagined.chosen.check.goals, out.imagined.chosen.image);
         receiptSlot.replaceChildren(receiptCard(out.receipt, { seconds: out.record.durationMs / 1000, costUsd: out.record.costUsd, verdict: out.record.verdict?.verdict ?? null, replay: false, usage: out.record.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${out.record.id}/episode` }));
       } else if (out.record.status === 'no-after') {
-        stage.setCaption('No imagined photo kept every object — Ayna will not plan from it', 'orange');
+        const stopped = out.record.feedback.at(-1)?.match(/^stopped: (.*)$/)?.[1];
+        stage.setCaption(stopped ? `Muse Spark stopped: ${stopped}` : 'No imagined photo kept every object — Ayna will not plan from it', 'orange');
       } else if (out.record.error) {
         stage.setCaption(out.record.error, 'orange');
       }

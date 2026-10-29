@@ -273,6 +273,57 @@ come from segmentation and the 3D scan, trust them over your impression of dista
   return { judgement: value, usage: [usage] };
 }
 
+export interface Decision {
+  action: 'redraw' | 'narrow' | 'stop';
+  reason: string;
+  editor_note: string;
+  keep: string[];
+}
+
+const DECISION_SCHEMA = {
+  type: 'object',
+  properties: {
+    action: { type: 'string', enum: ['redraw', 'narrow', 'stop'] },
+    reason: { type: 'string', description: 'one sentence for the person: what went wrong and what happens next' },
+    editor_note: { type: 'string', description: 'for redraw and narrow: what the next edit must do differently, concretely' },
+    keep: { type: 'array', items: { type: 'string' }, description: 'for narrow: names of objects to leave where they are' },
+  },
+  required: ['action', 'reason', 'editor_note', 'keep'],
+  additionalProperties: false,
+};
+
+export interface DecideInput {
+  request: string;
+  prompt: string; // the edit instruction of the round that failed
+  round: number;
+  roundsLeft: number;
+  rejections: { id: string; reasons: string[] }[];
+  objects: { name: string; label: string }[];
+}
+
+/** After a round where every version was rejected, Spark decides what to do next. */
+export async function decide(input: DecideInput): Promise<{ decision: Decision; usage: Usage[] }> {
+  const text = `You run the loop that turns a person's request into an "after" photo robots can carry out.
+The person asked: "${input.request}". The image editor was told: "${input.prompt}".
+An automatic check (SAM 3.1 on every object, then the robots' reach and put-down test) rejected every
+version of round ${input.round}:
+${input.rejections.map((r) => `- version ${r.id}: ${r.reasons.join('; ')}`).join('\n')}
+Objects: ${input.objects.map((o) => `${o.name} (${o.label})`).join(', ')}. Rounds left: ${input.roundsLeft}.
+Decide the next step:
+- "redraw" when the request can be done and the editor made a fixable mistake (an object vanished, was
+  duplicated, resized, or moved though it should stay, or a goal landed where no robot can put it down):
+  write editor_note, concrete and short, e.g. keep an object exactly in place, move something a shorter
+  distance, keep destinations away from the table edges and from objects that stay;
+- "narrow" when some requested moves can never be done (no robot can reach, grip or place that object
+  anywhere the request wants it): list those objects in "keep" (names from the list) and write editor_note
+  for the moves that can be done;
+- "stop" when the same failure repeats and another round will not help.
+"reason" is one plain sentence for the person.`;
+  const { value, usage } = await sparkJson<Decision>('ayna_decision', DECISION_SCHEMA, [{ type: 'input_text', text }]);
+  const names = new Set(input.objects.map((o) => o.name));
+  return { decision: { ...value, keep: value.keep.filter((k) => names.has(k)) }, usage: [usage] };
+}
+
 export interface PlanInput {
   request: string;
   moves: string[]; // one line per object to move: id, from, to, distance, rotation, size

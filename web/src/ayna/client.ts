@@ -52,6 +52,7 @@ export function models(session: Session): Models & { listen(wav: Blob | Uint8Arr
     imagine: (input) => post(session, '/api/ayna/imagine', input),
     segment: (input) => post(session, '/api/ayna/segment', input),
     judge: (input) => post(session, '/api/ayna/judge', input),
+    decide: (input) => post(session, '/api/ayna/decide', input),
     plan: (input) => post(session, '/api/ayna/plan', input),
     listen: async (wav) => {
       const heard = await request<{ text: string; usage: Usage[] }>(session, '/api/ayna/listen', { method: 'POST', body: wav as BodyInit, headers: { 'content-type': 'audio/wav' } });
