@@ -76,6 +76,7 @@ body {
 .scan__stage {
   position: sticky;
   top: 84px;
+  scroll-margin-top: 56px; /* below the sticky top bar when a phone scrolls to the robots */
 }
 
 .scan__panel {
