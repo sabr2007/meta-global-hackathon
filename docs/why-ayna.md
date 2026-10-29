@@ -23,7 +23,7 @@ We found no other system that joins a phone-scanned twin, a goal edited from a p
 ## Who it is for
 
 - **People a robot comes home to.** They see the after-photo and a rehearsal in their own twin, then approve or decline before anything moves. The picture is the consent screen.
-- **Robotics teams that need real-home evaluation.** Each scan, after-photo and verifier is an evaluation episode in a real home, with an automatic success check instead of hand-written task code.
+- **Robotics teams that need real-home evaluation.** Each scan, after-photo and verifier is an evaluation episode in a real home, with an automatic success check instead of hand-written task code. `web/scripts/policies.ts` already replays the 37 saved desk episodes with the same robots under four kinds of perception: what the photo alone shows does as well as exact simulator poses (105 vs 106 of 148 moves), and 2 cm of error costs 40% of the moves.
 
 ## What we measure
 
