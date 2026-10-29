@@ -27,7 +27,8 @@ the imagined photo with the error of every object.*
 already share plans as pictures; Ayna makes the picture the interface. The after photo is the plan you
 approve before anything moves, and the goal image that goal-conditioned robot planners (Meta's
 V-JEPA 2-AC, FAIR's RoboJEPA) need but cannot get in a stranger's home. Every scan + after photo +
-automatic check is also a ready evaluation episode for a robot policy in a real home. More in
+automatic check is also a ready evaluation episode for a robot policy in a real home, and
+`web/scripts/policies.ts` already scores robot variants on them ([Numbers](#numbers)). More in
 [docs/why-ayna.md](docs/why-ayna.md).
 
 ## Meta models: what each one does
@@ -178,7 +179,9 @@ npx tsx scripts/seed.ts --owner you@example.com:a-long-password \
   --scan desk="Desk" --demo desk          # accounts + scans into ../data/store (or Vercel Blob)
 npm run dev                              # http://localhost:5190/app/ (the API runs in the same server)
 npm test && npm run build
+export AYNA_EMAIL=you@example.com AYNA_PASSWORD=a-long-password   # the account the scripts save runs to
 npm run eval -- --scan desk --request "Tidy up the table"   # one headless run: live models, MuJoCo in Node
+npx tsx scripts/policies.ts --scan desk                     # saved runs as episodes, 4 perception policies, $0
 ```
 
 **Scan builder** (turns mirrors sent from the iPhone into twins; runs where the pipeline runs)
@@ -212,7 +215,9 @@ web/        Ayna (TypeScript): app (src/app), loop logic shared by browser and N
             MuJoCo WASM physics and robot controllers (src/sim), three.js rendering (src/render),
             server (server/: Meta model proxy, accounts, private storage), Vercel entry (api/)
 ios/        Ayna for iPhone: LiDAR scanner, hero shot, Send to Ayna
-docs/       why-ayna.md, images
+video/      Remotion compositions: the landing film (AynaLoop) and the demo video skeleton (AynaDemo)
+docs/       why-ayna.md (who it is for, with sources), eval-log.md (every eval round and what it
+            taught us), images
 ```
 
 Privacy: captures are photos of a real home. `data/` (scans, caches, local store) is git-ignored; the
@@ -224,7 +229,14 @@ deployed app reads scans from a private store through one-hour signed URLs.
 - Muse Image sometimes drops, duplicates or resizes an object; that is what the SAM 3.1 check is for, and
   it rejects most versions on cluttered requests (see Numbers). When no version keeps every object, Ayna
   does not plan from one.
-- Our parallel gripper opens to 11 cm, so the laptop and the keyboard are refused by the stationary arm.
+- The robots are scripted controllers that read exact poses from the simulator, not learned policies;
+  the policy table under Numbers shows how their success falls with perception error (about 1 cm is
+  fine, 2 cm loses 40% of the moves).
+- Our parallel grippers open to 11 cm (arm) and 16 cm (mobile): the laptop is refused by both, and the
+  27 cm keyboard by both too (too wide for the arm; held by its 1.9 cm edge it slipped out of the mobile
+  robot's fingers on every drive, so it is refused with that reason).
+- Mirror 02 is harder than the desk: Muse Image more often duplicates its pen or bottle or moves an
+  object that should stay, so more versions are rejected there.
 - LiDAR sees through transparent objects (a clear bottle) and flattens small ones; such objects are placed
   by resting them on the table along their camera rays, and their size comes from the photo, not LiDAR.
 - The iPhone upload path was tested in the iOS simulator against the API contract, not yet on a device.
@@ -242,7 +254,8 @@ one commit and changed since. [NEW_WORK.md](NEW_WORK.md) separates the two in de
   robot model files (Franka, MuJoCo Menagerie or other) are used.
 - **Dependencies** (installed by package managers): MuJoCo (Apache-2.0, `mujoco`, `@mujoco/mujoco`),
   three.js (MIT), Vite, Vitest, TypeScript, tsx (MIT), `@meta-sam/parser` and `meta-sam-parser` (Meta, SAM
-  License), `@vercel/blob` (Apache-2.0), numpy, scipy, trimesh, Pillow, httpx, openai, fal-client,
+  License), `@vercel/blob` (Apache-2.0), numpy, scipy, trimesh, Pillow, httpx, openai (the Python client only, pointed at Meta's
+  OpenAI-compatible API), fal-client,
   fast-simplification, python-dotenv, pytest. Fonts: Michroma and Doto (SIL Open Font License 1.1, licences
   in `web/src/styles/fonts/` and `ios/Ayna/Fonts/`). Video: [Remotion](https://www.remotion.dev/) (free for
   individuals and teams of up to 3).
