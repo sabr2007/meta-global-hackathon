@@ -176,7 +176,7 @@ function stationVerdicts(): void {
     const stopped = e.stopped ? ` In ${e.stopped} of them no version passed, so no robot moved at all.` : '';
     fillSlot(
       'rejections',
-      `Across ${e.attempted} runs on this desk, SAM 3.1 rejected ${e.versions.rejected} of ${e.versions.developed} versions before any robot moved.${stopped}`,
+      `Across ${e.attempted} runs on this desk, SAM 3.1 and the robots’ reach test rejected ${e.versions.rejected} of ${e.versions.developed} versions before any robot moved.${stopped}`,
     );
   }
 }

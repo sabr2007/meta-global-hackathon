@@ -152,7 +152,7 @@ over (5.2 → 0.5 cm), and masses and friction come from Muse Spark with a one-l
 | Mirror 02 | Tidy up the table | approved | 3/6 | 4/4 | 50 | 0.1 cm | 87 s | $0.13 |
 | Mirror 02 | Clear the front half of the table | approved | 0/3 | 1/1 | 80 | 0.6 cm | 45 s | $0.08 |
 | Mirror 02 | Put all the small things together in one corner | approved | 4/5 | 4/4 | 50 | 0.1 cm | 102 s | $0.12 |
-| Mirror 02 | Line the small objects up along the back edge | approved | 6/6 | 3/5 | 0 | 1.7 cm | 76 s | $0.12 |
+| Mirror 02 | Line the small objects up along the back edge | none fully doable: went ahead with refusals | 6/6 | 3/5 | 0 | 1.7 cm | 76 s | $0.12 |
 | Mirror 02 | Spoken in Russian: “gather the pen, the spoon and the calculator on one side of the table” (Voice Transcribe) | approved | 1/3 | 2/3 | 67 | 0.3 cm | 60 s | $0.08 |
 
 Final round (v8; Spark's decision between rounds and the photo-space check came after it): 12 runs, 12 with an approved after photo; SAM 3.1 rejected 29 of 47 versions; 43 of 50 requested moves ended within 3 cm of the goal; mean score 73; mean 67 s and $0.09 per run.
@@ -176,6 +176,10 @@ each object is when the robot reaches for it; scored by the same verifier.
 
 - **Guest:** open the [live demo](https://ayna-brown.vercel.app/app/) and replay a saved run (free, no model
   calls: the models' outputs come from the run record and the robots re-run in the twin).
+- **Note on the live site today:** its Vercel Blob store hit the free plan's operations quota during the
+  night's evaluation, so production serves a read-only snapshot of the store from inside the server function
+  (`AYNA_STORE=snapshot`). Replays, sign-in and live runs work; a new live run and an iPhone upload are kept
+  only while that server instance lives, and the scan builder cannot pick uploads up until the store is back.
 - **Live:** sign in (judges: credentials are in the submission form) → open a mirror → hold the mic or type
   "tidy up my desk" → watch the models work → drag the before/after slider → **Do it**.
 - **One take for video:** [`/app/?autoplay`](https://ayna-brown.vercel.app/app/?autoplay) replays the demo

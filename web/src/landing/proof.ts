@@ -109,7 +109,12 @@ export function renderEval(): void {
     tile(`${e.stays.kept}/${e.stays.total}`, 'objects the after photo left alone that the robots left alone too'),
     tile(`${e.medianErrorCm.median.toFixed(1)}`, 'median distance of the moved objects from their goals (the median of each run’s median)', '', 'cm'),
     tile(`${e.runs}/${e.attempted}`, e.stopped ? 'runs that got an after photo SAM 3.1 approved; in the others no version passed and no robot moved' : 'runs that got an after photo SAM 3.1 approved', e.stopped ? 'orange' : ''),
-    tile(`${e.versions.rejected}/${e.versions.developed}`, 'versions of the after photo rejected by SAM 3.1 before any robot moved', 'orange'),
+    tile(`${e.versions.rejected}/${e.versions.developed}`, 'versions of the after photo rejected by SAM 3.1 or the robots’ reach test before any robot moved', 'orange'),
+    tile(
+      `${e.moves.asked - e.moves.done}`,
+      `requested moves missed: ${e.refusals.count} refused, ${e.failedSteps} failed robot steps, and the rest landed more than 3 cm from their goal`,
+      e.moves.asked > e.moves.done ? 'orange' : '',
+    ),
     tile(String(e.refusals.count), e.refusals.count ? `honest refusals, each with its reason, in ${e.refusals.runsWithRefusals} of ${e.runs} measured runs` : `refusals: every move the plans asked for was one a robot could do (any refusal shows with its reason)`, e.refusals.count ? 'orange' : ''),
     tile(String(e.failedSteps), e.failedSteps ? 'robot steps that were tried and failed; the receipt shows each one' : 'robot steps failed in this round (a failed step shows on the receipt with its reason)'),
     tile(`${e.seconds.median}`, `median run, request to receipt, at a median $${e.costUsd.median.toFixed(3)} in Meta model calls`, '', 's'),

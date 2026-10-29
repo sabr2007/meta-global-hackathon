@@ -177,7 +177,7 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
   const inPhoto = receipt.photoMedianErrorCm === null || receipt.photoMedianErrorCm === undefined ? '' : `, centres ${receipt.photoMedianErrorCm.toFixed(1)} cm apart (median)`;
   summary.append(
     h('p', 'receipt__line', `${receipt.moved.done} of ${receipt.moved.asked} requested moves done`),
-    h('p', 'receipt__sub', `${receipt.stayed.kept} of ${receipt.stayed.total} other objects left in place · moved objects off their goals by ${receipt.medianErrorCm.toFixed(1)} cm (median), tolerance 3 cm${overlap}${inPhoto}`),
+    h('p', 'receipt__sub', `${receipt.stayed.kept} of ${receipt.stayed.total} other objects left in place · requested moves off their goals by ${receipt.medianErrorCm.toFixed(1)} cm (median of the moves that got a goal), tolerance 3 cm${overlap}${inPhoto}`),
   );
   head.append(score, summary);
   const table = h('ul', 'receipt__rows');

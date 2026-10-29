@@ -4,6 +4,9 @@ This file separates what was written during the hackathon (from October 26, 2026
 the open-source code it builds on.
 
 **In short:** `pipeline/`, `web/`, `docs/` and `video/` were written from scratch during the event.
+The repository's first commit (ad1aa96, October 28, 03:07) holds the first day and a half of that work,
+the scan-to-MuJoCo pipeline and its viewer, committed in one piece once it ran end to end; everything
+after it is in small commits.
 The only imported code is the iPhone capture engine in `ios/`, taken from the MIT-licensed
 3D Model Anything app in one verbatim commit and changed since (details below). Libraries come
 from package managers and are listed in the README.
