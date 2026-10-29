@@ -108,7 +108,7 @@ export function renderEval(): void {
     tile(`${e.moves.done}/${e.moves.asked}`, `requested moves done, each object within 3 cm of where the after photo put it, across ${e.runs} measured runs of the full loop`, 'hero'),
     tile(`${e.stays.kept}/${e.stays.total}`, 'objects the after photo left alone that the robots left alone too'),
     tile(`${e.medianErrorCm.median.toFixed(1)}`, 'median distance of the moved objects from their goals (the median of each run’s median)', '', 'cm'),
-    tile(`${e.runs}/${e.attempted}`, 'runs that got an after photo SAM 3.1 approved; in the others no version passed and no robot moved', e.stopped ? 'orange' : ''),
+    tile(`${e.runs}/${e.attempted}`, e.stopped ? 'runs that got an after photo SAM 3.1 approved; in the others no version passed and no robot moved' : 'runs that got an after photo SAM 3.1 approved', e.stopped ? 'orange' : ''),
     tile(`${e.versions.rejected}/${e.versions.developed}`, 'versions of the after photo rejected by SAM 3.1 before any robot moved', 'orange'),
     tile(String(e.refusals.count), `honest refusals, each with its reason, in ${e.refusals.runsWithRefusals} of ${e.runs} measured runs`, 'orange'),
     tile(String(e.failedSteps), 'robot steps that were tried and failed; the receipt shows each one'),

@@ -37,6 +37,15 @@ async function request<T>(session: Session, path: string, init: RequestInit = {}
 
 const post = <T>(session: Session, path: string, body: unknown): Promise<T> => request<T>(session, path, { method: 'POST', body: JSON.stringify(body) });
 
+/** Speech-to-text cleanup: a word heard twice in a row ("my my desk") is kept once, and trailing
+ * dots become one full stop. */
+export function tidyTranscript(text: string): string {
+  return text
+    .replace(/(?<![\p{L}\p{N}])([\p{L}\p{N}']+)(?:\s+\1)+(?![\p{L}\p{N}])/giu, '$1')
+    .replace(/\s*\.{2,}\s*$/, '.')
+    .trim();
+}
+
 export function models(session: Session): Models & { listen(wav: Blob | Uint8Array): Promise<{ text: string; usage: Usage[] }> } {
   return {
     instruct: (input) => post(session, '/api/ayna/instruct', input),
@@ -44,7 +53,10 @@ export function models(session: Session): Models & { listen(wav: Blob | Uint8Arr
     segment: (input) => post(session, '/api/ayna/segment', input),
     judge: (input) => post(session, '/api/ayna/judge', input),
     plan: (input) => post(session, '/api/ayna/plan', input),
-    listen: (wav) => request(session, '/api/ayna/listen', { method: 'POST', body: wav as BodyInit, headers: { 'content-type': 'audio/wav' } }),
+    listen: async (wav) => {
+      const heard = await request<{ text: string; usage: Usage[] }>(session, '/api/ayna/listen', { method: 'POST', body: wav as BodyInit, headers: { 'content-type': 'audio/wav' } });
+      return { ...heard, text: tidyTranscript(heard.text) };
+    },
   };
 }
 

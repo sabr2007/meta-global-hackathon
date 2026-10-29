@@ -183,7 +183,7 @@ export class ArmController {
    * turned by yawDelta (radians) from the heading it was picked with. */
   placeAt(x: number, y: number, yawDelta = 0): void {
     if (!this.ready() || !this.held) return;
-    const where = `at (${x.toFixed(2)}, ${y.toFixed(2)})`;
+    const where = `at (${x.toFixed(2)}, ${y.toFixed(2)}) m`;
     this.release([x, y, this.held.origin[2]], where, this.held.yaw + yawDelta);
   }
 

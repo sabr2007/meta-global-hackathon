@@ -4,6 +4,7 @@ import { checkPlan } from './dispatch';
 import type { FleetRobot } from './fleet';
 import { boxArea, checkCandidate, headingDelta, type BeforeMask, type SceneObject, type Segmented } from './goals';
 import type { TriangleMesh } from './glb';
+import { tidyTranscript } from './client';
 import { imageSize } from './images';
 import { silhouette } from './raster';
 import { decodeRle, encodeRle, iou, maskStats, scaleRle, type Rle } from './rle';
@@ -327,4 +328,10 @@ describe('receipt', () => {
     expect(receipt.medianErrorCm).toBeCloseTo(0.1, 5); // only the move that had a goal
     expect(receipt.results.find((r) => r.name === 'mouse')).toMatchObject({ wanted: 'move', ok: false, note: 'refused before the edit: no robot reaches the back edge' });
   });
+});
+
+test('voice transcripts lose words heard twice in a row', () => {
+  expect(tidyTranscript('tidy up my my desk desk and put the mouse next to the keyboard..')).toBe('tidy up my desk and put the mouse next to the keyboard.');
+  expect(tidyTranscript('Range le bureau bureau et pose la souris à côté du clavier..')).toBe('Range le bureau et pose la souris à côté du clavier.');
+  expect(tidyTranscript('Put the cup next to the cupboard')).toBe('Put the cup next to the cupboard');
 });

@@ -184,7 +184,7 @@ export class StationaryArm extends RobotBase {
     }
     this.home = { x, y, z, yaw };
     this.applyBase(this.home);
-    return ok(`On ${support} at (${x.toFixed(2)}, ${y.toFixed(2)})`);
+    return ok(`On ${support} at (${x.toFixed(2)}, ${y.toFixed(2)}) m`);
   }
 
   dispose(): void {

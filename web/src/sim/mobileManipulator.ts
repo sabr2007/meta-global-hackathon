@@ -196,7 +196,7 @@ export class MobileManipulator extends RobotBase {
     const shape = objectShape(this.physics, held.name);
     const surface = this.scene.placeSurface(x, y, shape.radius * FOOTPRINT_SHARE, this.bodyOf(held.name), held.origin[2] + PLACE_HEADROOM_M);
     if (typeof surface === 'string') return this.refuse(`Can't put ${label} down: ${surface}`);
-    const where = `on ${surface.object ? this.name(surface.object) : surface.name} at (${x.toFixed(2)}, ${y.toFixed(2)})`;
+    const where = `on ${surface.object ? this.name(surface.object) : surface.name} at (${x.toFixed(2)}, ${y.toFixed(2)}) m`;
     return this.release([x, y], surface.z, held.yaw + yawDelta, where);
   }
 
@@ -244,7 +244,7 @@ export class MobileManipulator extends RobotBase {
     if (this.scene.navGrid().clearanceAt(x, y) < footprint) return refused('Too close to the edge of the scanned floor');
     this.home = { x, y, z: 0, yaw };
     this.teleport(this.home);
-    return ok(`On the floor at (${x.toFixed(2)}, ${y.toFixed(2)})`);
+    return ok(`On the floor at (${x.toFixed(2)}, ${y.toFixed(2)}) m`);
   }
 
   dispose(): void {
