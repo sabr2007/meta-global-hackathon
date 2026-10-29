@@ -129,7 +129,37 @@ The ring's hole stays open (a ring of convex pieces instead of one hull), the cl
 over (5.2 → 0.5 cm), and masses and friction come from Muse Spark with a one-line reason per object.
 
 **The loop** (live Meta models through the deployed API, robots in MuJoCo, the app's own verifier;
-`npm run eval`): EVAL_TABLE
+`npm run eval`):
+| Scene | Request | After photo | Versions rejected by SAM 3.1 | Moves done / asked | Score | Median error of moved objects | Time | Cost |
+|---|---|---|---|---|---|---|---|---|
+| Desk | Tidy up the table | approved | 5/6 | 5/7 | 71 | 0.2 cm | 102 s | $0.13 |
+| Desk | Clear the front half of the table | approved | 2/3 | 4/5 | 80 | 1.1 cm | 73 s | $0.09 |
+| Desk | Put all the small things together in one corner | approved | 0/3 | 5/6 | 83 | 0.2 cm | 64 s | $0.10 |
+| Desk | Line the small objects up along the back edge | approved | 2/3 | 5/5 | 100 | 0.3 cm | 59 s | $0.08 |
+| Desk | Move the yellow cylinder to the front right corner of the table | approved | 2/3 | 1/1 | 100 | 0.8 cm | 34 s | $0.06 |
+| Desk | “tidy up my desk and put the mouse next to the keyboard.” (spoken, as Voice Transcribe heard it) | approved | 2/3 | 4/4 | 100 | 0.8 cm | 61 s | $0.07 |
+| Desk | Spoken in Russian: “tidy up the table and put the mouse next to the keyboard” (Voice Transcribe) | approved | 2/3 | 5/5 | 100 | 0.2 cm | 45 s | $0.07 |
+| Mirror 02 | Tidy up the table | approved | 3/6 | 4/4 | 50 | 0.1 cm | 87 s | $0.13 |
+| Mirror 02 | Clear the front half of the table | approved | 0/3 | 1/1 | 80 | 0.6 cm | 45 s | $0.08 |
+| Mirror 02 | Put all the small things together in one corner | approved | 4/5 | 4/4 | 50 | 0.1 cm | 102 s | $0.12 |
+| Mirror 02 | Line the small objects up along the back edge | approved | 6/6 | 3/5 | 0 | 1.7 cm | 76 s | $0.12 |
+| Mirror 02 | Spoken in Russian: “gather the pen, the spoon and the calculator on one side of the table” (Voice Transcribe) | approved | 1/3 | 2/3 | 67 | 0.3 cm | 60 s | $0.08 |
+
+Final round, final code: 12 runs, 12 with an approved after photo; SAM 3.1 rejected 29 of 47 versions; 43 of 50 requested moves ended within 3 cm of the goal; mean score 73; mean 67 s and $0.09 per run.
+All 56 runs on Desk tonight, every round and every version of the code: 144/215 requested moves done, 5 stopped with no approved after photo, 8 scored 0.
+All 28 runs on Mirror 02 tonight, every round and every version of the code: 41/80 requested moves done, 7 stopped with no approved after photo, 5 scored 0.
+Every round, its failures and what each one taught us: [docs/eval-log.md](docs/eval-log.md).
+
+**Robot policies on the saved episodes** (`npx tsx scripts/policies.ts --scan desk-sam3d`, no model calls): every saved
+run with an approved after photo replayed with the same robots and plan, but a different idea of where
+each object is when the robot reaches for it; scored by the same verifier.
+
+| Scene | Policy | Episodes | Requested moves done | Objects left in place | Mean score | Median error of moved objects | Slipped grasps |
+|---|---|---|---|---|---|---|---|
+| Desk | exact simulator poses | 37 | 106/148 | 110/111 | 70 | 0.7 cm | 0 |
+| Desk | only the photo (SAM 3.1 mask centres) | 37 | 105/148 | 110/111 | 70 | 0.8 cm | 0 |
+| Desk | exact + 1 cm error | 37 | 99/148 | 110/111 | 67 | 1.6 cm | 3 |
+| Desk | exact + 2 cm error | 37 | 64/148 | 110/111 | 44 | 4.7 cm | 30 |
 <!-- numbers:end -->
 
 ## Try it

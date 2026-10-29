@@ -1,6 +1,6 @@
 {
  "source": "Headless runs of the full Ayna loop: live Meta models, robots in MuJoCo, the same verifier as the app (web/scripts/eval.ts).",
- "generated": "2026-10-29T03:31:38.465Z",
+ "generated": "2026-10-29T04:31:47.706Z",
  "scan": "desk-sam3d",
  "runs": 7,
  "stopped": 0,
@@ -14,145 +14,152 @@
   "Put all the small things together in one corner",
   "Line the small objects up along the back edge",
   "Move the yellow cylinder to the front right corner of the table",
-  "tidy up my desk and put the mouse next to the keyboard..",
+  "tidy up my desk and put the mouse next to the keyboard.",
   "A request asked in Russian"
  ],
  "objects": {
   "checked": 49,
-  "matched": 43
+  "matched": 45
  },
  "medianErrorCm": {
-  "median": 0.14,
-  "min": 0,
-  "max": 1.66
+  "median": 0.27,
+  "min": 0.15,
+  "max": 1.11
  },
  "versions": {
-  "developed": 27,
+  "developed": 24,
   "rejected": 15
  },
  "moves": {
-  "asked": 29,
-  "done": 23
+  "asked": 33,
+  "done": 29
  },
  "stays": {
-  "total": 20,
-  "kept": 20
+  "total": 16,
+  "kept": 16
  },
  "refusals": {
-  "count": 2,
-  "runsWithRefusals": 2
+  "count": 0,
+  "runsWithRefusals": 0
  },
- "failedSteps": 2,
+ "failedSteps": 0,
  "costUsd": {
   "median": 0.082,
-  "total": 0.71
+  "total": 0.59
  },
  "seconds": {
-  "median": 73,
-  "min": 52,
-  "max": 116
+  "median": 61,
+  "min": 34,
+  "max": 102
+ },
+ "allTime": {
+  "since": "2026-10-29T02:15:09.745Z",
+  "attempted": 56,
+  "measured": 51,
+  "stopped": 5,
+  "moves": {
+   "asked": 215,
+   "done": 144
+  },
+  "zero": 8
  },
  "list": [
   {
-   "run": "20261029-030950-585v",
+   "run": "20261029-040947-kg0l",
    "scan": "desk-sam3d",
    "status": "done",
    "request": "Tidy up the table",
-   "matched": 6,
+   "matched": 5,
    "total": 7,
-   "medianErrorCm": 0.14,
-   "candidates": 3,
-   "rejected": 2,
-   "refusals": [
-    "white keyboard: white keyboard is 12.8 cm wide but arm gripper opens only to 11 cm and mobile cannot place it"
-   ],
-   "seconds": 68,
-   "costUsd": 0.076
+   "medianErrorCm": 0.18,
+   "candidates": 6,
+   "rejected": 5,
+   "refusals": [],
+   "seconds": 102,
+   "costUsd": 0.129
   },
   {
-   "run": "20261029-031058-gv30",
+   "run": "20261029-041129-f3kh",
    "scan": "desk-sam3d",
    "status": "done",
    "request": "Clear the front half of the table",
    "matched": 6,
    "total": 7,
-   "medianErrorCm": 0.17,
-   "candidates": 6,
-   "rejected": 4,
-   "refusals": [],
-   "seconds": 116,
-   "costUsd": 0.146
-  },
-  {
-   "run": "20261029-031253-lok1",
-   "scan": "desk-sam3d",
-   "status": "done",
-   "request": "Put all the small things together in one corner",
-   "matched": 7,
-   "total": 7,
-   "medianErrorCm": 0.39,
-   "candidates": 6,
-   "rejected": 4,
-   "refusals": [],
-   "seconds": 93,
-   "costUsd": 0.149
-  },
-  {
-   "run": "20261029-031426-xo54",
-   "scan": "desk-sam3d",
-   "status": "done",
-   "request": "Line the small objects up along the back edge",
-   "matched": 4,
-   "total": 7,
-   "medianErrorCm": 1.66,
-   "candidates": 3,
-   "rejected": 1,
-   "refusals": [
-    "yellow cylinder: yellow cylinder cannot be moved: arm needs 0.79 m to target but reaches only 0.76 m and mobile cannot place at table edge"
-   ],
-   "seconds": 84,
-   "costUsd": 0.111
-  },
-  {
-   "run": "20261029-031550-3qsw",
-   "scan": "desk-sam3d",
-   "status": "done",
-   "request": "Move the yellow cylinder to the front right corner of the table",
-   "matched": 6,
-   "total": 7,
-   "medianErrorCm": 0,
-   "candidates": 3,
-   "rejected": 0,
-   "refusals": [],
-   "seconds": 52,
-   "costUsd": 0.077
-  },
-  {
-   "run": "20261029-031642-vd7f",
-   "scan": "desk-sam3d",
-   "status": "done",
-   "request": "tidy up my desk and put the mouse next to the keyboard..",
-   "matched": 7,
-   "total": 7,
-   "medianErrorCm": 0.12,
+   "medianErrorCm": 1.11,
    "candidates": 3,
    "rejected": 2,
    "refusals": [],
    "seconds": 73,
+   "costUsd": 0.087
+  },
+  {
+   "run": "20261029-042028-yetc",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Put all the small things together in one corner",
+   "matched": 6,
+   "total": 7,
+   "medianErrorCm": 0.15,
+   "candidates": 3,
+   "rejected": 0,
+   "refusals": [],
+   "seconds": 64,
+   "costUsd": 0.099
+  },
+  {
+   "run": "20261029-042132-mg5k",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Line the small objects up along the back edge",
+   "matched": 7,
+   "total": 7,
+   "medianErrorCm": 0.27,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [],
+   "seconds": 59,
    "costUsd": 0.082
   },
   {
-   "run": "20261029-031756-t13o",
+   "run": "20261029-042232-x4kx",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Move the yellow cylinder to the front right corner of the table",
+   "matched": 7,
+   "total": 7,
+   "medianErrorCm": 0.81,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [],
+   "seconds": 34,
+   "costUsd": 0.059
+  },
+  {
+   "run": "20261029-042305-cgm6",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "tidy up my desk and put the mouse next to the keyboard.",
+   "matched": 7,
+   "total": 7,
+   "medianErrorCm": 0.84,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [],
+   "seconds": 61,
+   "costUsd": 0.068
+  },
+  {
+   "run": "20261029-042406-d36s",
    "scan": "desk-sam3d",
    "status": "done",
    "request": "A request asked in Russian",
    "matched": 7,
    "total": 7,
-   "medianErrorCm": 0.12,
+   "medianErrorCm": 0.16,
    "candidates": 3,
    "rejected": 2,
    "refusals": [],
-   "seconds": 59,
+   "seconds": 45,
    "costUsd": 0.068
   }
  ]
