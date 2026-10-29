@@ -71,6 +71,7 @@ class ScannedObject:
     rgba: tuple[float, float, float, float]
     depth_scale: float  # metric / SAM 3D depth used to place it
     fit_error_m: float  # mean LiDAR-to-mesh distance after placement
+    concept: str = ""  # the SAM 3.1 noun phrase that finds it in a photo
 
 
 @dataclass(frozen=True)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+import json
 import sys
 from pathlib import Path
 
@@ -14,11 +15,12 @@ import numpy as np
 from scan2sim import arm
 from scan2sim.capture import Capture, extract_zip, load_capture
 from scan2sim.export import write_bundle
+from scan2sim.hero import upright_camera, write_hero
 from scan2sim.lidar_mesh import read_lidar_mesh
 from scan2sim.lift import lift_masks
 from scan2sim.meta_client import load_settings
 from scan2sim.mount import choose_mount, footprint, reachable
-from scan2sim.objects import body_name, build_scanned_object, rests_on, target_surface
+from scan2sim.objects import body_name, build_scanned_object, fit_top, rests_on, stand_under, target_surface
 from scan2sim.perceive import perceive_photo, write_perception
 from scan2sim.scene import build_scene
 from scan2sim.stages import sam3d_objects, verified_objects
@@ -132,23 +134,41 @@ def objects(args: argparse.Namespace) -> int:
             print(f"  {v.label}: not on {surface.name} (starts {o.bottom_z - surface.top_z:+.2f} m from its top), skipped")
             continue
         kept.append(v)
+    if surface is not None and kept:
+        # Objects rest on the real (LiDAR) surface; RoomPlan's box top sits a little above it.
+        lidar_top = float(np.median([lifted[id(v.mask)].bottom_z for v in kept]))
+        fitted = fit_top(surface, lidar_top)
+        print(f"{surface.name}: RoomPlan top {surface.top_z:.3f} m, LiDAR surface {lidar_top:.3f} m, using {fitted.top_z:.3f} m")
+        scene = dataclasses.replace(scene, boxes=tuple(fitted if b.name == surface.name else b for b in scene.boxes))
+        surface = fitted
     reconstructions = asyncio.run(sam3d_objects(image, [v.mask for v in kept], cache))
 
     bodies = []
+    masks = {}
     for i, (obj, reconstruction) in enumerate(zip(kept, reconstructions)):
         if reconstruction is None:
             print(f"  {obj.label}: SAM 3D returned no mesh, skipped")
             continue
-        bodies.append(
-            build_scanned_object(
-                body_name(i, obj.label), obj.label, reconstruction, lifted[id(obj.mask)].points_world,
-                image, view, scene.frame, scene.boxes,
-            )
+        body = build_scanned_object(
+            body_name(i, obj.label), obj.label, reconstruction, lifted[id(obj.mask)].points_world,
+            image, view, scene.frame, scene.boxes,
         )
+        bodies.append(dataclasses.replace(body, concept=obj.mask.concept))
+        masks[body.name] = obj.mask
+    if surface is not None:
+        stands = [box for box in (stand_under(b, surface) for b in bodies) if box is not None]
+        for box in stands:
+            print(f"  {box.name}: {box.half_size[1] * 200:.1f} cm stand under it (not in the scan's objects)")
+        scene = dataclasses.replace(scene, boxes=scene.boxes + tuple(stands))
     items = [footprint(b.name, b.position + b.hull_vertices) for b in bodies]
     mount = None if args.no_arm else choose_mount(scene.boxes, items)
     scene = dataclasses.replace(scene, objects=tuple(bodies), arm=mount)
-    paths = write_bundle(capture, room, scene, read_lidar_mesh(room.mesh_ply, room.mesh_colors), Path(args.out))
+    camera = upright_camera(view, image, scene.frame)
+    concepts = {b.name: b.concept for b in bodies}
+    paths = write_bundle(
+        capture, room, scene, read_lidar_mesh(room.mesh_ply, room.mesh_colors), Path(args.out),
+        hero=lambda out: write_hero(out, image, camera, scene.objects, masks, concepts),
+    )
     moved = _settle_distances(paths.mjcf, [b.name for b in bodies] + ([arm.LINK_NAMES[-1]] if mount else []))
 
     where = f" on {surface.name}" if surface is not None else ""
@@ -171,6 +191,14 @@ def objects(args: argparse.Namespace) -> int:
         )
     elif not args.no_arm:
         print("arm: no free spot within reach of the objects, left out")
+    checks = json.loads(paths.metadata.read_text())["camera"]["alignment"]
+    if checks:
+        ious = [c["iou"] for c in checks.values()]
+        offsets = [c["centroid_offset_px"] for c in checks.values()]
+        print(
+            f"photo camera vs placed meshes: mask IoU {min(ious):.2f}-{max(ious):.2f} (median {float(np.median(ious)):.2f}), "
+            f"centroid offset median {float(np.median(offsets)):.1f} px"
+        )
     print(f"wrote {paths.mjcf.parent}")
     return 0
 

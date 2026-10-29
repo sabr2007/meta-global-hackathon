@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -73,7 +74,9 @@ def _box_metadata(box) -> dict[str, Any]:
     }
 
 
-def scene_metadata(capture: Capture, room: CapturedRoom, scene: SimScene, mesh_stats: dict[str, int]) -> dict[str, Any]:
+def scene_metadata(
+    capture: Capture, room: CapturedRoom, scene: SimScene, mesh_stats: dict[str, int], camera: dict[str, Any] | None = None
+) -> dict[str, Any]:
     manifest = capture.manifest
     return {
         "format": BUNDLE_FORMAT,
@@ -101,6 +104,7 @@ def scene_metadata(capture: Capture, room: CapturedRoom, scene: SimScene, mesh_s
         ],
         "objects": [_object_metadata(o) for o in scene.objects],
         "arm": _arm_metadata(scene.arm) if scene.arm else None,
+        "camera": camera,
         "mesh": mesh_stats,
         "files": {"mjcf": "scene.xml", "mesh": "room_mesh.glb"},
     }
@@ -110,6 +114,7 @@ def _object_metadata(obj: ScannedObject) -> dict[str, Any]:
     return {
         "name": obj.name,
         "label": obj.label,
+        "concept": obj.concept,
         "body": obj.name,
         "mesh": f"{OBJECTS_DIR}/{obj.name}.glb",
         "size_m": [round(v, 3) for v in obj.size.tolist()],
@@ -141,7 +146,15 @@ def _arm_metadata(mount: arm.ArmMount) -> dict[str, Any]:
     }
 
 
-def write_bundle(capture: Capture, room: CapturedRoom, scene: SimScene, mesh: LidarMesh, out_dir: Path) -> BundlePaths:
+def write_bundle(
+    capture: Capture,
+    room: CapturedRoom,
+    scene: SimScene,
+    mesh: LidarMesh,
+    out_dir: Path,
+    hero: Callable[[Path], dict[str, Any]] | None = None,
+) -> BundlePaths:
+    """`hero` writes the photo files into the bundle and returns the camera block for scene.json."""
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = BundlePaths(mjcf=out_dir / "scene.xml", mesh=out_dir / "room_mesh.glb", metadata=out_dir / "scene.json")
     paths.mjcf.write_text(scene_to_mjcf(scene, model_name=f"room-{room.index}"))
@@ -150,5 +163,6 @@ def write_bundle(capture: Capture, room: CapturedRoom, scene: SimScene, mesh: Li
         for obj in scene.objects:
             (out_dir / OBJECTS_DIR / f"{obj.name}.glb").write_bytes(obj.visual_glb)
     mesh_stats = export_room_mesh(mesh, scene.frame, paths.mesh)
-    paths.metadata.write_text(json.dumps(scene_metadata(capture, room, scene, mesh_stats), indent=2) + "\n")
+    camera = hero(out_dir) if hero else None
+    paths.metadata.write_text(json.dumps(scene_metadata(capture, room, scene, mesh_stats, camera), indent=2) + "\n")
     return paths

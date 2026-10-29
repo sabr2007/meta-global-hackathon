@@ -130,3 +130,15 @@ def test_bundle_lists_scanned_objects(scene):
     assert meta["mesh"] == "objects/obj_0_cup.glb"
     assert meta["size_m"] == pytest.approx(CUP_SIZE.tolist())
     json.dumps(meta)  # serialisable
+
+
+def test_reduced_hull_stays_inside_the_mesh():
+    from scan2sim.object_mesh import HULL_MAX_VERTICES, convex_hull
+
+    rng = np.random.default_rng(3)
+    points = rng.normal(size=(4000, 3)) * np.array([0.17, 0.15, 0.02])  # a flat, laptop-like blob
+    vertices, faces = convex_hull(points)
+    assert len(vertices) <= HULL_MAX_VERTICES
+    assert vertices[:, 2].min() >= points[:, 2].min() - 1e-9
+    assert vertices[:, 2].max() <= points[:, 2].max() + 1e-9
+    assert np.all(np.abs(vertices).max(axis=0) <= np.abs(points).max(axis=0) + 1e-9)

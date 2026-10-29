@@ -25,17 +25,26 @@ def simplify(mesh: trimesh.Trimesh, target_faces: int = VISUAL_FACES) -> trimesh
     return trimesh.Trimesh(points, faces, vertex_colors=colors[nearest], process=False)
 
 
+def farthest_points(points: np.ndarray, count: int) -> np.ndarray:
+    """`count` of the points, spread out: the six axis extremes first, then farthest-point sampling."""
+    points = np.asarray(points, dtype=np.float64)
+    chosen = list(dict.fromkeys([*np.argmin(points, axis=0).tolist(), *np.argmax(points, axis=0).tolist()]))
+    distance = np.min(np.linalg.norm(points[:, None, :] - points[chosen][None, :, :], axis=2), axis=1)
+    while len(chosen) < min(count, len(points)):
+        index = int(np.argmax(distance))
+        chosen.append(index)
+        distance = np.minimum(distance, np.linalg.norm(points - points[index], axis=1))
+    return points[chosen]
+
+
 def convex_hull(vertices: np.ndarray, max_vertices: int = HULL_MAX_VERTICES) -> tuple[np.ndarray, np.ndarray]:
-    """Convex hull for collisions (MuJoCo collides meshes as hulls anyway), decimated to max_vertices."""
+    """Convex hull for collisions (MuJoCo collides meshes as hulls anyway) with at most max_vertices.
+
+    The reduced hull is built from a subset of the true hull's vertices, so it never sticks out of
+    the mesh (decimating the hull did: a laptop's collider reached 2.3 cm into the table)."""
     hull = trimesh.convex.convex_hull(np.asarray(vertices, dtype=np.float64))
     if len(hull.vertices) > max_vertices:
-        # A closed triangle mesh has about 2V faces; re-hull the decimated points to stay convex.
-        points, _ = fast_simplification.simplify(
-            np.asarray(hull.vertices, dtype=np.float64),
-            np.asarray(hull.faces, dtype=np.int32),
-            target_count=2 * max_vertices - 4,
-        )
-        hull = trimesh.convex.convex_hull(points)
+        hull = trimesh.convex.convex_hull(farthest_points(hull.vertices, max_vertices))
     return np.asarray(hull.vertices), np.asarray(hull.faces)
 
 

@@ -16,3 +16,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Night-run journal (local only)
+.night/

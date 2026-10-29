@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import io
 import re
 
@@ -23,6 +25,9 @@ FOOTPRINT_MARGIN_M = 0.03
 # RoomPlan top: below covers tops placed above the real surface, above covers small stacks
 # (a case on a notebook), while a wall shelf over the table sits ~0.4 m higher.
 ON_SURFACE_BELOW_M = 0.06
+MAX_TOP_FIT_M = 0.05
+STAND_MIN_M = 0.008  # an object this far above its surface rests on something unscanned (a tray, a stand)
+UPRIGHT = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]])  # box local y (RoomPlan height) -> world z  # never move a RoomPlan top further than this to meet the LiDAR surface
 ON_SURFACE_ABOVE_M = 0.10
 
 
@@ -52,6 +57,30 @@ def target_surface(boxes: tuple[Box, ...], element_name: str | None = None) -> B
     """The RoomPlan element whose objects are scanned: the named one, else the largest table."""
     candidates = [b for b in boxes if (b.name == element_name if element_name else b.category == "table")]
     return max(candidates, key=lambda b: b.half_size[0] * b.half_size[2], default=None)
+
+
+def fit_top(box: Box, top_z: float) -> Box:
+    """The box with its top moved down to `top_z` (RoomPlan tops sit 1-2 cm above the LiDAR surface)."""
+    drop = box.top_z - top_z
+    if drop <= 0 or drop > MAX_TOP_FIT_M:
+        return box
+    vertical = int(np.argmax(np.abs(box.rotation[2])))  # local axis that points up in the world
+    half = box.half_size.copy()
+    half[vertical] -= drop / 2
+    return dataclasses.replace(box, center=box.center - np.array([0.0, 0.0, drop / 2]), half_size=half)
+
+
+def stand_under(obj: ScannedObject, surface: Box) -> Box | None:
+    """A static block that fills the gap between an object and its surface (e.g. a laptop on a tray),
+    so lowering the surface to the LiDAR height does not drop the object."""
+    world = obj.hull_vertices + obj.position
+    gap = float(world[:, 2].min()) - DROP_GAP_M - surface.top_z
+    if gap < STAND_MIN_M:
+        return None
+    low, high = world[:, :2].min(axis=0), world[:, :2].max(axis=0)
+    center = np.array([*(low + high) / 2, surface.top_z + gap / 2])
+    half = np.array([(high[0] - low[0]) / 2, gap / 2, (high[1] - low[1]) / 2])
+    return Box(f"{obj.name}_stand", "object", "table", center, UPRIGHT, half, True, "low", "")
 
 
 def rests_on(surface: Box, center_xy: np.ndarray, bottom_z: float) -> bool:
