@@ -132,6 +132,7 @@ async function replay(mujoco: Awaited<ReturnType<typeof loadMujoco>>, scene: Sce
     beforeMasks: new Map<string, Rle>(scene.ctx.before.map((b) => [b.object, b.rle])),
     notes,
   });
+  robots.dispose(); // each robot's IK holds a scratch MjData in the WASM heap
   physics.dispose();
   return { receipt, slipped: executed.filter((e) => !e.result.ok && /slipped|missed/i.test(e.result.reason)).length };
 }

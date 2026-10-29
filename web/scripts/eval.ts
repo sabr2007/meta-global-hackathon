@@ -116,6 +116,8 @@ async function main(): Promise<void> {
     for (const r of record.receipt?.results ?? []) {
       console.log(`    ${r.label.padEnd(20)} ${r.wanted.padEnd(5)} err ${(r.errorM * 100).toFixed(1).padStart(5)} cm  iou ${r.iou?.toFixed(2) ?? '-'} (base ${r.baselineIou?.toFixed(2) ?? '-'}) ${r.ok ? 'OK' : 'MISS'} ${r.note}`);
     }
+    robots.dispose(); // free the WASM heap before the next request's scene
+    physics.dispose();
   }
 }
 
