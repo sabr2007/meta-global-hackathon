@@ -11,8 +11,7 @@
   ],
   "functions": {
     "api/index.ts": {
-      "maxDuration": 120,
-      "includeFiles": "snapshot/**"
+      "maxDuration": 120
     }
   },
   "headers": [

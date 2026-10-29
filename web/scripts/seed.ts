@@ -3,8 +3,8 @@
 //   npx tsx scripts/seed.ts --owner you@example.com:PASSWORD --member judge@example.com:PASSWORD \
 //     --scan desk-sam3d="Desk" --scan mirror02-sam3d="Mirror 02" [--demo desk-sam3d] [--runs-from ../data/store]
 //
-// Uses the private Vercel Blob store when BLOB_READ_WRITE_TOKEN is set (e.g. after `vercel env pull`),
-// otherwise ../data/store on disk. Bundles are read from ../data/scenes/<id> or public/scenes/<id>.
+// Writes to the production R2 bucket with AYNA_STORE=r2 (the R2_* keys in the repo-root .env),
+// otherwise to ../data/store on disk. Bundles are read from ../data/scenes/<id> or public/scenes/<id>.
 
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';

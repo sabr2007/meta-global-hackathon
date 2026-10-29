@@ -16,7 +16,7 @@
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",
     "@mujoco/mujoco": "^3.17.0",
-    "@vercel/blob": "^2.8.2",
+    "aws4fetch": "1.0.20",
     "three": "^0.186.1"
   },
   "devDependencies": {

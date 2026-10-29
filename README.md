@@ -181,10 +181,6 @@ rather than independent perception noise; the noise rows are the stress test.
 
 - **Guest:** open the [live demo](https://ayna-brown.vercel.app/app/) and replay a saved run (free, no model
   calls: the models' outputs come from the run record and the robots re-run in the twin).
-- **Note on the live site today:** its Vercel Blob store hit the free plan's operations quota during the
-  night's evaluation, so production serves a read-only snapshot of the store from inside the server function
-  (`AYNA_STORE=snapshot`). Replays, sign-in and live runs work; a new live run and an iPhone upload are kept
-  only while that server instance lives, and the scan builder cannot pick uploads up until the store is back.
 - **Live:** sign in (judges: credentials are in the submission form) → open a mirror → hold the mic or type
   "tidy up my desk" → watch the models work → drag the before/after slider → **Do it**.
 - **Who decides what, in saved runs:** [Spark redraws after a rejected round, then the person overrules its
@@ -232,7 +228,7 @@ writes `web/public/landing/ayna-loop.mp4`. `AynaDemo` is the skeleton of the 3-m
 ```sh
 cd web && npm install
 npx tsx scripts/seed.ts --owner you@example.com:a-long-password \
-  --scan desk="Desk" --demo desk          # accounts + scans into ../data/store (or Vercel Blob)
+  --scan desk="Desk" --demo desk          # accounts + scans into ../data/store (AYNA_STORE=r2: the R2 bucket)
 npm run dev                              # http://localhost:5190/app/ (the API runs in the same server)
 npm test && npm run build
 export AYNA_EMAIL=you@example.com AYNA_PASSWORD=a-long-password   # the account the scripts save runs to
@@ -244,11 +240,12 @@ npx tsx scripts/policies.ts --scan desk                     # saved runs as epis
 
 ```sh
 cd web && npm run worker            # polls the queue; add -- --once to drain it and exit
+AYNA_STORE=r2 npm run worker        # the same against production (the R2_* keys in the repo-root .env)
 ```
 
 The phone pairs with a 6-character code from the Mirrors page, uploads the capture straight to the
-private store (a presigned URL), and the scan shows *queued → processing → ready* in the app. With
-`BLOB_READ_WRITE_TOKEN` in `web/.env.local` (`vercel env pull`) the worker serves production.
+private store (a presigned PUT to the R2 bucket), and the scan shows *queued → processing → ready* in the
+app.
 
 **iPhone app** (Xcode 27, `brew install xcodegen`)
 
@@ -258,13 +255,13 @@ xcodebuild -project Ayna.xcodeproj -scheme Ayna -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath build -allowProvisioningUpdates build
 ```
 
-**Deploy:** `cd web && vercel deploy --prod` (one Vercel Function serves `/api`; scans and runs live in a
-private Vercel Blob store; set `META_API_KEY`, `META_API_BASE`, `AUTH_SECRET`, `AYNA_DEMO_SCAN` (and
-optionally `AYNA_DEMO_RUN`, the run the one-take plays) with
-`vercel env add`). Without Blob (its free quota runs out under a night of evals), `AYNA_STORE=snapshot`
-serves a private copy of the store from inside the function: seed one into `web/snapshot/` with
-`AYNA_STORE_DIR=$PWD/snapshot npx tsx scripts/seed.ts …`; it is deployed with the function, never to the
-public folder or git, and new runs then last as long as the server instance.
+**Deploy:** `cd web && vercel deploy --prod`. One Vercel Function serves `/api`; accounts, scans and runs
+live in a private Cloudflare R2 bucket, reached over its S3 API with a token scoped to that one bucket.
+Browsers get presigned links (the bucket's CORS rule allows the site's origins) and the phone uploads with a
+presigned PUT, so no file passes through the function. Set `META_API_KEY`, `META_API_BASE`, `AUTH_SECRET`,
+`AYNA_DEMO_SCAN` (and optionally `AYNA_DEMO_RUN`, the run the one-take plays), `AYNA_STORE=r2`,
+`R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` with `vercel env add`, and seed
+the bucket with `AYNA_STORE=r2 npx tsx scripts/seed.ts …`.
 
 ## Repository
 
@@ -316,7 +313,7 @@ one commit and changed since. [NEW_WORK.md](NEW_WORK.md) separates the two in de
   robot model files (Franka, MuJoCo Menagerie or other) are used.
 - **Dependencies** (installed by package managers): MuJoCo (Apache-2.0, `mujoco`, `@mujoco/mujoco`),
   three.js (MIT), Vite, Vitest, TypeScript, tsx (MIT), `@meta-sam/parser` and `meta-sam-parser` (Meta, SAM
-  License), `@vercel/blob` (Apache-2.0), numpy, scipy, trimesh, Pillow, httpx, openai (the Python client only, pointed at Meta's
+  License), `aws4fetch` (MIT), numpy, scipy, trimesh, Pillow, httpx, openai (the Python client only, pointed at Meta's
   OpenAI-compatible API), fal-client,
   fast-simplification, python-dotenv, pytest. Fonts: Michroma and Doto (SIL Open Font License 1.1, licences
   in `web/src/styles/fonts/` and `ios/Ayna/Fonts/`). Video: [Remotion](https://www.remotion.dev/) (free for

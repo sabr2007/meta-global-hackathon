@@ -5,8 +5,10 @@
 //   cd web && npm run worker              # keep polling (every 15 s)
 //   cd web && npm run worker -- --once    # build what is queued, then exit
 //
-// With BLOB_READ_WRITE_TOKEN in web/.env.local (`vercel env pull`) it serves production; without it,
-// the local store in ../data/store.
+// With AYNA_STORE=r2 (and the R2_* keys in the repo-root .env) it serves production, the R2 bucket;
+// without it, the local store in ../data/store:
+//
+//   cd web && AYNA_STORE=r2 npm run worker
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';

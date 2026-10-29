@@ -1,15 +1,16 @@
-// Private storage for users, scans and runs: a private Vercel Blob store in production, a folder on
-// disk in local development, or (AYNA_STORE=snapshot) a read-only copy deployed inside the server
-// function with writes kept on the instance's temporary disk. Browsers never get store credentials,
-// only short-lived file URLs.
+// Private storage for users, scans and runs: a Cloudflare R2 bucket in production, which the server and
+// local tools such as the scan builder reach over R2's S3 API (AYNA_STORE=r2), or a folder on disk in
+// local development. Browsers never get store credentials, only short-lived presigned or signed file
+// URLs; the iPhone uploads its scan with a presigned PUT straight to the bucket.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { AwsClient } from 'aws4fetch';
 
 export const URL_TTL_MS = 60 * 60 * 1000;
 const URL_BUCKET_MS = 10 * 60 * 1000; // expiries round up to this, so a file keeps one URL (and one cache entry) for a while
+const LIST_PAGE = 1000;
 
 /** When a link signed now expires: at least URL_TTL_MS away, the same for every link signed in the same 10 minutes. */
 export const linkExpiry = (): number => Math.ceil((Date.now() + URL_TTL_MS) / URL_BUCKET_MS) * URL_BUCKET_MS;
@@ -21,7 +22,7 @@ export interface UploadTarget {
 }
 
 export interface Store {
-  readonly kind: 'blob' | 'disk';
+  readonly kind: 'r2' | 'disk';
   getBytes(key: string): Promise<Uint8Array | null>;
   exists(key: string): Promise<boolean>;
   putBytes(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
@@ -67,6 +68,10 @@ function safeKey(key: string): string {
 
 function diskStore(root: string): Store {
   const file = (key: string): string => path.join(root, safeKey(key));
+  const signedUrl = (key: string): string => {
+    const expires = linkExpiry();
+    return `/api/files/${safeKey(key)}?exp=${expires}&sig=${signFileUrl(key, expires)}`;
+  };
   return {
     kind: 'disk',
     async getBytes(key) {
@@ -112,110 +117,77 @@ function diskStore(root: string): Store {
     async remove(key) {
       await rm(file(key), { force: true });
     },
-    async readUrl(key) {
-      const expires = linkExpiry();
-      return `/api/files/${safeKey(key)}?exp=${expires}&sig=${signFileUrl(key, expires)}`;
-    },
-    async uploadTarget(key, contentType) {
-      const expires = linkExpiry();
-      return {
-        url: `/api/files/${safeKey(key)}?exp=${expires}&sig=${signFileUrl(key, expires)}`,
-        method: 'PUT',
-        headers: { 'content-type': contentType },
-      };
-    },
+    readUrl: async (key) => signedUrl(key),
+    uploadTarget: async (key, contentType) => ({ url: signedUrl(key), method: 'PUT', headers: { 'content-type': contentType } }),
   };
 }
 
-/** A read-only snapshot with a writable layer on top: reads see the layer first, writes and removals
- * go to it. Used when the Blob store is unavailable (the free plan's quota): everything works, but
- * what is written lasts only as long as the server instance. */
-function overlayStore(snapshot: string, layer: string): Store {
-  const lower = diskStore(snapshot);
-  const upper = diskStore(layer);
-  return {
-    kind: 'disk',
-    getBytes: async (key) => (await upper.getBytes(key)) ?? lower.getBytes(key),
-    exists: async (key) => (await upper.exists(key)) || lower.exists(key),
-    putBytes: (key, bytes, type) => upper.putBytes(key, bytes, type),
-    list: async (prefix) => [...new Set([...(await lower.list(prefix)), ...(await upper.list(prefix))])].sort(),
-    remove: (key) => upper.remove(key),
-    readUrl: (key) => upper.readUrl(key),
-    uploadTarget: (key, type, max) => upper.uploadTarget(key, type, max),
-  };
+interface R2Settings {
+  accountId: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
 }
 
-function blobStore(): Store {
-  // Imported lazily so local development does not need the package's credentials.
-  const sdk = import('@vercel/blob');
-  let token: Promise<{ clientSigningToken: string; delegationToken: string; validUntil: number }> | null = null;
-  const signedToken = async (): Promise<{ clientSigningToken: string; delegationToken: string; validUntil: number }> => {
-    const current = await token;
-    if (!token || !current || current.validUntil < Date.now() + 5 * 60 * 1000) {
-      const { issueSignedToken } = await sdk;
-      token = issueSignedToken({ pathname: '*', operations: ['get', 'put'], validUntil: Date.now() + 2 * URL_TTL_MS });
-    }
-    return token as Promise<{ clientSigningToken: string; delegationToken: string; validUntil: number }>;
+/** The bucket's S3 keys from the environment (a token scoped to that one bucket), or null without them. */
+function r2Settings(): R2Settings | null {
+  const { R2_ACCOUNT_ID: accountId, R2_BUCKET: bucket = 'ayna-store', R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey } = process.env;
+  return accountId && accessKeyId && secretAccessKey ? { accountId, bucket, accessKeyId, secretAccessKey } : null;
+}
+
+const amzDate = (ms: number): string => new Date(ms).toISOString().replace(/[:-]|\.\d{3}/g, '');
+
+function r2Store(settings: R2Settings): Store {
+  const client = new AwsClient({ accessKeyId: settings.accessKeyId, secretAccessKey: settings.secretAccessKey, service: 's3', region: 'auto' });
+  const base = `https://${settings.accountId}.r2.cloudflarestorage.com/${settings.bucket}`;
+  const url = (key: string): string => `${base}/${safeKey(key)}`;
+  const call = async (key: string, init: RequestInit = {}): Promise<Response> => {
+    const response = await client.fetch(url(key), init);
+    if (!response.ok && response.status !== 404) throw new Error(`R2 ${init.method ?? 'GET'} ${key}: ${response.status} ${await response.text()}`);
+    return response;
+  };
+  /** A presigned URL for one request on one key, valid for `seconds` from `signedAt`. */
+  const presign = async (key: string, seconds: number, signedAt: number, init: RequestInit = {}): Promise<string> => {
+    const target = new URL(url(key));
+    target.searchParams.set('X-Amz-Expires', String(Math.round(seconds)));
+    return (await client.sign(target.toString(), { ...init, aws: { signQuery: true, datetime: amzDate(signedAt) } })).url;
   };
   return {
-    kind: 'blob',
+    kind: 'r2',
     async getBytes(key) {
-      const { get } = await sdk;
-      const result = await get(safeKey(key), { access: 'private' });
-      if (!result || result.statusCode !== 200) return null;
-      return new Uint8Array(await new Response(result.stream).arrayBuffer());
+      const response = await call(key);
+      return response.ok ? new Uint8Array(await response.arrayBuffer()) : null;
     },
-    async exists(key) {
-      const { head } = await sdk;
-      try {
-        await head(safeKey(key));
-        return true;
-      } catch {
-        return false;
-      }
-    },
+    exists: async (key) => (await call(key, { method: 'HEAD' })).ok,
     async putBytes(key, bytes, contentType) {
-      const { put } = await sdk;
-      await put(safeKey(key), Buffer.from(bytes), { access: 'private', contentType, addRandomSuffix: false, allowOverwrite: true });
+      await call(key, { method: 'PUT', body: bytes as BodyInit, headers: { 'content-type': contentType } });
     },
     async list(prefix) {
-      const { list } = await sdk;
       const keys: string[] = [];
-      let cursor: string | undefined;
+      let token: string | undefined;
       do {
-        const page = await list({ prefix, cursor, limit: 1000 });
-        keys.push(...page.blobs.map((b) => b.pathname));
-        cursor = page.hasMore ? page.cursor : undefined;
-      } while (cursor);
+        const query = new URLSearchParams({ 'list-type': '2', prefix, 'max-keys': String(LIST_PAGE) });
+        if (token) query.set('continuation-token', token);
+        const response = await client.fetch(`${base}?${query}`);
+        if (!response.ok) throw new Error(`R2 list ${prefix}: ${response.status} ${await response.text()}`);
+        const xml = await response.text();
+        keys.push(...Array.from(xml.matchAll(/<Key>([^<]+)<\/Key>/g), (match) => match[1]));
+        token = xml.includes('<IsTruncated>true</IsTruncated>') ? xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1] : undefined;
+      } while (token);
       return keys.sort();
     },
     async remove(key) {
-      const { del } = await sdk;
-      await del(safeKey(key));
+      await call(key, { method: 'DELETE' });
     },
+    // Every link signed in the same 10 minutes is identical, so the browser keeps one cache entry per file.
     async readUrl(key) {
-      const { presignUrl } = await sdk;
-      const { presignedUrl } = await presignUrl(await signedToken(), {
-        operation: 'get',
-        pathname: safeKey(key),
-        access: 'private',
-        validUntil: linkExpiry(),
-      });
-      return presignedUrl;
+      const signedAt = Math.floor(Date.now() / URL_BUCKET_MS) * URL_BUCKET_MS;
+      return presign(key, (linkExpiry() - signedAt) / 1000, signedAt);
     },
-    async uploadTarget(key, contentType, maxBytes) {
-      const { presignUrl } = await sdk;
-      const { presignedUrl } = await presignUrl(await signedToken(), {
-        operation: 'put',
-        pathname: safeKey(key),
-        access: 'private',
-        validUntil: Date.now() + URL_TTL_MS,
-        allowedContentTypes: [contentType],
-        maximumSizeInBytes: maxBytes,
-        addRandomSuffix: false, // the server finds the upload by its exact path
-        allowOverwrite: true, // the phone may retry an upload that did not finish
-      });
-      return { url: presignedUrl, method: 'PUT', headers: { 'content-type': contentType } };
+    // Straight to the bucket: a phone's scan (up to 500 MB) never passes through the function.
+    async uploadTarget(key, contentType) {
+      const headers = { 'content-type': contentType };
+      return { url: await presign(key, URL_TTL_MS / 1000, Date.now(), { method: 'PUT', headers }), method: 'PUT', headers };
     },
   };
 }
@@ -224,9 +196,13 @@ let instance: Store | null = null;
 
 export function store(): Store {
   if (!instance) {
-    if (process.env.AYNA_STORE === 'snapshot') instance = overlayStore(path.resolve(process.cwd(), 'snapshot'), path.join(tmpdir(), 'ayna-store'));
-    else if (process.env.BLOB_READ_WRITE_TOKEN) instance = blobStore();
-    else instance = diskStore(process.env.AYNA_STORE_DIR ?? path.resolve(process.cwd(), '../data/store'));
+    if (process.env.AYNA_STORE === 'r2') {
+      const settings = r2Settings();
+      if (!settings) throw new Error('AYNA_STORE=r2 needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY');
+      instance = r2Store(settings);
+    } else {
+      instance = diskStore(process.env.AYNA_STORE_DIR ?? path.resolve(process.cwd(), '../data/store'));
+    }
   }
   return instance;
 }
