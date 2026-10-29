@@ -138,9 +138,11 @@ export const scanRoutes: Route[] = [
           return { id, created, request: text, score, costUsd, durationMs, status, thumb: thumbUrl, rejected, versions: (candidates ?? []).length, moves: receipt?.moved ?? null };
         }),
       );
-      // Best first, then newest: a guest opens the strongest run, failures stay visible further along.
+      // Best first, then the bigger change, then newest: a guest (and the one-take) opens the strongest
+      // run, failures stay visible further along.
       const rank = (r: { score?: unknown }): number => (typeof r.score === 'number' ? r.score : -1);
-      const sorted = runs.filter(Boolean).sort((a, b) => rank(b!) - rank(a!) || String(b!.created).localeCompare(String(a!.created)));
+      const moved = (r: { moves: { done: number } | null }): number => r.moves?.done ?? 0;
+      const sorted = runs.filter(Boolean).sort((a, b) => rank(b!) - rank(a!) || moved(b!) - moved(a!) || String(b!.created).localeCompare(String(a!.created)));
       return json({ runs: sorted });
     },
   },
