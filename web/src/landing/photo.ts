@@ -15,10 +15,10 @@ const pct = (value: number): string => `${(value * 100).toFixed(4)}%`;
 
 export interface PhotoOptions {
   crop: Crop;
-  images: Images;
+  images: Pick<Images, '720'> & Partial<Images>;
   alt: string;
   sizes: string;
-  outlines?: { outline: Outline; tone: 'lime' | 'orange' }[];
+  outlines?: { outline: Outline; tone: 'lime' | 'orange' | 'neutral' }[];
   markers?: { at: [number, number]; text: string }[];
 }
 
@@ -31,8 +31,8 @@ export function photoCrop({ crop, images, alt, sizes, outlines = [], markers = [
   frame.append(
     h('img', {
       src: `/landing/${images['720']}`,
-      srcset: `/landing/${images['720']} 720w, /landing/${images['1080']} 1080w`,
-      sizes,
+      srcset: images['1080'] ? `/landing/${images['720']} 720w, /landing/${images['1080']} 1080w` : null,
+      sizes: images['1080'] ? sizes : null,
       width: 720,
       height: 960,
       loading: 'lazy',

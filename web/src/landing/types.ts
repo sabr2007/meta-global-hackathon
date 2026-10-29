@@ -64,7 +64,9 @@ export interface Showcase {
     candidates: Candidate[];
     chosen: string;
     judge: { reason: string; ranking: { id: string; note: string; followsRequest: number }[] };
+    judged: string; // the app's line for the choice, e.g. "Only version 1c passed the check"
     steps: { label: string; robot: string; why: string }[];
+    orderReason: string;
     refusals: { label: string; reason: string }[];
     executed: { label: string; robot: string; ok: boolean }[];
     receipt: {
@@ -77,19 +79,32 @@ export interface Showcase {
     };
     afterOutlines: Outline[];
     trace: TraceEntry[];
+    verdict: { matchesRequest: boolean; text: string } | null; // Muse Spark on the result vs the goal
+    render: { '720': string } | null; // the verifier's render of the twin from the photo's camera
     costUsd: number;
     seconds: number;
   };
+  others: OtherRun[];
+}
+
+/** Another saved run on the same scan, without pictures. */
+export interface OtherRun {
+  id: string;
+  request: string;
+  candidates: { id: string; passed: boolean; reasons: string[] }[];
+  executed: { label: string; robot: string; ok: boolean }[];
+  refusals: { label: string; reason: string }[];
+  receipt: { matched: number; total: number };
 }
 
 export interface EvalRun {
   run: string;
   scan: string;
+  status: string; // 'done' (measured) or 'no-after' (every version rejected, nothing moved)
   request: string;
-  score: number;
-  matched: number;
-  total: number;
-  medianErrorCm: number;
+  matched: number | null;
+  total: number | null;
+  medianErrorCm: number | null;
   candidates: number;
   rejected: number;
   refusals: string[];
@@ -100,7 +115,9 @@ export interface EvalRun {
 export interface EvalFacts {
   source: string;
   generated: string;
-  runs: number;
+  scan: string;
+  runs: number; // measured runs
+  stopped: number; // runs where no version passed SAM 3.1, so no robot moved
   attempted: number;
   scans: string[];
   requests: string[];
@@ -110,7 +127,6 @@ export interface EvalFacts {
   moves: { asked: number; done: number };
   refusals: { count: number; runsWithRefusals: number };
   failedSteps: number;
-  score: { median: number };
   costUsd: { median: number; total: number };
   seconds: { median: number; min: number; max: number };
   list: EvalRun[];

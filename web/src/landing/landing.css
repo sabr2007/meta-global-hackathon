@@ -506,6 +506,11 @@ a:not(.pill):not(.logo):hover {
   stroke: var(--lime);
 }
 
+.outline--neutral {
+  stroke: var(--neutral);
+  opacity: 0.85;
+}
+
 .marker circle {
   fill: var(--bg);
   stroke: var(--orange);
@@ -942,9 +947,25 @@ a:not(.pill):not(.logo):hover {
   box-shadow: var(--shadow-lift);
 }
 
-.pick__choice q {
+.pick__choice q,
+.pick__choice p {
   color: var(--neutral);
   line-height: 1.55;
+}
+
+.pick__order {
+  color: var(--neutral);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.twin {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
 .plan {
@@ -1310,6 +1331,17 @@ a:not(.pill):not(.logo):hover {
   }
 }
 
+.receipt__verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--line-strong);
+  line-height: 1.5;
+}
+
 .eval__source {
   color: var(--secondary);
   font-size: var(--text-xs);
@@ -1359,8 +1391,25 @@ a:not(.pill):not(.logo):hover {
 }
 
 .fleet__robot dd {
+  display: grid;
+  gap: 8px;
   color: var(--neutral);
   line-height: 1.6;
+}
+
+.fleet__moves {
+  color: var(--secondary);
+  font-size: var(--text-sm);
+}
+
+.fleet__moves::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--lime);
 }
 
 .robots__refusals {

@@ -10,9 +10,10 @@ export const BEATS = {
   instruct: { from: 216, frames: 120 },
   develop: { from: 336, frames: 240 },
   wipe: { from: 576, frames: 210 },
-  plan: { from: 786, frames: 150 },
-  receipt: { from: 936, frames: 180 },
-  outro: { from: 1116, frames: 54 },
+  plan: { from: 786, frames: 120 },
+  twin: { from: 906, frames: 120 },
+  receipt: { from: 1026, frames: 180 },
+  outro: { from: 1206, frames: 54 },
 } as const;
 
 export type BeatName = keyof typeof BEATS;

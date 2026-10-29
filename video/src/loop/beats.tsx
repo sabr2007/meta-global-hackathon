@@ -192,9 +192,9 @@ export const DevelopBeat: React.FC = () => {
         const stamp = spring({ frame: frame - checkAt, fps, config: { damping: 13, stiffness: 180, mass: 0.6 } });
         const isChosen = i === chosenIndex;
         const choose = ramp(frame, DEVELOP.choose, DEVELOP.choose + 16);
-        const dim = isChosen ? 1 : 1 - 0.62 * choose;
+        const dim = isChosen ? 1 : 1 - 0.45 * choose;
         const seconds = developSeconds(candidate.id);
-        const detail = candidate.passed ? prettify(candidate.notes[0] ?? '') : prettify(candidate.reasons[0] ?? 'rejected');
+        const detail = sentence(prettify(candidate.passed ? candidate.notes[0] ?? '' : candidate.reasons.join('; ') || 'rejected'));
         const score = judgeScore(candidate.id);
         return (
           <React.Fragment key={candidate.id}>
@@ -246,7 +246,7 @@ export const DevelopBeat: React.FC = () => {
                 style={{ maxWidth: rect.width + 12 }}
               />
             </div>
-            {isChosen && score !== null ? (
+            {isChosen ? (
               <div
                 style={{
                   position: 'absolute',
@@ -272,7 +272,7 @@ export const DevelopBeat: React.FC = () => {
                     boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
                   }}
                 >
-                  Chosen · follows the request {score}/10
+                  {score !== null ? `Chosen · follows the request ${score}/10` : 'Passed · goes on'}
                 </span>
               </div>
             ) : null}
@@ -384,10 +384,11 @@ export const PlanBeat: React.FC = () => {
       <AbsoluteFill style={{ padding: '200px 56px 0' }}>
         <Card style={{ display: 'flex', flexDirection: 'column', gap: 26, padding: '32px 36px' }}>
           <Eyebrow color={C.text} size={17}>
-            The plan · {run.executed.length} {run.executed.length === 1 ? 'move' : 'moves'}, {refusals().length} refused
+            The plan · {run.executed.length} {run.executed.length === 1 ? 'move' : 'moves'}
+            {refusals().length ? `, ${refusals().length} refused` : ''}
           </Eyebrow>
           {rows.map((row, i) => {
-            const show = ramp(frame, 14 + i * 14, 28 + i * 14);
+            const show = ramp(frame, 12 + i * 12, 24 + i * 12);
             return (
               <div key={i} style={{ display: 'flex', gap: 18, alignItems: 'flex-start', opacity: show, transform: `translateY(${(1 - show) * 12}px)` }}>
                 <div style={{ paddingTop: 10 }}>
@@ -405,6 +406,11 @@ export const PlanBeat: React.FC = () => {
               </div>
             );
           })}
+          {run.orderReason ? (
+            <div style={{ fontFamily: FONT.body, fontSize: 26, lineHeight: 1.4, color: C.secondary, opacity: ramp(frame, 40, 56), borderTop: `1px solid ${C.line}`, paddingTop: 20 }}>
+              Order: {run.orderReason}
+            </div>
+          ) : null}
         </Card>
       </AbsoluteFill>
       <Caption {...caption('plan')} opacity={1} />
@@ -412,7 +418,36 @@ export const PlanBeat: React.FC = () => {
   );
 };
 
-// ---------------------------------------------------------------- 7. the receipt
+// ---------------------------------------------------------------- 7. the twin, rendered from the photo's camera
+
+export const TwinBeat: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { frames } = BEATS.twin;
+  const fade = beatOpacity(frame, frames, 10);
+  const draw = (i: number) => ramp(frame, 18 + i * 5, 30 + i * 5);
+  return (
+    <AbsoluteFill style={{ opacity: fade }}>
+      {run.render ? (
+        <Overlay camera={BASE_CAMERA}>
+          {afterOutlines.map((o, i) => (
+            <DottedPath key={o.object} d={o.d} color={o.moves ? C.lime : C.neutral} opacity={draw(i)} />
+          ))}
+        </Overlay>
+      ) : null}
+      <div style={{ position: 'absolute', top: 176, left: 56, display: 'flex', gap: 10, opacity: ramp(frame, 8, 18) }}>
+        <Tag size={19}>{run.render ? 'The twin, rendered from the photo’s camera' : 'The after photo'}</Tag>
+        {run.render ? (
+          <Tag tone="lime" size={19}>
+            dots: the after photo
+          </Tag>
+        ) : null}
+      </div>
+      <Caption {...caption('twin')} opacity={1} />
+    </AbsoluteFill>
+  );
+};
+
+// ---------------------------------------------------------------- 8. the receipt
 
 export const ReceiptBeat: React.FC = () => {
   const frame = useCurrentFrame();
@@ -483,12 +518,20 @@ export const ReceiptBeat: React.FC = () => {
             </div>
           </div>
         </Card>
-        <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', gap: 10, opacity: ramp(frame, 84, 100) }}>
+        {run.verdict ? (
+          <div style={{ marginTop: 20, display: 'flex', gap: 14, alignItems: 'baseline', opacity: ramp(frame, 78, 94) }}>
+            <Tag tone={run.verdict.matchesRequest ? 'lime' : 'orange'} size={17}>
+              Muse Spark
+            </Tag>
+            <span style={{ fontFamily: FONT.body, fontSize: 25, lineHeight: 1.35, color: C.text }}>“{run.verdict.text}”</span>
+          </div>
+        ) : null}
+        <div style={{ marginTop: 16, display: 'flex', alignItems: 'baseline', gap: 10, opacity: ramp(frame, 96, 112) }}>
           <Num size={28} color={C.lime}>
             {evalNumbers.objects.matched}/{evalNumbers.objects.checked}
           </Num>
           <span style={{ fontFamily: FONT.body, fontSize: 22, color: C.neutral }}>
-            objects within 3 cm across {evalNumbers.runs} eval runs{evalNumbers.scans.length === 1 ? ' on this desk' : ''}
+            objects within 3 cm across {evalNumbers.runs} measured eval runs{evalNumbers.scans.length === 1 ? ' on this desk' : ''}
           </span>
         </div>
       </AbsoluteFill>

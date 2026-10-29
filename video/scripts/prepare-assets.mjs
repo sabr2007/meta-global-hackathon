@@ -5,12 +5,14 @@
 //   npm run prepare-assets                       # source = the repo root (web/public/scenes, data/store)
 //   npm run prepare-assets -- --source /path/to/checkout [--scan desk-sam3d] [--run <run id>]
 //
-// Reads:  <source>/web/public/scenes/<scan>/{hero.jpg,masks.json,scene.json}
+// Reads:  the scan's bundle {hero.jpg,masks.json,scene.json} from <source>/data/scenes/<scan>,
+//         <source>/web/public/scenes/<scan> or <source>/data/store/scans/*/<scan>/bundle
 //         <source>/data/store/scans/*/<scan>/runs/*/{run.json,candidate-*.webp}
 // Writes: web/public/landing/before-{720,1080}.webp, after-<run>-<id>-{720,1080}.webp
-//         web/src/landing/facts/showcase.json (scene facts, dotted mask outlines, the featured run)
+//         render-<run>-720.webp (the verifier's render of the twin, when saved)
+//         web/src/landing/facts/showcase.json (scene facts, dotted mask outlines, the featured run, the others)
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -57,15 +59,43 @@ function findRuns() {
   return runs;
 }
 
-/** A run that shows the whole loop: a rejected version first, then the best receipt. */
+// What SAM 3.1 caught, by kind, so the featured run shows as many different rejections as it can.
+const REJECTION_KINDS = [/missing|vanished/i, /appeared|extra|added/i, /changed size|size/i, /moved .* should stay/i];
+
+/** A run that shows the whole loop: rejected versions (of different kinds) first, then the receipt. */
 function rank({ run, withImages }) {
-  const rejectedShown = withImages.filter((c) => !c.passed).length;
-  return (rejectedShown > 0 ? 1000 : 0) + run.receipt.score * 2 + withImages.length;
+  const rejected = withImages.filter((c) => !c.passed);
+  const reasons = rejected.flatMap((c) => c.reasons ?? []);
+  const kinds = REJECTION_KINDS.filter((kind) => reasons.some((r) => kind.test(r))).length;
+  const matchShare = run.receipt.total ? run.receipt.matched / run.receipt.total : 0;
+  return (rejected.length > 0 ? 1000 : 0) + kinds * 60 + matchShare * 200 + withImages.length;
 }
 
-async function writeWebp(input, base, resize) {
+/** Other saved runs on the same scan, without images: what each robot did and what SAM 3.1 caught. */
+function summarise({ run }, labels) {
+  return {
+    id: run.id,
+    request: run.request,
+    candidates: run.candidates.map((c) => ({ id: c.id, passed: c.passed, reasons: c.reasons ?? [] })),
+    executed: run.executed.map((e) => ({ label: labels.get(e.object) ?? e.object, robot: e.robot, ok: e.ok })),
+    refusals: [
+      ...(run.instruction.refusals ?? []).map((r) => ({ label: labels.get(r.object) ?? r.object, reason: r.reason })),
+      ...run.refusals.map((r) => ({ label: r.label, reason: r.reason })),
+    ],
+    receipt: { matched: run.receipt.matched, total: run.receipt.total },
+  };
+}
+
+/** Removes earlier featured runs' pictures so only the current one ships. */
+function removeStale(keep) {
+  for (const file of readdirSync(PUBLIC_OUT)) {
+    if (/^(after|render)-.+\.webp$/.test(file) && !keep.has(file)) unlinkSync(path.join(PUBLIC_OUT, file));
+  }
+}
+
+async function writeWebp(input, base, resize, widths = WIDTHS) {
   const written = {};
-  for (const width of WIDTHS) {
+  for (const width of widths) {
     const height = Math.round((width * 4) / 3);
     const file = `${base}-${width}.webp`;
     const buffer = await sharp(input).resize(width, height, { fit: resize }).webp({ quality: QUALITY[width], effort: 6 }).toBuffer();
@@ -78,8 +108,18 @@ async function writeWebp(input, base, resize) {
 
 const round = (value, digits = 2) => Math.round(value * 10 ** digits) / 10 ** digits;
 
+/** The scan's bundle (hero.jpg, masks.json, scene.json), wherever this checkout keeps it. */
+function findScene() {
+  const scans = path.join(source, 'data', 'store', 'scans');
+  const owners = existsSync(scans) ? readdirSync(scans).map((owner) => path.join(scans, owner, scanId, 'bundle')) : [];
+  const places = [path.join(source, 'data', 'scenes', scanId), path.join(source, 'web', 'public', 'scenes', scanId), ...owners];
+  const found = places.find((dir) => ['hero.jpg', 'masks.json', 'scene.json'].every((f) => existsSync(path.join(dir, f))));
+  if (!found) throw new Error(`no bundle for ${scanId}; looked in:\n  ${places.join('\n  ')}`);
+  return found;
+}
+
 async function main() {
-  const sceneDir = path.join(source, 'web', 'public', 'scenes', scanId);
+  const sceneDir = findScene();
   const scene = readJson(path.join(sceneDir, 'scene.json'));
   const masks = readJson(path.join(sceneDir, 'masks.json'));
   mkdirSync(PUBLIC_OUT, { recursive: true });
@@ -99,8 +139,12 @@ async function main() {
   for (const c of run.candidates) {
     const file = c.file && path.join(dir, c.file);
     const images = file && existsSync(file) ? await writeWebp(file, `after-${run.id}-${c.id}`, 'fill') : null;
-    candidates.push({ id: c.id, round: c.round, passed: c.passed, reasons: c.reasons, notes: c.notes, images });
+    candidates.push({ id: c.id, round: c.round, passed: c.passed, reasons: c.reasons ?? [], notes: c.notes ?? [], images });
   }
+  // the verifier's render of the twin from the photo's camera, when the run saved one
+  const renderFile = path.join(dir, 'render.jpg');
+  const render = existsSync(renderFile) ? await writeWebp(renderFile, `render-${run.id}`, 'fill', [720]) : null;
+  removeStale(new Set([...candidates.flatMap((c) => Object.values(c.images ?? {})), ...Object.values(render ?? {})]));
 
   const labels = new Map(scene.objects.map((o) => [o.name, o.label]));
   const showcase = {
@@ -133,7 +177,9 @@ async function main() {
         reason: run.judgement?.reason ?? '',
         ranking: (run.judgement?.ranking ?? []).map((r) => ({ id: r.id, note: r.note, followsRequest: r.follows_request })),
       },
+      judged: run.trace.find((t) => t.step === 'judge' && t.state === 'done')?.text ?? '',
       steps: run.steps.map((s) => ({ label: s.label, robot: s.robot, why: s.why })),
+      orderReason: run.orderReason ?? '',
       refusals: run.refusals.map((r) => ({ label: r.label, reason: r.reason })),
       executed: run.executed.map((e) => ({ label: labels.get(e.object) ?? e.object, robot: e.robot, ok: e.ok })),
       receipt: {
@@ -160,9 +206,12 @@ async function main() {
         text: t.text,
         usage: (t.usage ?? []).map((u) => ({ model: u.model, ms: u.ms, costUsd: u.costUsd ?? null })),
       })),
+      verdict: run.verdict ? { matchesRequest: run.verdict.matches_request, text: run.verdict.verdict } : null,
+      render,
       costUsd: round(run.costUsd, 4),
       seconds: Math.round(run.durationMs / 1000),
     },
+    others: runs.filter((r) => r !== featured).map((r) => summarise(r, labels)),
   };
   writeFileSync(path.join(DATA_OUT, 'showcase.json'), `${JSON.stringify(showcase, null, 1)}\n`);
   const shown = candidates.filter((c) => c.images).length;

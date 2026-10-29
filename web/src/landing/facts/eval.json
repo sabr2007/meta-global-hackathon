@@ -1,56 +1,65 @@
 {
  "source": "Headless runs of the full Ayna loop: live Meta models, robots in MuJoCo, the same verifier as the app (web/scripts/eval.ts).",
- "generated": "2026-10-29T02:06:42.728Z",
- "runs": 3,
- "attempted": 3,
+ "generated": "2026-10-29T02:45:29.629Z",
+ "scan": "desk-sam3d",
+ "runs": 10,
+ "stopped": 5,
+ "attempted": 15,
  "scans": [
   "desk-sam3d"
  ],
  "requests": [
   "Tidy up my desk",
   "Make room for my laptop: clear the space in front of it",
-  "Group the orange toys together next to the yellow cylinder"
+  "Group the orange toys together next to the yellow cylinder",
+  "Tidy up the table",
+  "Make room for a laptop in the middle of the table",
+  "Put the small things together in one group",
+  "A request asked in Russian",
+  "Put the yellow cylinder next to the white mouse",
+  "Clear the front half of the table",
+  "Line the small objects up along the back edge",
+  "Move everything a bit closer to me",
+  "Move the yellow cylinder to the front edge of the table, next to the white earbud case",
+  "Put all the small things together in one corner"
  ],
  "objects": {
-  "checked": 21,
-  "matched": 18
+  "checked": 70,
+  "matched": 52
  },
  "medianErrorCm": {
   "median": 0.18,
-  "min": 0.12,
-  "max": 0.19
+  "min": 0.1,
+  "max": 3.11
  },
  "versions": {
-  "developed": 11,
-  "rejected": 5
+  "developed": 67,
+  "rejected": 52
  },
  "moves": {
-  "asked": 9,
-  "done": 6
+  "asked": 39,
+  "done": 21
  },
  "refusals": {
-  "count": 3,
-  "runsWithRefusals": 2
+  "count": 13,
+  "runsWithRefusals": 8
  },
- "failedSteps": 0,
- "score": {
-  "median": 86
- },
+ "failedSteps": 5,
  "costUsd": {
-  "median": 0.074,
-  "total": 0.23
+  "median": 0.075,
+  "total": 1.28
  },
  "seconds": {
-  "median": 45,
+  "median": 60,
   "min": 37,
-  "max": 81
+  "max": 109
  },
  "list": [
   {
    "run": "20261029-015217-2xen",
    "scan": "desk-sam3d",
+   "status": "done",
    "request": "Tidy up my desk",
-   "score": 86,
    "matched": 6,
    "total": 7,
    "medianErrorCm": 0.18,
@@ -66,8 +75,8 @@
   {
    "run": "20261029-015552-4e9u",
    "scan": "desk-sam3d",
+   "status": "done",
    "request": "Make room for my laptop: clear the space in front of it",
-   "score": 86,
    "matched": 6,
    "total": 7,
    "medianErrorCm": 0.12,
@@ -82,8 +91,8 @@
   {
    "run": "20261029-015629-yxiu",
    "scan": "desk-sam3d",
+   "status": "done",
    "request": "Group the orange toys together next to the yellow cylinder",
-   "score": 86,
    "matched": 6,
    "total": 7,
    "medianErrorCm": 0.19,
@@ -92,6 +101,190 @@
    "refusals": [],
    "seconds": 45,
    "costUsd": 0.057
+  },
+  {
+   "run": "20261029-021337-h5q0",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Tidy up the table",
+   "matched": 6,
+   "total": 7,
+   "medianErrorCm": 0.11,
+   "candidates": 6,
+   "rejected": 4,
+   "refusals": [
+    "yellow cylinder: yellow cylinder is 10.8 cm wide and cannot be gripped by the arm that opens to 11 cm"
+   ],
+   "seconds": 92,
+   "costUsd": 0.134
+  },
+  {
+   "run": "20261029-021509-1g2t",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Make room for a laptop in the middle of the table",
+   "matched": 4,
+   "total": 7,
+   "medianErrorCm": 0.17,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [
+    "white mouse: White mouse target is only 0.15 m from the base, too close for the arm.",
+    "yellow cylinder: Yellow cylinder is 10.8 cm wide, too tight for the 11 cm gripper.",
+    "white earbud case: White earbud case target is 0.78 m away, beyond the 0.76 m arm reach."
+   ],
+   "seconds": 51,
+   "costUsd": 0.059
+  },
+  {
+   "run": "20261029-021600-o4kg",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Put the small things together in one group",
+   "matched": 4,
+   "total": 7,
+   "medianErrorCm": 0.41,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [
+    "orange ring toy: orange ring toy cannot be placed because orange figurine 3 stays on its target.",
+    "white mouse: white mouse cannot be placed because orange figurine 3 stays on its target.",
+    "orange figurine: orange figurine cannot be placed because yellow cylinder 5 stays on its target."
+   ],
+   "seconds": 55,
+   "costUsd": 0.061
+  },
+  {
+   "run": "20261029-021801-6edq",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "A request asked in Russian",
+   "matched": 3,
+   "total": 7,
+   "medianErrorCm": 3.11,
+   "candidates": 6,
+   "rejected": 5,
+   "refusals": [
+    "yellow cylinder: yellow cylinder is 10.8 cm wide, gripper opens to 11 cm so cannot grip safely"
+   ],
+   "seconds": 109,
+   "costUsd": 0.114
+  },
+  {
+   "run": "20261029-023100-0tg3",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Put the yellow cylinder next to the white mouse",
+   "matched": 7,
+   "total": 7,
+   "medianErrorCm": 0.1,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [],
+   "seconds": 40,
+   "costUsd": 0.048
+  },
+  {
+   "run": "20261029-024133-ba67",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Clear the front half of the table",
+   "matched": 6,
+   "total": 7,
+   "medianErrorCm": 0.3,
+   "candidates": 3,
+   "rejected": 1,
+   "refusals": [
+    "white keyboard: white keyboard needs 13.2 cm grip but arm opens to 11 cm, and mobile would be 0.78 m away but reaches 0.73 m"
+   ],
+   "seconds": 65,
+   "costUsd": 0.08
+  },
+  {
+   "run": "20261029-024351-i85a",
+   "scan": "desk-sam3d",
+   "status": "done",
+   "request": "Line the small objects up along the back edge",
+   "matched": 4,
+   "total": 7,
+   "medianErrorCm": 1.31,
+   "candidates": 3,
+   "rejected": 2,
+   "refusals": [
+    "white mouse: white mouse target is blocked by silver laptop 4 that stays"
+   ],
+   "seconds": 64,
+   "costUsd": 0.075
+  },
+  {
+   "run": "20261029-021655-xmrn",
+   "scan": "desk-sam3d",
+   "status": "no-after",
+   "request": "Move everything a bit closer to me",
+   "matched": null,
+   "total": null,
+   "medianErrorCm": null,
+   "candidates": 5,
+   "rejected": 5,
+   "refusals": [],
+   "seconds": 66,
+   "costUsd": 0.1
+  },
+  {
+   "run": "20261029-022841-z5vo",
+   "scan": "desk-sam3d",
+   "status": "no-after",
+   "request": "Move the yellow cylinder to the front edge of the table, next to the white earbud case",
+   "matched": null,
+   "total": null,
+   "medianErrorCm": null,
+   "candidates": 6,
+   "rejected": 6,
+   "refusals": [],
+   "seconds": 45,
+   "costUsd": 0.088
+  },
+  {
+   "run": "20261029-022934-w3z3",
+   "scan": "desk-sam3d",
+   "status": "no-after",
+   "request": "Put the yellow cylinder next to the white mouse",
+   "matched": null,
+   "total": null,
+   "medianErrorCm": null,
+   "candidates": 6,
+   "rejected": 6,
+   "refusals": [],
+   "seconds": 51,
+   "costUsd": 0.09
+  },
+  {
+   "run": "20261029-024011-6wgq",
+   "scan": "desk-sam3d",
+   "status": "no-after",
+   "request": "Tidy up the table",
+   "matched": null,
+   "total": null,
+   "medianErrorCm": null,
+   "candidates": 6,
+   "rejected": 6,
+   "refusals": [],
+   "seconds": 81,
+   "costUsd": 0.096
+  },
+  {
+   "run": "20261029-024238-xftx",
+   "scan": "desk-sam3d",
+   "status": "no-after",
+   "request": "Put all the small things together in one corner",
+   "matched": null,
+   "total": null,
+   "medianErrorCm": null,
+   "candidates": 6,
+   "rejected": 6,
+   "refusals": [],
+   "seconds": 73,
+   "costUsd": 0.103
   }
  ]
 }

@@ -42,10 +42,12 @@ made them) and writes small public copies that are committed:
 
 ```sh
 npm run prepare-assets -- --source /path/to/checkout     # default: this repo's root
-#   reads  <source>/web/public/scenes/desk-sam3d/{hero.jpg,masks.json,scene.json}
+#   reads  the desk-sam3d bundle {hero.jpg,masks.json,scene.json} (data/scenes/, web/public/scenes/
+#          or data/store/scans/*/desk-sam3d/bundle/)
 #          <source>/data/store/scans/*/desk-sam3d/runs/*/{run.json,candidate-*.webp}
-#   writes web/public/landing/{before,after-<run>-<version>}-{720,1080}.webp
-#          web/src/landing/facts/showcase.json (objects, dotted mask outlines, the featured run)
+#   writes web/public/landing/{before,after-<run>-<version>}-{720,1080}.webp, render-<run>-720.webp
+#          web/src/landing/facts/showcase.json (objects, dotted mask outlines, the featured run,
+#          and a summary of the other saved runs)
 ```
 
 It features the run that shows the whole loop best: one with a version SAM 3.1 rejected if there is

@@ -5,13 +5,17 @@ import { loadAynaFonts } from '../fonts';
 import { C } from '../theme';
 import { Logo } from '../components/Logo';
 import { BASE_CAMERA, Photo, useProjection } from '../components/Stage';
-import { DevelopBeat, InstructBeat, PlanBeat, ReceiptBeat, RequestBeat, SegmentBeat, WIPE, WipeChrome, wipePosition } from './beats';
+import { run } from '../data';
+import { DevelopBeat, InstructBeat, PlanBeat, ReceiptBeat, RequestBeat, SegmentBeat, TwinBeat, WIPE, WipeChrome, wipePosition } from './beats';
 import { EdgeShade, Shade } from './parts';
 import { BEATS, contactLayout, ramp, sheetCandidates, type BeatName } from './timeline';
 
 loadAynaFonts();
 
-const STEPS: BeatName[] = ['request', 'segment', 'instruct', 'develop', 'wipe', 'plan', 'receipt'];
+const STEPS: BeatName[] = ['request', 'segment', 'instruct', 'develop', 'wipe', 'plan', 'twin', 'receipt'];
+
+/** 1 inside [from, to), fading in and out over `fade` frames. */
+const windowed = (frame: number, from: number, to: number, fade = 14) => ramp(frame, from, from + fade) * (1 - ramp(frame, to - fade, to));
 
 const Header: React.FC<{ frame: number }> = ({ frame }) => {
   const reset = 1 - ramp(frame, BEATS.outro.from, BEATS.outro.from + 30);
@@ -66,13 +70,17 @@ export const AynaLoop: React.FC = () => {
   const beforeOpacity =
     frame < developFrom ? 1 : frame < BEATS.wipe.from + WIPE.expand ? 1 - ramp(frame, developFrom, developFrom + 16) : 1;
   const shade = Math.max(
-    ramp(frame, BEATS.instruct.from, BEATS.instruct.from + 14) * (1 - ramp(frame, developFrom, developFrom + 16)) * 0.68,
-    ramp(frame, BEATS.plan.from, BEATS.plan.from + 14) * (1 - ramp(frame, BEATS.outro.from, BEATS.outro.from + 30)) * 0.66,
+    windowed(frame, BEATS.instruct.from, developFrom + 16) * 0.68,
+    windowed(frame, BEATS.plan.from, BEATS.twin.from + 8, 12) * 0.66,
+    windowed(frame, BEATS.receipt.from - 8, BEATS.outro.from + 30, 12) * 0.66,
   );
+  const render = run.render?.['720'];
+  const twin = windowed(frame, BEATS.twin.from - 4, BEATS.receipt.from + 8, 14);
   return (
     <AbsoluteFill style={{ background: C.bg }}>
       <Photo camera={BASE_CAMERA} file={scan.before['1080']} style={{ opacity: beforeOpacity }} />
       <AfterLayer frame={frame} />
+      {render && twin > 0 ? <Photo camera={BASE_CAMERA} file={render} style={{ opacity: twin }} /> : null}
       <EdgeShade />
       <Shade amount={shade} />
       <Sequence from={BEATS.request.from} durationInFrames={BEATS.request.frames} layout="none">
@@ -92,6 +100,9 @@ export const AynaLoop: React.FC = () => {
       </Sequence>
       <Sequence from={BEATS.plan.from} durationInFrames={BEATS.plan.frames} layout="none">
         <PlanBeat />
+      </Sequence>
+      <Sequence from={BEATS.twin.from} durationInFrames={BEATS.twin.frames} layout="none">
+        <TwinBeat />
       </Sequence>
       <Sequence from={BEATS.receipt.from} durationInFrames={BEATS.receipt.frames} layout="none">
         <ReceiptBeat />

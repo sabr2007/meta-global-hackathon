@@ -1,10 +1,13 @@
 // Real material only: the run the landing features (web/src/landing/facts/showcase.json, written by
 // scripts/prepare-assets.mjs from a saved Ayna run) and the eval totals (eval.json, from the eval log).
-import evalNumbers from '../../web/src/landing/facts/eval.json';
-import showcase from '../../web/src/landing/facts/showcase.json';
+import evalJson from '../../web/src/landing/facts/eval.json';
+import showcaseJson from '../../web/src/landing/facts/showcase.json';
+import type { EvalFacts, Showcase } from '../../web/src/landing/types';
 import captions from './loop/captions.json';
 
-export { evalNumbers, showcase };
+// The same shapes the landing uses (web/src/landing/types.ts).
+export const showcase = showcaseJson as unknown as Showcase;
+export const evalNumbers = evalJson as unknown as EvalFacts;
 
 export type Size = '720' | '1080';
 export type Point = [number, number];
@@ -82,14 +85,23 @@ export function refusals(): { label: string; reason: string }[] {
 export const formatCm = (cm: number): string => (cm < 10 ? cm.toFixed(1) : Math.round(cm).toString());
 export const formatUsd = (usd: number): string => `$${usd.toFixed(2)}`;
 
+interface Cue {
+  key: string;
+  chip: string;
+  text: string;
+  single?: { chip: string; text: string };
+}
+
 /** On-screen caption of the loop (captions.json), with the featured run's values filled in. */
 export function caption(key: string): { chip: string; text: string } {
-  const cue = captions.cues.find((c) => c.key === key);
+  const cue = captions.cues.find((c) => c.key === key) as Cue | undefined;
   if (!cue) throw new Error(`no caption ${key}`);
   const values: Record<string, string> = {
     request: run.request,
     objects: String(scan.objects.length),
     versions: String(Math.min(candidates.length, 6)),
+    chosen: chosen.id,
   };
-  return { chip: cue.chip, text: cue.text.replace(/\{(\w+)\}/g, (_, name: string) => values[name] ?? name) };
+  const picked = cue.single && !run.judge.ranking.length ? cue.single : cue;
+  return { chip: picked.chip, text: picked.text.replace(/\{(\w+)\}/g, (_, name: string) => values[name] ?? name) };
 }

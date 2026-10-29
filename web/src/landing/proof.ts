@@ -1,6 +1,6 @@
 // The evidence slots: the comparison, the receipt, the eval totals, refusals and scan facts.
 import { fillSlot, h, num, s } from './dom';
-import { allRefusals, chosen, deviceName, evalFacts, formatCm, formatDate, formatUsd, judgeOf, median, run, scan, sentenceCase } from './facts';
+import { allRefusals, chosen, deviceName, evalFacts, formatCm, formatDate, formatUsd, judgeOf, median, robotMoves, run, scan, sentenceCase } from './facts';
 import { photoCrop, type Crop } from './photo';
 
 // Wide enough to show where the mouse goes in the chosen version (hero pixels, 3:2).
@@ -88,6 +88,14 @@ export function renderReceipt(): void {
       h('p', { class: 'figure' }, h('span', {}, num(receipt.medianErrorCm.toFixed(1), 'cm')), h('span', { class: 'eyebrow' }, 'median error')),
       h('p', { class: 'figure' }, h('span', {}, num(run.seconds, 's')), h('span', { class: 'eyebrow' }, `${formatUsd(run.costUsd)} in model calls`)),
     ),
+    run.verdict
+      ? h(
+          'p',
+          { class: 'receipt__verdict' },
+          h('span', { class: `tag ${run.verdict.matchesRequest ? 'tag--lime' : 'tag--orange'}` }, 'Muse Spark'),
+          h('q', {}, run.verdict.text),
+        )
+      : null,
   );
 }
 
@@ -97,23 +105,40 @@ export function renderEval(): void {
     h('div', { class: `stat-tile${modifier ? ` stat-tile--${modifier}` : ''}` }, h('span', { class: 'num' }, value), h('p', {}, label));
   fillSlot(
     'eval',
-    tile(`${e.objects.matched}/${e.objects.checked}`, `objects ended within 3 cm of where the after photo put them, across ${e.runs} runs of the full loop`, 'hero'),
+    tile(`${e.objects.matched}/${e.objects.checked}`, `objects ended within 3 cm of where the after photo put them, across ${e.runs} measured runs of the full loop`, 'hero'),
     tile(`${e.medianErrorCm.median.toFixed(2)}`, 'cm median placement error (the median of each run’s median)'),
     tile(`${e.versions.rejected}/${e.versions.developed}`, 'versions of the after photo rejected by SAM 3.1 before any robot moved', 'orange'),
-    tile(String(e.refusals.count), `honest refusals, each with its measurement, in ${e.refusals.runsWithRefusals} of ${e.runs} runs`, 'orange'),
-    tile(`${e.seconds.median}`, `seconds for a whole run, median (${e.seconds.min}–${e.seconds.max} s)`),
-    tile(formatUsd(e.costUsd.median), 'per run in Meta model calls, median'),
-    tile(String(e.failedSteps), 'robot steps that failed once started'),
+    tile(String(e.stopped), `runs stopped with nothing moved, because no version passed the check`, 'orange'),
+    tile(String(e.refusals.count), `honest refusals, each with its reason, in ${e.refusals.runsWithRefusals} of ${e.runs} measured runs`, 'orange'),
+    tile(String(e.failedSteps), 'robot steps that were tried and failed; the receipt shows each one'),
+    tile(`${e.seconds.median} s`, `median run, request to receipt, at a median $${e.costUsd.median.toFixed(3)} in Meta model calls`),
   );
-  const requests = e.requests.map((r) => `“${r}”`).join(', ');
   fillSlot(
     'eval-source',
-    `Source: ${e.runs} headless runs of the whole loop on the ${e.scans.join(', ')} scan, with live Meta models, robots in MuJoCo and the same verifier as the app. Requests: ${requests}. Logged by `,
+    `Source: ${e.attempted} headless runs of the whole loop on the desk scan (${e.requests.length} different requests), with live Meta models, robots in MuJoCo and the same verifier as the app. Logged by `,
     h('code', {}, 'web/scripts/eval.ts'),
     ', summarised by ',
     h('code', {}, 'web/scripts/landing-numbers.mjs'),
     ` on ${formatDate(e.generated)}.`,
   );
+}
+
+/** What each robot actually moved in the saved runs, under its description. */
+export function renderFleet(): void {
+  const describe = (kind: 'arm' | 'mobile') => {
+    const moves = robotMoves(kind);
+    if (!moves.length) return null;
+    const objects = [...new Set(moves.map((m) => m.label))];
+    const best = [...moves].sort((a, b) => b.matched / b.total - a.matched / a.total)[0];
+    return h(
+      'span',
+      { class: 'fleet__moves' },
+      `In saved runs it moved the ${objects.join(', the ')}. `,
+      `For “${best.request}”, ${best.matched} of ${best.total} objects matched the after photo.`,
+    );
+  };
+  fillSlot('fleet-arm', describe('arm'));
+  fillSlot('fleet-mobile', describe('mobile'));
 }
 
 export function renderRefusals(): void {

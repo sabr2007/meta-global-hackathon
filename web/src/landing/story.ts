@@ -20,22 +20,18 @@ import { photoCrop, type Crop } from './photo';
 
 // The table, with a margin around every object (hero pixels).
 export const PROBLEM_CROP: Crop = { x: 250, y: 360, w: 1150, h: 920 };
+// The twin render: the arm at the top left, the objects, the table (hero pixels, 4:3).
+const TWIN_CROP: Crop = { x: 0, y: 220, w: 1440, h: 1080 };
 
 const GRIPPER_OPENS_CM = 11; // the arm's gripper, as its refusals report it
 
-const objectWidth = (label: string): string | null => {
-  const object = scan.objects.find((o) => o.label === label);
-  return object ? Math.min(object.sizeCm[0], object.sizeCm[1]).toFixed(1) : null;
-};
-
-/** One honest question per object on the desk; the numbers come from the scan. */
+/** One honest question per object on the desk. */
 function questionFor(label: string): string {
-  const width = objectWidth(label);
   switch (label) {
     case 'white keyboard':
-      return `${width} cm wide. Can a gripper that opens ${GRIPPER_OPENS_CM} cm hold it?`;
+      return `Wider than the gripper opens (${GRIPPER_OPENS_CM} cm), whichever way it turns. Can a robot move it at all?`;
     case 'yellow cylinder':
-      return `${width} cm wide, and the gripper opens ${GRIPPER_OPENS_CM} cm. Close enough?`;
+      return `Can a gripper that opens ${GRIPPER_OPENS_CM} cm close around it safely?`;
     case 'white mouse':
       return 'Next to the keyboard, or out of the way?';
     case 'white earbud case':
@@ -57,6 +53,13 @@ export function renderFilmCaption(): void {
     `A real run on this desk, from request to receipt: “${run.request}” in ${run.seconds} s for ${formatUsd(run.costUsd)} of model calls.`,
   );
   fillSlot('film-transcript', ...loop.cues.map((cue) => h('li', {}, `${cue.chip}: ${cue.text}`)));
+  // the poster is the frame where SAM 3.1's verdicts are stamped on the versions
+  const poster = document.querySelector<HTMLImageElement>('.film__poster');
+  const rejected = run.candidates.filter((c) => !c.passed);
+  if (poster && rejected.length) {
+    const reasons = rejected.map((c) => `version ${c.id} (${prettify(c.reasons.join('; '))})`).join(' and ');
+    poster.alt = `A frame of the film: Muse Image's ${run.candidates.length} versions of the after photo for a real desk. SAM 3.1 rejected ${reasons}; version ${chosen.id} keeps all ${scan.objects.length} objects.`;
+  }
 }
 
 export function renderProblem(): void {
@@ -157,15 +160,16 @@ function stationVerdicts(): void {
         { class: `verdict${candidate.passed ? '' : ' verdict--rejected'}` },
         h('span', { class: 'eyebrow verdict__id' }, candidate.id),
         h('span', { class: 'verdict__title' }, candidate.passed ? `Keeps all ${objects} objects` : 'Rejected'),
-        h('span', { class: 'verdict__detail' }, sentenceCase(prettify((candidate.passed ? candidate.notes[0] : candidate.reasons[0]) ?? ''))),
+        h('span', { class: 'verdict__detail' }, sentenceCase(prettify(candidate.passed ? candidate.notes[0] ?? '' : candidate.reasons.join('; ')))),
       ),
     ),
   );
-  const strictest = [...evalFacts.list].sort((a, b) => b.rejected - a.rejected)[0];
-  if (strictest && strictest.rejected > 0) {
+  const e = evalFacts;
+  if (e.versions.rejected > 0) {
+    const stopped = e.stopped ? ` In ${e.stopped} of them no version passed, so no robot moved at all.` : '';
     fillSlot(
       'rejections',
-      `In the “${strictest.request}” run, SAM 3.1 rejected ${strictest.rejected} of ${strictest.candidates} versions before one passed. Rejected versions never reach a robot.`,
+      `Across ${e.attempted} runs on this desk, SAM 3.1 rejected ${e.versions.rejected} of ${e.versions.developed} versions before any robot moved.${stopped}`,
     );
   }
 }
@@ -183,15 +187,15 @@ function stationPick(): void {
       h('li', { class: 'is-refused' }, h('span', { class: 'tag tag--orange' }, 'Refused'), h('strong', {}, refusal.label), h('span', {}, sentenceCase(prettify(refusal.reason)))),
     ),
   );
+  // with several passing versions Spark ranks them; with one, the app says so and moves on
+  const choice = judge
+    ? [h('span', { class: 'tag tag--lime tag--wrap' }, `Version ${chosen.id} · follows the request ${judge.followsRequest}/10`), h('q', {}, sentenceCase(judge.note))]
+    : [h('span', { class: 'tag tag--lime tag--wrap' }, `Version ${chosen.id}`), h('p', {}, `${run.judged || `Only version ${chosen.id} passed the check`}, so there was nothing to choose between.`)];
   fillSlot(
     'pick',
-    h(
-      'div',
-      { class: 'pick__choice' },
-      h('span', { class: 'tag tag--lime tag--wrap' }, judge ? `Version ${chosen.id} · follows the request ${judge.followsRequest}/10` : `Version ${chosen.id}`),
-      judge ? h('q', {}, sentenceCase(judge.note)) : null,
-    ),
+    h('div', { class: 'pick__choice' }, ...choice),
     plan,
+    run.orderReason ? h('p', { class: 'pick__order' }, h('span', { class: 'eyebrow' }, 'Order'), ` ${run.orderReason}`) : null,
   );
 }
 
@@ -210,6 +214,24 @@ function stationBodies(): void {
       { class: 'chips', role: 'list' },
       ...scan.objects.map((o) => h('li', { class: 'tag' }, `${o.label} `, h('span', { class: 'num' }, o.fitErrorMm.toFixed(1)), ' mm')),
     ),
+    run.render
+      ? h(
+          'figure',
+          { class: 'twin' },
+          photoCrop({
+            crop: TWIN_CROP,
+            images: run.render,
+            alt: 'The twin after the robots moved, rendered from the photo’s camera: the arm, the laptop, the keyboard, the mouse, the earbud case and the toys as SAM 3D bodies on the scanned table.',
+            sizes: '(min-width: 960px) 600px, calc(100vw - 32px)',
+            outlines: run.afterOutlines.map((outline) => ({ outline, tone: outline.moves ? ('lime' as const) : ('neutral' as const) })),
+          }),
+          h(
+            'figcaption',
+            {},
+            'The twin after the robots moved, rendered from the photo’s own camera. The dots are where the after photo puts each object; lime for the ones that moved.',
+          ),
+        )
+      : null,
   );
 }
 

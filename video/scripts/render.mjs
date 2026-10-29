@@ -21,7 +21,7 @@ const ROOT = path.resolve(HERE, '..');
 const LANDING = path.resolve(ROOT, '..', 'web', 'public', 'landing');
 const OUT = path.join(ROOT, 'out');
 const MAX_BYTES = 4 * 1024 * 1024;
-const POSTER_FRAME = 771; // the after photo with the moves drawn on it: the loop's idea in one frame
+const POSTER_FRAME = 494; // the versions with SAM 3.1's verdicts stamped on them: the loop's idea in one frame
 const FPS = 30;
 
 const flag = (name) => process.argv.includes(`--${name}`);
@@ -44,9 +44,14 @@ function captionCues() {
     request: showcase.run.request,
     objects: String(showcase.scan.objects.length),
     versions: String(Math.min(showcase.run.candidates.length, 6)),
+    chosen: showcase.run.chosen,
   };
+  const single = showcase.run.judge.ranking.length === 0;
   const fill = (text) => text.replace(/\{(\w+)\}/g, (_, name) => values[name] ?? name);
-  return cues.map((c) => ({ from: c.from, to: c.to, start: c.from / FPS, end: c.to / FPS, chip: c.chip, text: fill(c.text) }));
+  return cues.map((c) => {
+    const cue = c.single && single ? c.single : c;
+    return { from: c.from, to: c.to, start: c.from / FPS, end: c.to / FPS, chip: cue.chip, text: fill(cue.text) };
+  });
 }
 
 function writeCaptions(cues) {

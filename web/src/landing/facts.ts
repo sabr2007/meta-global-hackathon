@@ -66,9 +66,12 @@ export interface Refusal {
   request: string;
 }
 
-/** Refusals from every logged run plus the featured run's planning refusals; measured ones first. */
+/** Refusals from every logged and saved run; ones with a measurement first, one per object. */
 export function allRefusals(limit = 4): Refusal[] {
-  const fromPlan = run.planRefusals.map((r) => ({ label: r.label, reason: r.reason, request: run.request }));
+  const fromPlan = [
+    ...run.planRefusals.map((r) => ({ label: r.label, reason: r.reason, request: run.request })),
+    ...showcase.others.flatMap((o) => o.refusals.map((r) => ({ label: r.label, reason: r.reason, request: o.request }))),
+  ];
   const fromRuns = evalFacts.list.flatMap((r) =>
     r.refusals.map((text) => {
       const split = text.indexOf(': ');
@@ -77,15 +80,27 @@ export function allRefusals(limit = 4): Refusal[] {
         : { label: '', reason: prettify(text), request: r.request };
     }),
   );
-  const seen = new Set<string>();
   const measured = (r: Refusal) => (/\d+(\.\d+)?\s?(cm|m)\b/.test(r.reason) ? 0 : 1);
-  return [...fromPlan, ...fromRuns]
+  const ranked = [...fromPlan, ...fromRuns].sort((a, b) => measured(a) - measured(b));
+  const objects = new Set<string>();
+  return ranked
     .filter((r) => {
-      const key = `${r.label}|${r.reason}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
+      if (objects.has(r.label)) return false;
+      objects.add(r.label);
       return true;
     })
-    .sort((a, b) => measured(a) - measured(b))
     .slice(0, limit);
+}
+
+/** What each kind of robot actually moved across the saved runs on this desk. */
+export function robotMoves(kind: 'arm' | 'mobile'): { label: string; request: string; matched: number; total: number }[] {
+  const runs = [
+    { request: run.request, executed: run.executed, receipt: run.receipt },
+    ...showcase.others.map((o) => ({ request: o.request, executed: o.executed, receipt: o.receipt })),
+  ];
+  return runs.flatMap((r) =>
+    r.executed
+      .filter((e) => e.ok && e.robot === kind)
+      .map((e) => ({ label: e.label, request: r.request, matched: r.receipt.matched, total: r.receipt.total })),
+  );
 }

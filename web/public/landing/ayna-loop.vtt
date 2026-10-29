@@ -1,7 +1,7 @@
 WEBVTT
 
 00:00:00.133 --> 00:00:03.067
-The request: “Make room for my laptop: clear the space in front of it”
+The request: “Put the white mouse next to the keyboard and the earbud case next to the mouse”
 
 00:00:03.200 --> 00:00:07.200
 SAM 3.1: Finds every object on your photo
@@ -16,13 +16,16 @@ Muse Image: Develops 3 versions of the after photo
 SAM 3.1: Checks every object in every version
 
 00:00:16.800 --> 00:00:19.200
-Muse Spark: Picks the version that follows the request
+SAM 3.1: Only version 1c kept every object, so it goes on
 
 00:00:20.133 --> 00:00:26.200
 The after photo: It is the plan you approve before a robot touches anything
 
-00:00:26.200 --> 00:00:31.200
-Muse Spark: Gives each move to a robot that can do it, or says why not
+00:00:26.200 --> 00:00:30.200
+Muse Spark: Orders the moves and gives each one to a robot that can do it
 
-00:00:31.200 --> 00:00:37.200
-SAM 3D Objects · twin: Robots rehearse on SAM 3D bodies; every object is measured
+00:00:30.200 --> 00:00:34.200
+SAM 3D Objects · twin: The robots move SAM 3D bodies in a physics twin of the table
+
+00:00:34.200 --> 00:00:40.200
+Verifier: Every object is measured against the after photo
