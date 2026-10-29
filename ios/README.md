@@ -3,15 +3,15 @@
 *Show your robot the after.*
 
 The scanner is the first step of Ayna. You walk around a table with a LiDAR iPhone. The app
-records the table and its room, then asks for one **hero shot**: the "before" photo. It shares
-everything as a `house-capture/5` bundle. The pipeline (`../pipeline`, `scan2sim`) turns that
+records the table and its room, then asks for one **hero shot**: the "before" photo. It sends
+everything to Ayna, or shares it, as a `house-capture/5` bundle. The pipeline (`../pipeline`, `scan2sim`) turns that
 bundle into a MuJoCo twin of the table. Muse Image draws the "after" from the hero shot, a
 robot arm works towards that state in simulation, and SAM 3.1 checks the result against the
 picture.
 
 The capture engine comes from the open-source **3D Model Anything** app by Wes Bos (MIT, see
 [`LICENSE-3d-model-anything`](LICENSE-3d-model-anything)), imported unchanged in the first
-commit of this folder. The flow, the design, the hero shot and the review are new. See
+commit of this folder. The flow, the design, the hero shot, the review and Send to Ayna are new. See
 [`../NEW_WORK.md`](../NEW_WORK.md) for the split.
 
 ## Requirements
@@ -47,7 +47,7 @@ renaming files. Known risks for the first build are listed in [`BUILD_NOTES.md`]
 
 ## The flow
 
-**Home → New scan → Scan → Hero shot → Review → Share .zip**
+**Home → New scan → Scan → Hero shot → Review → Send to Ayna (or Share .zip)**
 
 One scan is one **mirror**. Every mirror is a new capture session with a single room, and it
 always starts in a fresh ARKit world. The app never relocalizes against an earlier scan.
@@ -80,11 +80,41 @@ always starts in a fresh ARKit world. The app never relocalizes against an earli
    screen first shows it on a *Saved* card. The review shows the name (rename from the menu) and
    the 3D preview, coloured from the photos. It also shows counters for photos, depth
    frames and coverage, and the hero shot.
-5. **Share .zip.** Exports this mirror's bundle through the share sheet (AirDrop, Files, …).
-   *Send to Ayna* is a placeholder marked *Coming soon*; the app makes no network requests.
+5. **Send to Ayna.** Uploads this mirror to the Ayna server, which builds its twin; see below.
+   **Share .zip** exports the same bundle through the share sheet (AirDrop, Files, …).
 
-Let the review finish *Coloring from photos* before you share. That pass writes
+Let the review finish *Coloring from photos* before you send or share. That pass writes
 `mesh/room-0-colors.bin`, and the pipeline uses it for the mesh colours.
+
+## Send to Ayna
+
+The card on the review goes **idle → zipping → uploading NN% → queued** ("Ayna is building your
+twin — open it on the web"), or **failed** with the server's message and *Retry*.
+
+- **Pairing, once per iPhone.** The web's *Mirrors* page shows a 6-character code that works for
+  10 minutes. The first *Send to Ayna* opens a sheet for it (*Pair and send*). The token goes to
+  the Keychain (service `com.sabyrzhan.ayna.server`, one item per server, this device only). The
+  account chip on the card and *Pairing with Ayna* in the mirror's menu open the same sheet;
+  its menu edits the server and unpairs.
+- **Server.** `https://ayna-scan.vercel.app` by default (`AynaServer.defaultBaseURL`, the only
+  place it is written). The sheet can change it (https only); it is kept in `UserDefaults`.
+- **Upload.** The zip is the *Share .zip* export (`ScanBundle.zippedRoom`). It is moved to
+  `Application Support/Uploads` and uploaded by a background `URLSession`, so it carries on
+  while the app is in the background or was closed by iOS. Closing Ayna from the app switcher
+  stops it. Each mirror's last confirmed send is remembered, and a confirmation the server
+  missed is retried at the next launch.
+- **Any 401** removes the token and asks to pair again.
+
+The calls (`AynaServer.swift`):
+
+```
+POST {base}/api/devices/pair               {code, deviceName}            → {token, user: {email}}
+POST {base}/api/uploads            Bearer  {name, sizeBytes, capturedAt} → {scanId, uploadUrl, method, headers}
+<method> uploadUrl                         the .zip with exactly those headers, no Bearer
+POST {base}/api/uploads/{scanId}/complete  Bearer                        → {status: "queued"}
+```
+
+Errors are 4xx/5xx with `{error: "message"}`; storage errors show their XML `<Message>`.
 
 ## What a mirror contains
 
@@ -155,12 +185,15 @@ python tools/make_app_icon.py
 
 | File | What |
 |---|---|
-| `AynaApp.swift` | app entry, share sheet, developer launch modes |
+| `AynaApp.swift` | app entry, app delegate for background uploads, share sheet, developer launch modes |
 | `HomeScreen.swift` | Home: logo, New scan card, mirror list |
 | `MirrorLibrary.swift` | the implicit house, mirrors, names, start/delete/rename |
 | `CaptureScreen.swift` | the scan screen and its auto flow (start, finish, close) |
 | `HeroShotView.swift` | hero shot framing, level, confirm |
-| `MirrorScreen.swift` | review, 3D preview, Share .zip, Send to Ayna placeholder |
+| `MirrorScreen.swift` | review, 3D preview, Send to Ayna, Share .zip |
+| `SendToAyna.swift` | the Send to Ayna card and the pairing sheet |
+| `AynaUploader.swift` | pairing state, per-mirror send state, the background upload session |
+| `AynaServer.swift` | server address, Keychain pairing, the JSON calls and their errors |
 | `AynaDesign.swift` | colours, fonts, logo, circles, buttons, cards, thumbnails |
 | `Coverage.swift` | wall coverage model and the round radar (`CoverageMap`) |
 | `CaptureController.swift` | upstream capture session; Ayna adds the hero shot and the auto-photo haptic |
@@ -183,6 +216,7 @@ Read the logs with
 
 ## Privacy
 
-Ayna has no account, analytics or network requests. Scans stay on the phone until you share a
-zip. Photos and geometry of a real space are private data, so this repository never contains
-scans, photos or keys.
+Ayna has no analytics or tracking. It goes online only to pair with Ayna and for *Send to
+Ayna*, which uploads the one mirror you choose; otherwise scans stay on the phone until you
+share a zip. Photos and geometry of a real space are private data, so this repository never
+contains scans, photos or keys.

@@ -1,10 +1,10 @@
 {
   "title": "Privacy",
-  "updated": "October 28, 2026",
+  "updated": "October 29, 2026",
   "sections": [
     {
-      "title": "Your scans stay on this iPhone",
-      "body": "Ayna does not require an account and makes no network requests. Scans, photos, layouts and diagnostics are not sent anywhere. There is no advertising, analytics or tracking."
+      "title": "Your scans stay on this iPhone until you send one",
+      "body": "Ayna makes network requests only when you pair this iPhone with Ayna or tap Send to Ayna. Scans are not sent anywhere else, and diagnostics are never sent. There is no advertising, analytics or tracking."
     },
     {
       "title": "What the app saves",
@@ -12,11 +12,15 @@
     },
     {
       "title": "Sharing",
-      "body": "Nothing is shared automatically. When you use Share .zip, iOS sends the archive to the app, device or person you choose. Review the destination before sharing; copies you share are not removed when you delete the mirror. Send to Ayna is not available yet; when it is, it will upload only the mirror you choose, when you choose it."
+      "body": "Nothing is shared automatically. When you use Share .zip, iOS sends the archive to the app, device or person you choose. Review the destination before sharing; copies you share are not removed when you delete the mirror."
+    },
+    {
+      "title": "Send to Ayna",
+      "body": "Send to Ayna uploads only the mirror you choose, when you choose it: its room layout, LiDAR mesh, posed photos (including the hero shot), depth frames and the device model. It goes to the Ayna server set in the app (ayna-scan.vercel.app unless you change it) and is linked to the Ayna account you paired with. Pairing sends the code from the website and this iPhone's name; the server's token is kept in the Keychain on this iPhone only. You can unpair from Pairing with Ayna in a mirror's menu. Deleting a mirror on the iPhone does not delete a copy that was sent."
     },
     {
       "title": "Storage and deletion",
-      "body": "Mirrors are stored in the app's Documents folder, also visible in the Files app, and may be included in your device backups. Delete mirror removes a mirror's local files permanently. Temporary ZIP files made for sharing are removed after the share sheet closes."
+      "body": "Mirrors are stored in the app's Documents folder, also visible in the Files app, and may be included in your device backups. Delete mirror removes a mirror's local files permanently. Temporary ZIP files made for sharing are removed after the share sheet closes; the copy made for Send to Ayna is removed when its upload ends."
     },
     {
       "title": "Permissions",

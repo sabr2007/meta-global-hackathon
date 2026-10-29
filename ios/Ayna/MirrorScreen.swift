@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Review of one mirror: its 3D preview, what was recorded, and sharing the bundle.
+/// Review of one mirror: its 3D preview, what was recorded, sending it to Ayna and sharing the
+/// bundle.
 struct MirrorScreen: View {
   let mirror: MirrorLibrary.Mirror
   /// renamed: the list should reload
   var onChange: () -> Void = {}
   var onDeleted: () -> Void = {}
 
+  @ObservedObject private var ayna: AynaUploader
   @State private var name: String
   @State private var source: PreviewSource?
   @State private var bundle: ScanBundle?
@@ -18,11 +20,19 @@ struct MirrorScreen: View {
   @State private var renaming = false
   @State private var newName = ""
   @State private var deleting = false
+  @State private var pairingSheet: PairingIntent?
+
+  /// Why the pairing sheet is open: to manage the pairing, or for a send that waits for it
+  private enum PairingIntent: Identifiable {
+    case manage, send
+    var id: Self { self }
+  }
 
   init(mirror: MirrorLibrary.Mirror, onChange: @escaping () -> Void = {}, onDeleted: @escaping () -> Void = {}) {
     self.mirror = mirror
     self.onChange = onChange
     self.onDeleted = onDeleted
+    _ayna = ObservedObject(wrappedValue: AynaUploader.shared)
     _name = State(initialValue: mirror.name)
   }
 
@@ -51,6 +61,7 @@ struct MirrorScreen: View {
       ToolbarItem(placement: .principal) { AynaEyebrow(text: "Mirror") }
       ToolbarItem(placement: .topBarTrailing) {
         Menu {
+          Button("Pairing with Ayna", systemImage: "link") { pairingSheet = .manage }
           Button("Rename mirror", systemImage: "pencil") { newName = name; renaming = true }
           Button("Delete mirror", systemImage: "trash", role: .destructive) { deleting = true }
         } label: {
@@ -63,6 +74,15 @@ struct MirrorScreen: View {
     .toolbarBackground(.visible, for: .navigationBar)
     .onAppear(perform: load)
     .sheet(item: $sharing) { ShareSheet(items: [$0]) }
+    .sheet(item: $pairingSheet) { intent in
+      AynaPairingSheet(uploader: ayna, sendAfter: intent == .send) {
+        if intent == .send { retrySend() }
+      }
+    }
+    .onChange(of: needsPairing) { _, needs in
+      // the server stopped accepting this iPhone (401) while the mirror was open: ask right away
+      if needs && pairingSheet == nil { pairingSheet = .send }
+    }
     .alert("Rename mirror", isPresented: $renaming) {
       TextField("Name", text: $newName)
       Button("Save", action: rename)
@@ -135,24 +155,16 @@ struct MirrorScreen: View {
 
   private var actions: some View {
     VStack(alignment: .leading, spacing: 10) {
+      SendToAynaCard(state: ayna.state(of: mirror), pairing: ayna.pairing, ready: bundle != nil,
+                     onSend: sendToAyna, onRetry: retrySend, onCancel: { ayna.cancel(mirror) },
+                     onPairing: { pairingSheet = needsPairing ? .send : .manage })
       Button(action: share) {
         Label(zipping ? "Preparing .zip…" : "Share .zip", systemImage: "square.and.arrow.up")
       }
-      .buttonStyle(AynaButtonStyle(kind: .lime))
-      .disabled(zipping || bundle == nil)
-      Button {} label: {
-        Label("Send to Ayna", systemImage: "paperplane")
-      }
       .buttonStyle(AynaButtonStyle(kind: .raised))
-      .disabled(true)
-      HStack(spacing: 6) {
-        StatusDot(color: AynaTheme.neutral)
-        Text("Coming soon").font(.caption.weight(.semibold))
-        Text("· builds the robot's world from this mirror").font(.caption)
-      }
-      .foregroundStyle(AynaTheme.secondary)
-      .padding(.leading, 4)
-      Text("The .zip is the house-capture/5 bundle of this mirror: RoomPlan layout, LiDAR mesh, posed photos (the hero shot is marked \"hero\": true in photos.json) and depth frames.")
+      .disabled(zipping || bundle == nil)
+      .padding(.top, 6)
+      Text("Send to Ayna and Share .zip use the same house-capture/5 bundle of this mirror: RoomPlan layout, LiDAR mesh, posed photos (the hero shot is marked \"hero\": true in photos.json) and depth frames.")
         .font(.caption)
         .foregroundStyle(AynaTheme.secondary)
         .padding(.top, 6)
@@ -193,6 +205,30 @@ struct MirrorScreen: View {
       case .success(let url): sharing = url
       case .failure(let e): error = e.localizedDescription
       }
+    }
+  }
+
+  /// The send failed because Ayna no longer accepts this iPhone (or it was never paired)
+  private var needsPairing: Bool {
+    if case .failed(_, true) = ayna.state(of: mirror) { return true }
+    return false
+  }
+
+  /// Unpaired: the pairing sheet first, which sends once it has paired
+  private func sendToAyna() {
+    guard let bundle else { return }
+    if ayna.pairing == nil {
+      pairingSheet = .send
+    } else {
+      ayna.send(mirror, bundle: bundle, name: name)
+    }
+  }
+
+  private func retrySend() {
+    if ayna.pairing == nil {
+      pairingSheet = .send
+    } else {
+      ayna.retry(mirror, bundle: bundle, name: name)
     }
   }
 

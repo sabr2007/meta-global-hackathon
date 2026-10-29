@@ -69,8 +69,18 @@ From upstream, kept as the engine of the app:
   - saved as an ordinary posed photo with `"hero": true` in `photos.json`, with a depth frame at
     the same pose; Retake, Use it, Skip.
 - **Review** (`MirrorScreen`): name and rename, the existing 3D preview, Doto counters for photos,
-  depth frames and coverage, the hero shot, Share .zip (the existing export), and a disabled
-  *Send to Ayna* marked *Coming soon*.
+  depth frames and coverage, the hero shot, Send to Ayna and Share .zip (the existing export).
+- **Send to Ayna** (`AynaServer`, `AynaUploader`, `SendToAyna`): uploads a mirror to the Ayna web
+  app, which builds its twin.
+  - pairing once per iPhone with the 6-character code from the web's Mirrors page; the token is
+    kept in the Keychain, per server; a sheet to change the server (default
+    `ayna-scan.vercel.app`) and unpair;
+  - the Share .zip export, uploaded to the presigned URL the server hands out by a background
+    `URLSession` that continues while the app is in the background or closed by iOS, then
+    confirmed with `complete`; a confirmation the server missed is retried at the next launch;
+  - the card shows idle → zipping → uploading NN% → queued, or the server's error with Retry;
+    any 401 removes the token and asks to pair again;
+  - the privacy manifest, privacy policy and in-app help now describe the upload.
 - **Small, additive engine changes**:
   - `AnchorMesh.flash` (triangles one photo turned green);
   - `DepthRecorder.consider(force:)`;
