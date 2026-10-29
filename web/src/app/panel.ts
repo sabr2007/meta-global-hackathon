@@ -83,9 +83,14 @@ export function versions(onPick: (id: string) => void): { root: HTMLElement; set
     set(list) {
       root.replaceChildren(
         ...list.map((v) => {
-          const card = h('button', `version ${v.passed ? 'version--passed' : 'version--rejected'} ${v.chosen ? 'version--chosen' : ''}`);
+          // No version could be done in full: this one keeps every object and goes ahead, and the
+          // robots refuse the moves they cannot do (the receipt counts them).
+          const fallback = v.chosen && !v.passed;
+          const state = v.passed ? 'version--passed' : fallback ? 'version--fallback' : 'version--rejected';
+          const card = h('button', `version ${state} ${v.chosen ? 'version--chosen' : ''}`);
           card.type = 'button';
-          card.setAttribute('aria-label', `Version ${v.id}: ${v.passed ? 'kept every object' : `rejected, ${v.reasons.join('; ')}`}`);
+          const said = v.passed ? 'kept every object' : fallback ? `goes ahead, the robots refuse what they cannot do: ${v.reasons.join('; ')}` : `rejected, ${v.reasons.join('; ')}`;
+          card.setAttribute('aria-label', `Version ${v.id}: ${said}`);
           const img = h('img');
           img.src = v.image;
           img.alt = '';
@@ -93,8 +98,9 @@ export function versions(onPick: (id: string) => void): { root: HTMLElement; set
           const label = h('span', 'version__label');
           label.append(h('span', 'num', v.id.toUpperCase()), h('span', `dot ${v.passed ? 'dot--lime' : 'dot--orange'}`));
           card.append(img, label);
-          if (!v.passed) card.append(h('span', 'version__reason', v.reasons[0] ?? 'rejected'));
-          if (v.chosen) card.append(h('span', 'version__chosen', 'Approved goal'));
+          if (fallback) card.append(h('span', 'version__chosen version__chosen--fallback', 'Goes ahead · robots refuse what they cannot do'));
+          else if (!v.passed) card.append(h('span', 'version__reason', v.reasons[0] ?? 'rejected'));
+          else if (v.chosen) card.append(h('span', 'version__chosen', 'Approved goal'));
           card.addEventListener('click', () => onPick(v.id));
           return card;
         }),

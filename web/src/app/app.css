@@ -555,6 +555,10 @@ body {
   box-shadow: 0 0 0 2px var(--lime);
 }
 
+.version--fallback.version--chosen {
+  box-shadow: 0 0 0 2px var(--orange);
+}
+
 .version__label {
   position: absolute;
   top: 8px;
@@ -589,6 +593,11 @@ body {
   background: var(--lime);
   color: var(--on-lime);
   font-weight: 600;
+}
+
+.version__chosen--fallback {
+  background: var(--orange);
+  color: var(--bg);
 }
 
 /* review */

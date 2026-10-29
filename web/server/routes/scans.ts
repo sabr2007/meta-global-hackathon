@@ -129,12 +129,13 @@ export const scanRoutes: Route[] = [
         keys.map(async (key) => {
           const run = await getJson<Record<string, unknown>>(store(), key);
           if (!run) return null;
-          const { id, created, request: text, score, costUsd, durationMs, status, thumb, candidates, receipt } = run as Record<string, unknown> & {
-            candidates?: { passed: boolean }[];
+          const { id, created, request: text, score, costUsd, durationMs, status, thumb, candidates, chosen, receipt } = run as Record<string, unknown> & {
+            candidates?: { id: string; passed: boolean }[];
             receipt?: { moved?: { done: number; asked: number } } | null;
           };
           const thumbUrl = typeof thumb === 'string' ? await store().readUrl(key.replace(/run\.json$/, thumb)) : null;
-          const rejected = (candidates ?? []).filter((c) => !c.passed).length;
+          // a version that went ahead with refusals (none could be done in full) is not counted as rejected
+          const rejected = (candidates ?? []).filter((c) => !c.passed && c.id !== chosen).length;
           return { id, created, request: text, score, costUsd, durationMs, status, thumb: thumbUrl, rejected, versions: (candidates ?? []).length, moves: receipt?.moved ?? null };
         }),
       );
