@@ -15,7 +15,8 @@ One row per object:
 - hole_open: for an object with a hole straight through it (a ring), the share of that hole, seen
   from above, that its colliders leave open (a single convex hull closes it: 0.0);
 - depth: where the object's depth came from, as stored in scene.json ("table" means the LiDAR saw
-  past it, so its LiDAR columns measure the background, not the object).
+  past it, so its LiDAR columns measure the background, not the object);
+- mass_g: the body's mass in the simulation (Muse Spark's estimate, or 600 kg/m^3 of its colliders).
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ class ObjectQuality:
     iou: float | None
     depth: str | None = None
     hole_open: float | None = None
+    mass_g: float | None = None
 
 
 def start_state(mjcf: Path) -> tuple[mujoco.MjModel, mujoco.MjData]:
@@ -143,6 +145,7 @@ def object_quality(
     iou: float | None,
     depth: str | None = None,
     colliders: list[tuple[np.ndarray, np.ndarray]] | None = None,
+    mass_kg: float | None = None,
 ) -> ObjectQuality:
     """All metrics of one object whose mesh is already placed in the world."""
     vertices = np.asarray(mesh_world.vertices, dtype=np.float64)
@@ -159,7 +162,8 @@ def object_quality(
         colors = np.asarray(mesh_world.visual.vertex_colors)[visible]
         color_de = mean_color_difference(photo, full_raster(mask, (camera.width, camera.height)), colors)
     hole = hole_open(mesh_world, colliders) if colliders is not None else None
-    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth, hole)
+    mass_g = None if mass_kg is None else mass_kg * 1000
+    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth, hole, mass_g)
 
 
 def lidar_points(capture_dir: Path, photo_stem: str, masks: dict[str, ObjectMask], frame: WorldFrame) -> dict[str, np.ndarray]:
@@ -194,12 +198,14 @@ def report(bundle: Path, capture: Path | None = None, photo_stem: str | None = N
         points = lidar_points(capture, photo_stem, masks, WorldFrame.from_matrix(meta["frame"]["arkit_to_world"]))
     model, data = start_state(bundle / meta["files"]["mjcf"])
     colliders = {o["body"]: collider_meshes(model, data, o["body"]) for o in objects}
+    masses = {o["body"]: float(model.body(o["body"]).mass[0]) for o in objects}
     moved = drift(model, data, [o["body"] for o in objects])
     alignment = (camera_block or {}).get("alignment", {})
     return [
         object_quality(
             o["name"], o["label"], placed_mesh(bundle, o), camera, photo, masks.get(o["name"]), points.get(o["name"]),
             moved[o["body"]], alignment.get(o["name"], {}).get("iou"), o.get("depth_source"), colliders[o["body"]],
+            masses[o["body"]],
         )
         for o in objects
     ]
@@ -211,12 +217,16 @@ def _cell(value: float | None, spec: str) -> str:
 
 def format_table(rows: list[ObjectQuality]) -> str:
     """Fixed-width table with a median row (per column; per axis for the size ratios)."""
-    lines = [f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}{'hole':>6}  depth"]
+    lines = [
+        f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}{'hole':>6}"
+        f"{'mass g':>8}  depth"
+    ]
     for r in rows:
         size = " / ".join(f"{v:.2f}" for v in r.size) if r.size else "-"
         lines.append(
             f"{r.label[:23]:<24}{_cell(r.lidar_mm, '.1f'):>9}  {size:>18}{r.tilt_deg:>7.1f}{r.drift_cm:>9.2f}"
-            f"{_cell(r.color_de, '.1f'):>7}{_cell(r.iou, '.2f'):>6}{_cell(r.hole_open, '.0%'):>6}  {r.depth or '-'}"
+            f"{_cell(r.color_de, '.1f'):>7}{_cell(r.iou, '.2f'):>6}{_cell(r.hole_open, '.0%'):>6}{_cell(r.mass_g, '.0f'):>8}"
+            f"  {r.depth or '-'}"
         )
     median = lambda values: float(np.median(values)) if values else None  # noqa: E731
     sizes = np.array([r.size for r in rows if r.size])

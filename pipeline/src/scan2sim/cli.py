@@ -22,6 +22,7 @@ from scan2sim.meta_client import load_settings
 from scan2sim.mount import choose_mount, footprint, reachable
 from scan2sim.objects import body_name, build_scanned_object, fit_top, rests_on, stand_under, target_surface
 from scan2sim.perceive import perceive_photo, write_perception
+from scan2sim.physical import physical_properties
 from scan2sim.quality import SETTLE_SECONDS, format_table, report, rows_json, settle_drift
 from scan2sim.scene import build_scene
 from scan2sim.stages import sam3d_objects, verified_objects
@@ -141,6 +142,12 @@ def objects(args: argparse.Namespace) -> int:
         )
         bodies.append(dataclasses.replace(body, concept=obj.mask.concept))
         masks[body.name] = obj.mask
+    if args.physics and bodies:
+        estimates = asyncio.run(physical_properties(load_settings(), image, [(b.name, b.label, tuple(b.size)) for b in bodies], cache))
+        bodies = [
+            dataclasses.replace(b, mass_kg=e.mass_kg, friction=e.friction, physics_reason=e.reason) if (e := estimates.get(b.name)) else b
+            for b in bodies
+        ]
     if surface is not None:
         stands = [box for box in (stand_under(b, surface) for b in bodies) if box is not None]
         for box in stands:
@@ -169,6 +176,8 @@ def objects(args: argparse.Namespace) -> int:
             f"photo x{b.photo_scale:.2f}  "
             f"fit {b.fit_error_m * 1000:.1f} mm  moves {moved[b.name] * 100:.1f} cm in {SETTLE_SECONDS:.0f} s"
         )
+        if b.mass_kg is not None:
+            print(f"  {'':<22} {b.mass_kg * 1000:.0f} g, friction {b.friction:.2f}: {b.physics_reason}")
     if mount:
         where = f"on a {mount.pedestal_height:.2f} m pedestal by" if mount.pedestal_height else "on"
         print(
@@ -236,6 +245,9 @@ def main(argv: list[str] | None = None) -> int:
     objects_cmd.add_argument("--room", type=int, default=0)
     objects_cmd.add_argument("--cache", help="keep paid results (masks, SAM 3D meshes) here and reuse them")
     objects_cmd.add_argument("--no-arm", action="store_true", help="leave the robot arm out of the scene")
+    objects_cmd.add_argument(
+        "--physics", action="store_true", help="mass and friction per object from Muse Spark (cached with --cache)"
+    )
     objects_cmd.set_defaults(handler=objects)
 
     report_cmd = commands.add_parser("report", help="per-object quality of a scene bundle against its capture")

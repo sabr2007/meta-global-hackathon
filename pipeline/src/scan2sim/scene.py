@@ -76,6 +76,9 @@ class ScannedObject:
     photo_scale: float = 1.0  # size correction that matched its silhouette to the photo mask
     depth_source: str = "lidar"  # "lidar", or "table" when it was slid along its camera rays onto the table
     collider_pieces: tuple[tuple[np.ndarray, np.ndarray], ...] = ()  # body-local convex pieces; () = the hull
+    mass_kg: float | None = None  # estimated by Muse Spark (scan2sim objects --physics); None = uniform density
+    friction: float | None = None  # sliding friction on the table, with mass_kg
+    physics_reason: str = ""  # Muse Spark's one-line reason for both
 
 
 @dataclass(frozen=True)
