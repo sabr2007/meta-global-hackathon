@@ -1176,7 +1176,13 @@ body {
     grid-template-columns: 10px 1fr auto;
   }
 
+  .fleet__robot > .pill {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
   .fleet__status {
     grid-column: 2 / -1;
+    grid-row: 2;
   }
 }
