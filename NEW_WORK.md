@@ -27,7 +27,8 @@ from package managers and are listed in the README.
 
 - The loop shared by the browser and Node (`src/ayna/`): Spark's edit instruction, Muse Image
   versions, the SAM 3.1 conservation check, metric goals from masks, plan checking, execution,
-  the verifier and the receipt; the headless eval (`scripts/eval.ts`).
+  the verifier and the receipt; the headless eval (`scripts/eval.ts`) and the replay of saved runs
+  as evaluation episodes for robot policies with different perception (`scripts/policies.ts`).
 - The app (`src/app/`): mirrors, sign-in, the stage where the photo, the imagined photo and the
   twin share one camera, the develop effect, the before/after slider, the model timeline, robot
   placement with a live reach map, run history and replays, push-to-talk.
