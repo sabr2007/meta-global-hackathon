@@ -69,3 +69,10 @@ export function objectShape(physics: Physics, name: string): ObjectShape {
   const radius = Math.max(...world.map(([x, y]) => Math.hypot(x - cx, y - cy)));
   return { center: [cx, cy, (bottom + top) / 2], bottom, top, yaw, width: minorHi - minorLo, length: majorHi - majorLo, radius };
 }
+
+/** The shape as a robot sees it when it reaches for the object: off by the physics' perception error, if any. */
+export function perceivedShape(physics: Physics, name: string): ObjectShape {
+  const shape = objectShape(physics, name);
+  const error = physics.perceive?.(name);
+  return error ? { ...shape, center: [shape.center[0] + error[0], shape.center[1] + error[1], shape.center[2]] } : shape;
+}

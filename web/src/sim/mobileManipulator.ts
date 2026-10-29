@@ -2,7 +2,7 @@ import type { MobileRobotInfo } from '../scene/bundle';
 import { ArmIk, topDown, type IkResult, type Vec3 } from './ik';
 import { DriveCurve, MotionQueue, angleTo, roundCorners, type Move } from './motion';
 import { canPark, distanceField, insidePolygon, parkingSpots, pathTo, rectDistance, shortcut, type DistanceField, type Parking, type ParkingQuery, type Vec2 } from './navigation';
-import { objectShape, type ObjectShape } from './objectShape';
+import { objectShape, perceivedShape, type ObjectShape } from './objectShape';
 import type { Physics } from './physics';
 import { RobotBase, ok, refused, type BasePose, type ReachCheck, type RobotPhase, type RobotStatus, type StepResult } from './robot';
 import type { SceneGeometry } from './sceneGeometry';
@@ -154,7 +154,7 @@ export class MobileManipulator extends RobotBase {
     if (this.held) return refused(`Already holding ${this.name(this.held.name)}`);
     if (!this.hasObject(objectName)) return refused(`No object named ${objectName}`);
     const label = this.name(objectName);
-    const shape = objectShape(this.physics, objectName);
+    const shape = perceivedShape(this.physics, objectName);
     const width = this.widthProblem(shape);
     if (width) return this.refuse(`${label}: ${width}`);
     const graspZ = this.graspHeight(shape);

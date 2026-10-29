@@ -15,6 +15,9 @@ export interface Physics {
   time(): number;
   contactCount(): number;
   dispose(): void;
+  /** How far off (world xy, metres) robots think an object is when they reach for it; unset, they
+   * read the simulator. scripts/policies.ts sets it to score robots that only know what a camera saw. */
+  readonly perceive?: (name: string) => [number, number];
 }
 
 /** Physics for an already loaded MuJoCo module (tests load it themselves in Node). */

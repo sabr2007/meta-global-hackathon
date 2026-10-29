@@ -1,6 +1,6 @@
 import type { ArmInfo } from '../scene/bundle';
 import { ArmIk, topDown, type IkResult, type Vec3 } from './ik';
-import { objectShape } from './objectShape';
+import { objectShape, perceivedShape } from './objectShape';
 import type { Physics } from './physics';
 
 // Scripted manipulation for the arm: top-down pick, place on another object, put back, home.
@@ -122,7 +122,7 @@ export class ArmController {
       this.fail(`Already holding ${this.label(this.held.name)}`);
       return;
     }
-    const shape = this.shapeOf(name);
+    const shape = this.shapeOf(name, true);
     const problem = this.reachProblem(shape) ?? this.widthProblem(shape);
     if (problem) {
       this.fail(`${this.label(name)}: ${problem}`);
@@ -283,9 +283,10 @@ export class ArmController {
     return data.xpos[body * 3 + 2];
   }
 
-  /** The object's collider (its convex hull) as it is now, and how far it is from the base axis. */
-  private shapeOf(name: string): Shape {
-    const shape = objectShape(this.physics, name);
+  /** The object's collider (its convex hull) as it is now, or as the robot perceives it before a
+   * grasp, and how far it is from the base axis. */
+  private shapeOf(name: string, perceived = false): Shape {
+    const shape = (perceived ? perceivedShape : objectShape)(this.physics, name);
     const base = this.physics.data.xpos.subarray(this.baseBody * 3, this.baseBody * 3 + 3);
     return { ...shape, distance: Math.hypot(shape.center[0] - base[0], shape.center[1] - base[1]) };
   }
