@@ -69,10 +69,14 @@ export interface Refusal {
 }
 
 /** Refusals from every logged and saved run; ones with a measurement first, one per object. */
+// Runs saved from here on were planned with the robots' current checks (feasibility as a hard check, the
+// carry rule); older runs' refusal reasons describe robots that have changed since.
+const CURRENT_CHECKS = '20261029-031600';
+
 export function allRefusals(limit = 4): Refusal[] {
   const fromPlan = [
     ...run.planRefusals.map((r) => ({ label: r.label, reason: r.reason, request: run.request })),
-    ...showcase.others.flatMap((o) => o.refusals.map((r) => ({ label: r.label, reason: r.reason, request: o.request }))),
+    ...showcase.others.filter((o) => o.id >= CURRENT_CHECKS).flatMap((o) => o.refusals.map((r) => ({ label: r.label, reason: r.reason, request: o.request }))),
   ];
   const fromRuns = evalFacts.list.flatMap((r) =>
     r.refusals.map((text) => {

@@ -1220,9 +1220,9 @@
    "text": "Yes, this matches the goal with all the small things together in one corner. Biggest drift is the orange ring at 1.5 cm, everything else is under 0.6 cm."
   },
   "render": null,
+  "twinClip": "twin-20261029-031253-lok1.mp4",
   "costUsd": 0.1486,
-  "seconds": 84,
-  "twinClip": "twin-20261029-031253-lok1.mp4"
+  "seconds": 84
  },
  "others": [
   {
@@ -1377,6 +1377,432 @@
    "refusals": [],
    "receipt": {
     "matched": 7,
+    "total": 7
+   }
+  },
+  {
+   "id": "20261029-044505-6rks",
+   "request": "Line the small objects up along the back edge",
+   "candidates": [
+    {
+     "id": "1a",
+     "passed": false,
+     "reasons": [
+      "white earbud case changed size (×0.79)"
+     ]
+    },
+    {
+     "id": "1b",
+     "passed": false,
+     "reasons": [
+      "no robot can move the yellow cylinder there (Arm: 0.78 m away, reach 0.76 m; Mobile manipulator: can't put things down there: (-0.89, 2.66) is too close to obj_5_yellow_cylinder)"
+     ]
+    },
+    {
+     "id": "1c",
+     "passed": false,
+     "reasons": [
+      "orange figurine is missing"
+     ]
+    },
+    {
+     "id": "2a",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "2b",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "2c",
+     "passed": true,
+     "reasons": []
+    }
+   ],
+   "executed": [
+    {
+     "label": "orange figurine",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "yellow cylinder",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white earbud case",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white mouse",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": false
+    },
+    {
+     "label": "orange figurine",
+     "robot": "arm",
+     "ok": true
+    }
+   ],
+   "refusals": [],
+   "receipt": {
+    "matched": 6,
+    "total": 7
+   }
+  },
+  {
+   "id": "20261029-044657-xwxw",
+   "request": "Move everything a bit closer to me",
+   "candidates": [
+    {
+     "id": "1a",
+     "passed": false,
+     "reasons": [
+      "no robot can move the white mouse there (Arm: can't put it down there: the spot is 3 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 3 cm past the edge of the table)",
+      "no robot can move the white earbud case there (Arm: can't put it down there: the spot is 6 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 6 cm past the edge of the table)"
+     ]
+    },
+    {
+     "id": "1b",
+     "passed": false,
+     "reasons": [
+      "no robot can move the white mouse there (Arm: can't put it down there: the spot is 5 cm past the edge of the obj_6_white_earbud_case_geom; Mobile manipulator: can't put it down there: the spot is 5 cm past the edge of the obj_6_white_earbud_case_geom)",
+      "no robot can move the white earbud case there (Arm: can't put it down there: the spot is 2 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 2 cm past the edge of the table)"
+     ]
+    },
+    {
+     "id": "1c",
+     "passed": true,
+     "reasons": []
+    }
+   ],
+   "executed": [
+    {
+     "label": "white earbud case",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange figurine",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "yellow cylinder",
+     "robot": "arm",
+     "ok": true
+    }
+   ],
+   "refusals": [
+    {
+     "label": "white keyboard",
+     "reason": "Request implies moving it closer, but no robot can grip it: too wide/thin and slips."
+    },
+    {
+     "label": "silver laptop",
+     "reason": "Request implies moving it closer, but no robot can grip/reach it: too wide and too far."
+    }
+   ],
+   "receipt": {
+    "matched": 5,
+    "total": 7
+   }
+  },
+  {
+   "id": "20261029-050019-51g3",
+   "request": "Tidy up my desk",
+   "candidates": [
+    {
+     "id": "1a",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "1b",
+     "passed": false,
+     "reasons": [
+      "white mouse moved 12 cm though it should stay"
+     ]
+    },
+    {
+     "id": "1c",
+     "passed": false,
+     "reasons": [
+      "white earbud case changed size (×0.11)"
+     ]
+    }
+   ],
+   "executed": [
+    {
+     "label": "orange figurine",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "yellow cylinder",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white earbud case",
+     "robot": "arm",
+     "ok": true
+    }
+   ],
+   "refusals": [],
+   "receipt": {
+    "matched": 7,
+    "total": 7
+   }
+  },
+  {
+   "id": "20261029-050201-yea3",
+   "request": "Put the white mouse next to the keyboard",
+   "candidates": [
+    {
+     "id": "1a",
+     "passed": false,
+     "reasons": [
+      "the white mouse would land on the white keyboard, which stays"
+     ]
+    },
+    {
+     "id": "1b",
+     "passed": false,
+     "reasons": [
+      "white earbud case moved 14 cm though it should stay"
+     ]
+    },
+    {
+     "id": "1c",
+     "passed": false,
+     "reasons": [
+      "the white mouse would land on the white keyboard, which stays"
+     ]
+    },
+    {
+     "id": "2a",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "2b",
+     "passed": false,
+     "reasons": [
+      "white earbud case moved 31 cm though it should stay"
+     ]
+    },
+    {
+     "id": "2c",
+     "passed": true,
+     "reasons": []
+    }
+   ],
+   "executed": [
+    {
+     "label": "white mouse",
+     "robot": "arm",
+     "ok": true
+    }
+   ],
+   "refusals": [],
+   "receipt": {
+    "matched": 7,
+    "total": 7
+   }
+  },
+  {
+   "id": "20261029-050808-tj09",
+   "request": "Tidy up my desk",
+   "candidates": [
+    {
+     "id": "1a",
+     "passed": false,
+     "reasons": [
+      "an extra orange figurine appeared"
+     ]
+    },
+    {
+     "id": "1b",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "2a",
+     "passed": false,
+     "reasons": [
+      "no robot can move the white earbud case there (Arm: can't put it down there: the spot is 2 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 2 cm past the edge of the table)"
+     ]
+    },
+    {
+     "id": "2b",
+     "passed": false,
+     "reasons": [
+      "no robot can move the white mouse there (Arm: can't put it down there: the spot is 3 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 3 cm past the edge of the table)"
+     ]
+    },
+    {
+     "id": "2c",
+     "passed": false,
+     "reasons": [
+      "no robot can move the white earbud case there (Arm: can't put it down there: the spot is 3 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 3 cm past the edge of the table)"
+     ]
+    },
+    {
+     "id": "3a",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "3b",
+     "passed": false,
+     "reasons": [
+      "no robot can move the white earbud case there (Arm: can't put it down there: the spot is 4 cm past the edge of the table; Mobile manipulator: can't put it down there: the spot is 4 cm past the edge of the table)"
+     ]
+    },
+    {
+     "id": "3c",
+     "passed": true,
+     "reasons": []
+    }
+   ],
+   "executed": [
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white mouse",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange figurine",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white earbud case",
+     "robot": "arm",
+     "ok": true
+    }
+   ],
+   "refusals": [
+    {
+     "label": "white keyboard",
+     "reason": "MUST STAY: too wide for Arm gripper and slips for mobile manipulator"
+    },
+    {
+     "label": "silver laptop",
+     "reason": "MUST STAY: too wide for both grippers and out of reach"
+    }
+   ],
+   "receipt": {
+    "matched": 5,
+    "total": 7
+   }
+  },
+  {
+   "id": "20261029-053158-ae7f",
+   "request": "Line the small objects up along the back edge",
+   "candidates": [
+    {
+     "id": "1a",
+     "passed": false,
+     "reasons": [
+      "white mouse changed size (×0.45)"
+     ]
+    },
+    {
+     "id": "1b",
+     "passed": false,
+     "reasons": [
+      "white mouse changed size (×0.52)"
+     ]
+    },
+    {
+     "id": "1c",
+     "passed": false,
+     "reasons": [
+      "white mouse changed size (×0.49)"
+     ]
+    },
+    {
+     "id": "2a",
+     "passed": false,
+     "reasons": [
+      "white mouse changed size (×0.78)",
+      "white earbud case changed size (×0.80)"
+     ]
+    },
+    {
+     "id": "2b",
+     "passed": true,
+     "reasons": []
+    },
+    {
+     "id": "2c",
+     "passed": false,
+     "reasons": [
+      "white mouse changed size (×0.47)"
+     ]
+    }
+   ],
+   "executed": [
+    {
+     "label": "orange figurine",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white earbud case",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "white mouse",
+     "robot": "arm",
+     "ok": true
+    },
+    {
+     "label": "orange ring toy",
+     "robot": "arm",
+     "ok": false
+    }
+   ],
+   "refusals": [],
+   "receipt": {
+    "matched": 4,
     "total": 7
    }
   }
