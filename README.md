@@ -18,6 +18,7 @@ and success checks produced by Meta models).
 | 5 | Object masks, reviewed (renamed, fragments dropped), lifted to 3D with LiDAR depth | working: SAM 3.1 + Muse Spark |
 | 6 | Full meshes for movable objects, placed and scaled by LiDAR, simulated as convex hulls | working: SAM 3D Objects |
 | 7 | Robot arm placed on the scanned table; IK pick and place in the browser | working: our arm |
+| 7b | Mobile manipulator: drives around furniture, lifts the arm to any table, wider gripper | working: our robot |
 | 8 | Physical properties, task suites and code verifiers | planned: Muse Spark |
 | 9 | Voice commands, scene variations, dataset export | planned: Voice Transcribe, Muse Image |
 
@@ -46,7 +47,8 @@ npm run dev   # http://localhost:5190/?scene=living-room (or ?scene=desk)
 
 In a scene with the arm, every scanned object in the panel has an action: **Pick**, then
 **Put on** another object or **Put back**. The status line says what the arm is doing, or why it
-can't (out of reach, wider than the gripper).
+can't (out of reach, wider than the gripper). `scan2sim objects` also adds the mobile manipulator
+on the floor next to the table (`--no-mobile` leaves it out).
 
 `scan2sim build` writes `scene.xml` (MJCF), `room_mesh.glb` (scan surfaces, ceiling as its own
 node) and `scene.json` (element list, confidence, dimensions, frame transform), and compiles the
@@ -93,8 +95,34 @@ with gravity compensation; the fingers are coupled by a tendon, open to 11 cm an
   out of the grip. The arm collides with walls, tables and objects, but not with RoomPlan's
   furniture boxes, which are bounding boxes (a chair's includes the air around its backrest).
 
+### Robots
+
+Every robot kind has an MJCF generator, a TypeScript controller and one look (graphite shells,
+neutral metal, a lime status light that the app may tint orange when a robot needs attention).
+`scene.json` lists them in `robots: [...]` (`id`, `kind`, `label`, `base`, `position`, `yaw`,
+`reach_m`, `gripper`, ...); the old `arm` key still describes the stationary arm.
+
+- **Stationary arm** (`kind: "arm"`): the arm above. Its base is a mocap body, so the app moves it
+  without recompiling (`setBasePose(x, y, yaw)` snaps it onto a table top, clear of objects) and
+  the IK follows the base wherever it stands.
+- **Mobile manipulator** (`kind: "mobile"`, `pipeline/src/scan2sim/mobile.py`): a round holonomic
+  base on three actuated planar joints (x, y, yaw in world coordinates), a lift that puts the arm
+  base anywhere from 0.40 to 1.00 m, and the same arm with a 16 cm gripper. It starts on open
+  floor next to the table. `web/src/sim/navigation.ts` plans on a 5 cm grid of RoomPlan footprints
+  (walls and furniture, doors cut out, cells outside the scanned floor outline blocked) inflated by
+  the base radius; the controller picks a parking spot from which the arm reaches the target,
+  drives there along a smoothed A* path, raises the lift to the surface and grasps top-down. The
+  base never touches furniture boxes (navigation avoids them); its arm collides like the
+  stationary one. On the scanned desk it takes the 10.8 cm yellow cylinder the stationary arm
+  cannot hold.
+- **One API** (`web/src/sim/robot.ts`, created by `createRobots` in `robots.ts`): `status`,
+  `update()`, `reset()`, `reachOf(object)` (instant, with a reason), `pick`, `placeAt(x, y,
+  yawDelta)`, `placeOn`, `putBack`, `goHome`, `setBasePose` and a Promise-based `run(step)`, e.g.
+  `run({ object, x, y, yawDelta })` for a whole pick and place. Commands return at once (accepted,
+  or refused with the reason); after a placement the robot checks where the object ended up.
+
 Tests: `cd pipeline && uv run pytest` (synthetic fixtures; no personal scans needed) and
-`cd web && npm test` (runs the arm on a scene bundle if one is present, otherwise skips).
+`cd web && npm test` (runs the robots on a scene bundle if one is present, otherwise skips).
 
 ## Layout
 
@@ -120,7 +148,8 @@ All code in this repository was written during the hackathon. Pre-existing tools
   hosted by [fal](https://fal.ai/models/fal-ai/sam-3/3d-objects).
 - **Robot reference:** the arm's kinematics (modified DH parameters, joint limits) are the
   published Franka Emika Panda values. No robot model files (Franka, MuJoCo Menagerie or other)
-  are used; the shells, gripper, masses, controllers and IK are written here.
+  are used; the shells, gripper, masses, controllers and IK are written here, and so are the
+  mobile manipulator (base, lift, MJCF) and its navigation (grid, A*, parking, path following).
 - **Simulation and rendering:** MuJoCo (Python `mujoco`, npm `@mujoco/mujoco`), three.js.
 - **Python:** numpy, scipy, trimesh, fast-simplification, Pillow, httpx, openai (SDK for the OpenAI-compatible Meta Model API), meta-sam-parser (Meta's official SAM output parser), fal-client (fal's SDK), python-dotenv, pytest. **Web tooling:** Vite, TypeScript, Vitest.
 

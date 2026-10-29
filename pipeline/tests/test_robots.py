@@ -204,3 +204,26 @@ def test_robot_registry_describes_every_robot(scene):
         for light in entry["status_lights"]:
             assert model.geom(light).id >= 0
     assert model.body(rover_entry["base"]).id >= 0 and model.body(stationary["base"]).id >= 0
+
+
+def test_scene_json_lists_robots_and_keeps_the_arm_key(scene):
+    from types import SimpleNamespace
+
+    from scan2sim.export import scene_metadata
+
+    (table,) = [b for b in scene.boxes if b.category == "table"]
+    mount = arm.ArmMount(np.array([table.center[0], table.center[1], TABLE_H]), 0.3, support=table.name)
+    floor = navgrid.floor_outline(scene.floor)
+    rover_start = mobile.choose_start(scene.boxes, floor, table)
+    full = dataclasses.replace(scene, arm=mount, mobile=rover_start, floor_polygon=floor)
+    capture = SimpleNamespace(manifest={"format": "house-capture/5"}, photos=[], depth_frames=[])
+    room = SimpleNamespace(index=0, name="Room")
+    meta = scene_metadata(capture, room, full, {})
+    assert meta["arm"] == robots.arm_info(mount)  # the old key, now with mocap and status lights
+    assert {"base", "joints", "home", "grip_site", "gripper", "reach_m", "keyframe"} <= meta["arm"].keys()
+    assert [r["id"] for r in meta["robots"]] == ["arm", "mobile"]
+    assert np.allclose(meta["room"]["floor_polygon"], floor, atol=1e-4)
+    (table_entry,) = [e for e in meta["elements"] if e["name"] == table.name]
+    width_axis = table.rotation[:2, 0]  # RoomPlan local x (width) in the world
+    assert table_entry["yaw"] == pytest.approx(np.arctan2(width_axis[1], width_axis[0]), abs=1e-4)
+    assert scene_metadata(capture, room, scene, {})["robots"] == []
