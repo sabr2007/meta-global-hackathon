@@ -182,6 +182,11 @@ each object is when the robot reaches for it; scored by the same verifier.
   only while that server instance lives, and the scan builder cannot pick uploads up until the store is back.
 - **Live:** sign in (judges: credentials are in the submission form) → open a mirror → hold the mic or type
   "tidy up my desk" → watch the models work → drag the before/after slider → **Do it**.
+- **Who decides what, in saved runs:** [Spark redraws after a rejected round, then the person overrules its
+  pick](https://ayna-brown.vercel.app/app/#/scan/f5757ba8142d/desk-sam3d/run/20261029-050201-yea3)
+  ("Draw again: …", "You picked version 2c over Muse Spark's 2a") ·
+  [the person turns the after photo down with a reason](https://ayna-brown.vercel.app/app/#/scan/f5757ba8142d/desk-sam3d/run/20261029-050808-tj09)
+  ("keep the yellow cylinder exactly where it is" → a new edit that leaves it).
 - **One take for video:** [`/app/?autoplay`](https://ayna-brown.vercel.app/app/?autoplay) replays the demo
   mirror's featured run without clicks ("Put all the small things together in one corner": SAM 3.1 rejected
   four of six versions, five objects move, 5 of 5 done). Any saved run plays the same way with
