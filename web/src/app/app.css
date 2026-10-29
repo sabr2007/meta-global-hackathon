@@ -645,6 +645,7 @@ body {
 
 /* receipt */
 .receipt {
+  scroll-margin-top: 84px;
   padding: var(--space-5);
   display: grid;
   gap: var(--space-5);
@@ -711,7 +712,7 @@ body {
 }
 
 .receipt__error {
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   text-align: right;
 }
 
@@ -890,7 +891,7 @@ body {
 }
 
 .mirror--feature {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: min(42%, 465px) minmax(0, 1fr);
   min-height: 460px;
 }
 

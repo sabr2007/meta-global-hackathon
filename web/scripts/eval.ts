@@ -78,6 +78,8 @@ async function main(): Promise<void> {
     if (!args('no-save').length && !process.argv.includes('--no-save')) await scans.saveRun(session, owner, scanId, record, out.files);
     const rejected = record.candidates.filter((c) => !c.passed).length;
     const line = {
+      server: BASE,
+      at: new Date().toISOString(),
       scan: scanId,
       request,
       run: record.id,
