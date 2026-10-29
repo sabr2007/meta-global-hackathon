@@ -65,7 +65,7 @@ flowchart LR
     check -- every version rejected --> decide["Spark decides: redraw · narrow · stop"]
     decide -- its note to the editor --> instruct
     check --> judge["Spark picks the best"]
-    judge --> approve["You approve the after photo"]
+    judge --> approve["You approve the after photo, or pick another version that passed"]
     approve --> goals["Masks → rays → table plane → (x, y, θ)"]
     goals --> plan["Spark orders moves, assigns robots, refuses"]
     plan --> sim["Robots execute in MuJoCo (browser)"]
