@@ -5,6 +5,7 @@
 // calls: the goals are saved with the run.
 //
 //   cd web && npx tsx scripts/policies.ts --scan desk-sam3d [--since 2026-10-29T03:30] [--policy exact --policy camera]
+//     [--out src/landing/facts/policies.json]   # the summary the landing page shows
 //
 // Policies (where the robots think an object is when they reach for it):
 //   exact      the simulator's pose, as in the app
@@ -14,7 +15,7 @@
 //
 // Runs are read from the server in AYNA_URL as AYNA_EMAIL (scripts/session.ts).
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import loadMujoco from '@mujoco/mujoco';
 import { scans } from '../src/ayna/client';
@@ -174,7 +175,10 @@ async function main(): Promise<void> {
   console.log('\n| Policy | Episodes | Requested moves done | Objects left in place | Mean score | Median error of moved objects, cm | Slipped grasps |');
   console.log('|---|---|---|---|---|---|---|');
   for (const t of table) console.log(`| ${t.policy} | ${t.episodes} | ${t.done}/${t.asked} | ${t.kept}/${t.stays} | ${t.meanScore} | ${t.medianMoveErrorCm.toFixed(1)} | ${t.slipped} |`);
-  console.log(`\n${JSON.stringify({ scan: scanId, since, generated: new Date().toISOString(), table })}`);
+  const summary = { scan: scanId, since, generated: new Date().toISOString(), episodes: runs.length, table };
+  console.log(`\n${JSON.stringify(summary)}`);
+  const out = args('out')[0];
+  if (out) writeFileSync(out, `${JSON.stringify(summary, null, 1)}\n`);
 }
 
 main().catch((error: unknown) => {

@@ -1,0 +1,52 @@
+{
+ "scan": "desk-sam3d",
+ "since": "",
+ "generated": "2026-10-29T03:49:16.696Z",
+ "episodes": 37,
+ "table": [
+  {
+   "policy": "exact",
+   "episodes": 37,
+   "done": 106,
+   "asked": 148,
+   "kept": 110,
+   "stays": 111,
+   "meanScore": 70,
+   "medianMoveErrorCm": 0.7,
+   "slipped": 0
+  },
+  {
+   "policy": "camera",
+   "episodes": 37,
+   "done": 105,
+   "asked": 148,
+   "kept": 110,
+   "stays": 111,
+   "meanScore": 70,
+   "medianMoveErrorCm": 0.8,
+   "slipped": 0
+  },
+  {
+   "policy": "noise-1cm",
+   "episodes": 37,
+   "done": 99,
+   "asked": 148,
+   "kept": 110,
+   "stays": 111,
+   "meanScore": 67,
+   "medianMoveErrorCm": 1.6,
+   "slipped": 3
+  },
+  {
+   "policy": "noise-2cm",
+   "episodes": 37,
+   "done": 64,
+   "asked": 148,
+   "kept": 110,
+   "stays": 111,
+   "meanScore": 44,
+   "medianMoveErrorCm": 4.7,
+   "slipped": 30
+  }
+ ]
+}

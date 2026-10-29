@@ -1,12 +1,14 @@
 // The real material behind the page, and the small derivations the sections share.
 import evalJson from './facts/eval.json';
 import loopJson from './facts/loop.json';
+import policiesJson from './facts/policies.json';
 import showcaseJson from './facts/showcase.json';
-import type { Candidate, EvalFacts, LoopFacts, Showcase } from './types';
+import type { Candidate, EvalFacts, LoopFacts, PolicyFacts, Showcase } from './types';
 
 export const showcase: Showcase = showcaseJson;
 export const evalFacts: EvalFacts = evalJson;
 export const loop: LoopFacts = loopJson;
+export const policyFacts: PolicyFacts = policiesJson;
 
 export const run = showcase.run;
 export const scan = showcase.scan;

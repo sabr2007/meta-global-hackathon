@@ -1,6 +1,6 @@
 // The evidence slots: the comparison, the receipt, the eval totals, refusals and scan facts.
 import { fillSlot, h, num, s } from './dom';
-import { allRefusals, chosen, deviceName, evalFacts, formatCm, formatDate, formatUsd, judgeOf, median, robotMoves, run, scan, sentenceCase } from './facts';
+import { allRefusals, chosen, deviceName, evalFacts, formatCm, formatDate, formatUsd, judgeOf, median, policyFacts, robotMoves, run, scan, sentenceCase } from './facts';
 import { photoCrop, type Crop } from './photo';
 
 // Wide enough to show where the mouse goes in the chosen version (hero pixels, 3:2).
@@ -121,6 +121,38 @@ export function renderEval(): void {
     ', summarised by ',
     h('code', {}, 'web/scripts/landing-numbers.mjs'),
     ` on ${formatDate(e.generated)}. The robots are scripted controllers that read exact poses from the simulator, so these numbers grade the goals and the plans, not a learned policy.`,
+  );
+}
+
+const POLICY_LABELS: Record<string, string> = {
+  exact: 'Exact poses from the simulator',
+  camera: 'Only the photo: SAM 3.1 mask centres',
+  'noise-1cm': 'Exact poses, off by 1 cm',
+  'noise-2cm': 'Exact poses, off by 2 cm',
+};
+
+/** The same robots replayed on every saved desk run with four ways of seeing the objects. */
+export function renderPolicies(): void {
+  const worst = Math.min(...policyFacts.table.map((p) => p.done));
+  fillSlot(
+    'policies',
+    ...policyFacts.table.map((p) => {
+      const bar = h('span', { class: 'policy__bar', 'aria-hidden': 'true' });
+      bar.style.setProperty('--share', (p.asked ? p.done / p.asked : 0).toFixed(3));
+      return h(
+        'li',
+        { class: `policy${p.done === worst ? ' policy--orange' : ''}` },
+        h('span', { class: 'policy__label' }, POLICY_LABELS[p.policy] ?? p.policy),
+        h('span', { class: 'policy__value' }, num(`${p.done}/${p.asked}`)),
+        bar,
+      );
+    }),
+  );
+  fillSlot(
+    'policies-source',
+    `Requested moves done when the ${policyFacts.episodes} saved desk runs are replayed as evaluation episodes: the same robots and plan, scored by the app's verifier, no model calls (`,
+    h('code', {}, 'web/scripts/policies.ts'),
+    ').',
   );
 }
 

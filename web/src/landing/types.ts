@@ -140,3 +140,10 @@ export interface LoopFacts {
   bytes: number;
   cues: { start: number; end: number; chip: string; text: string }[];
 }
+
+export interface PolicyFacts {
+  scan: string;
+  generated: string;
+  episodes: number;
+  table: { policy: string; episodes: number; done: number; asked: number; kept: number; stays: number; meanScore: number; medianMoveErrorCm: number; slipped: number }[];
+}
