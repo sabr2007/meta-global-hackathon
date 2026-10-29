@@ -423,6 +423,8 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   async function replay(runId: string, auto: boolean): Promise<void> {
     if (busy) return;
     startRun();
+    // The address names the run, so it can be shared; replaceState does not fire hashchange (no re-render).
+    history.replaceState(null, '', `${location.pathname}${location.search}#/scan/${owner}/${id}/run/${runId}`);
     const { run, files: runFiles } = await scans.run(session, owner, id, runId);
     await resetTwin();
     const url = (file: string): string => runFiles[file] ?? '';
