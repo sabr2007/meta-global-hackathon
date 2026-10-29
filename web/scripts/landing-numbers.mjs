@@ -1,7 +1,7 @@
 // The landing page's live numbers, from the eval log: one JSON line per headless run of the whole
 // Ayna loop (live Meta models, MuJoCo robots, the app's verifier), written by scripts/eval.ts.
 //
-//   node scripts/landing-numbers.mjs [path/to/eval-runs.jsonl] [--scan desk-sam3d|all]
+//   node scripts/landing-numbers.mjs [path/to/eval-runs.jsonl] [--scan desk-sam3d|all] [--since ISO-time]
 //     default log: ../.night/eval-runs.jsonl; default scan: desk-sam3d (the only scan shown in public)
 //
 // Writes src/landing/facts/eval.json, which the landing bundles at build time. No dependencies.
@@ -19,6 +19,7 @@ const flag = (name, fallback) => {
 const positional = args.filter((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
 const input = path.resolve(positional[0] ?? path.join(WEB, '..', '.night', 'eval-runs.jsonl'));
 const scan = flag('scan', 'desk-sam3d');
+const since = flag('since', ''); // only runs of the current system, e.g. the last eval round
 const output = path.join(WEB, 'src', 'landing', 'facts', 'eval.json');
 
 // The page is in English: a request spoken in Russian is listed by its language, not its words.
@@ -42,7 +43,7 @@ const logged = lines.map((line, i) => {
     throw new Error(`${input}:${i + 1} is not JSON`);
   }
 });
-const all = logged.filter((r) => scan === 'all' || r.scan === scan);
+const all = logged.filter((r) => (scan === 'all' || r.scan === scan) && (!since || (r.at ?? '') >= since));
 // done: robots ran and the verifier measured; no-after: SAM 3.1 rejected every version, nothing moved
 const done = all.filter((r) => r.status === 'done' && !r.error && typeof r.total === 'number' && r.total > 0);
 const stopped = all.filter((r) => r.status === 'no-after' && !r.error);
