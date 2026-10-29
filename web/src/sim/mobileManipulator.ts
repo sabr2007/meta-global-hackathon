@@ -39,7 +39,7 @@ const REACH_OUTER_MARGIN_M = 0.03;
 const PREFERRED_REACH_M = 0.5;
 const PARKING_TRIES = 8;
 const ROUND_RATIO = 1.15; // an object this close to round can be grasped from any side
-const FOOTPRINT_SHARE = 0.8; // this much of a held object's footprint must rest on the surface
+const FOOTPRINT_SHARE = 0.5; // this much of a held object's footprint radius must rest on the surface (goals often group objects closely)
 const PLACED_HEIGHT_M = 0.03; // after a release the object rests this close to the planned surface
 const PLACED_OFFSET_M = 0.06; // ... and this close to the planned point
 

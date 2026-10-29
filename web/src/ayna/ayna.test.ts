@@ -103,7 +103,7 @@ describe('candidate check', () => {
 describe('plan check', () => {
   const robot = (id: string, reach: (name: string) => boolean): FleetRobot => ({
     id,
-    kind: 'arm',
+    kind: id === 'mobile' ? 'mobile' : 'arm',
     label: id,
     gripWidthM: 0.11,
     reachOf: (name) => ({ ok: reach(name), reason: reach(name) ? 'ok' : '0.80 m away, reach 0.76 m', distanceM: 0.5 }),
@@ -124,6 +124,8 @@ describe('plan check', () => {
       ['near', 'arm'],
     ]);
     expect(checked.fixes).toHaveLength(2);
+    const preferArm = checkPlan({ steps: [{ object: 'near', robot: 'mobile', why: '' }], refusals: [], order_reason: '' }, [goal('near')], fleet);
+    expect(preferArm.steps[0].robot).toBe('arm');
     const alone = checkPlan(plan, [goal('far')], [robot('arm', (n) => n !== 'far')]);
     expect(alone.refusals[0].reason).toMatch(/0.80 m away/);
   });

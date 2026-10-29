@@ -143,6 +143,12 @@ export function checkPlan(
       robot = able[0];
       fixes.push(`${goal.label}: ${step.robot} cannot do it, ${robot.id} can`);
     }
+    // The stationary arm needs no driving and places more precisely: it takes every move it can do.
+    const arm = able.find((r) => r.kind === 'arm');
+    if (robot && robot.kind !== 'arm' && arm) {
+      fixes.push(`${goal.label}: the stationary arm can do it, no need to drive`);
+      robot = arm;
+    }
     if (!robot) {
       refusals.push({ object: goal.name, label: goal.label, reason: blocker(goal) });
       if (fleet.some((r) => r.id === step.robot)) fixes.push(`${goal.label}: no robot can do it`);
@@ -160,7 +166,8 @@ export function checkPlan(
     if (handled.has(goal.name)) continue;
     const able = capable(goal);
     if (able.length) {
-      steps.push({ object: goal.name, label: goal.label, robot: able[0].id, why: 'added: the plan left it out', x: goal.to[0], y: goal.to[1], yawDelta: goal.yawDelta });
+      const pick = able.find((r) => r.kind === 'arm') ?? able[0];
+      steps.push({ object: goal.name, label: goal.label, robot: pick.id, why: 'added: the plan left it out', x: goal.to[0], y: goal.to[1], yawDelta: goal.yawDelta });
       fixes.push(`${goal.label}: missing from the plan, added`);
     } else {
       refusals.push({ object: goal.name, label: goal.label, reason: blocker(goal) });
