@@ -615,6 +615,12 @@ body {
   line-height: 1.35;
 }
 
+.review__hint {
+  margin-top: var(--space-2);
+  color: var(--secondary);
+  font-size: 0.8125rem;
+}
+
 .review__refusals {
   margin: 0;
   padding-left: 1.1em;

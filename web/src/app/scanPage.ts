@@ -96,7 +96,12 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   logBlock.append(h('h2', 'eyebrow block__title', 'What the models are doing'), log.root);
   const versionsBlock = h('section', 'block');
   versionsBlock.hidden = true;
-  const versionList = versions((vid) => void showVersion(vid));
+  // While the after photo waits for approval, clicking another version that passed picks it instead.
+  let picker: ((id: string) => void) | null = null;
+  const versionList = versions((vid) => {
+    void showVersion(vid);
+    picker?.(vid);
+  });
   versionsBlock.append(h('h2', 'eyebrow block__title', 'Developed after photos · SAM 3.1 check'), versionList.root);
   const review = h('section', 'block review');
   review.hidden = true;
@@ -255,10 +260,12 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   };
 
   /** Show the chosen version, the slider and wait for "Do it". */
-  const approveStep = (chosenId: string, summary: string, refusals: { object: string; reason: string }[], auto: boolean): Promise<boolean> => {
-    const view = versionViews.get(chosenId);
-    if (view) view.chosen = true;
-    renderVersions();
+  const approveStep = (chosenId: string, summary: string, refusals: { object: string; reason: string }[], auto: boolean, alternatives: string[] = []): Promise<boolean | string> => {
+    const mark = (id: string): void => {
+      for (const v of versionViews.values()) v.chosen = v.id === id;
+      renderVersions();
+    };
+    mark(chosenId);
     void showVersion(chosenId);
     stage.setSlider(true);
     stage.setCaption('Before · after — drag to compare', 'lime');
@@ -266,6 +273,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     review.replaceChildren();
     const text = h('p', 'review__summary', summary);
     review.append(h('h2', 'eyebrow block__title', 'The plan, as a picture'), text);
+    if (alternatives.length) review.append(h('p', 'review__hint', `Muse Spark picked version ${chosenId.toUpperCase()}. Click another version that passed to plan from it instead.`));
     if (refusals.length) {
       const list = h('ul', 'review__refusals');
       for (const r of refusals) list.append(h('li', '', `${twin.objects.find((o) => o.name === r.object)?.label ?? r.object}: ${r.reason}`));
@@ -281,11 +289,19 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     no.type = 'button';
     actions.append(yes, no);
     review.append(actions);
+    let pending = chosenId;
+    picker = (id) => {
+      if (id === pending || (id !== chosenId && !alternatives.includes(id))) return;
+      pending = id;
+      mark(id);
+      text.textContent = id === chosenId ? summary : `You picked version ${id.toUpperCase()}; Muse Spark preferred ${chosenId.toUpperCase()}. “Do it” plans from your pick.`;
+    };
     return new Promise((resolve) => {
       const done = (ok: boolean): void => {
         actions.remove();
         stage.setSlider(false);
-        resolve(ok);
+        picker = null;
+        resolve(ok && pending !== chosenId ? pending : ok);
       };
       yes.addEventListener('click', () => done(true));
       no.addEventListener('click', () => done(false));
@@ -332,7 +348,8 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       },
       approve: async (imagined: Imagined) => {
         for (const c of imagined.candidates) goalsByVersion.set(c.id, c.check.goals);
-        return approveStep(imagined.chosen!.id, imagined.instruction.summary, imagined.instruction.refusals, false);
+        const passed = imagined.candidates.filter((c) => c.check.passed && c.id !== imagined.chosen!.id).map((c) => c.id);
+        return approveStep(imagined.chosen!.id, imagined.instruction.summary, imagined.instruction.refusals, false, passed);
       },
       onPlan: async (planned) => {
         list = await beginExecution(planned.steps, planned.refusals);

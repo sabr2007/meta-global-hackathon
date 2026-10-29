@@ -6,7 +6,7 @@ import type { FleetRobot } from './fleet';
 import type { SceneObject } from './goals';
 import { newRunId, type RunRecord } from './record';
 import type { Rle } from './rle';
-import { dispatch, dispatchGoals, execute, imagineAfter, type Dispatch, type Imagined, type Instruction, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
+import { dispatch, dispatchGoals, execute, imagineAfter, type Candidate, type Dispatch, type Imagined, type Instruction, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
 import { bodyPose, measure, type BodyPose, type Receipt } from './verify';
 import type { Physics } from '../sim/physics';
 
@@ -18,7 +18,9 @@ export interface SceneRuntime {
 }
 
 export interface RunHooks {
-  approve(imagined: Imagined): Promise<boolean>;
+  /** The person's answer to the after photo: true for Spark's pick, the id of another version that passed to
+   * plan from that one instead, false to stop. */
+  approve(imagined: Imagined): Promise<boolean | string>;
   drive<T>(work: Promise<T>): Promise<T>;
   /** Let the simulation run for a while (objects come to rest). */
   settle(seconds: number): Promise<void>;
@@ -119,15 +121,26 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
       record.status = 'no-after';
       return finish();
     }
-    const chosen = imagined.chosen;
-    record.chosen = chosen.id;
+    let chosen = imagined.chosen;
+    const keep = (candidate: Candidate): void => {
+      record.chosen = candidate.id;
+      record.thumb = record.candidates.find((c) => c.id === candidate.id)!.file;
+      record.goals = candidate.check.goals.map((g) => ({ name: g.name, label: g.label, found: g.found, moves: g.moves, from: g.from, to: g.to, yawDelta: g.yawDelta, distanceM: g.distanceM, mask: g.mask }));
+    };
+    keep(chosen);
     record.judgement = imagined.judgement;
-    record.thumb = record.candidates.find((c) => c.id === chosen.id)!.file;
-    record.goals = chosen.check.goals.map((g) => ({ name: g.name, label: g.label, found: g.found, moves: g.moves, from: g.from, to: g.to, yawDelta: g.yawDelta, distanceM: g.distanceM, mask: g.mask }));
-    if (!(await hooks.approve(imagined))) {
+    const approved = await hooks.approve(imagined);
+    if (!approved) {
       record.status = 'failed';
       record.error = 'Not approved';
       return finish();
+    }
+    const picked = typeof approved === 'string' ? imagined.candidates.find((c) => c.id === approved && c.check.passed) : undefined;
+    if (picked && picked.id !== chosen.id) {
+      trace({ step: 'judge', state: 'info', text: `You picked version ${picked.id} over Muse Spark's ${chosen.id}` });
+      chosen = picked;
+      imagined = { ...imagined, chosen };
+      keep(chosen);
     }
 
     const planned = await dispatch(scene.ctx, request, chosen, scene.fleet, models, trace);
