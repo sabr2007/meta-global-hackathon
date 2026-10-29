@@ -145,3 +145,34 @@ describe('step order', () => {
     expect(cycle.steps.map((s) => s.object)).toEqual(['a', 'b']);
   });
 });
+
+describe('size check', () => {
+  // The camera looks along the table at an angle, so moving away shrinks an object's image.
+  const tilted: PhotoCamera = {
+    ...camera,
+    camera_to_world: [
+      [1, 0, 0, 0],
+      [0, 0.8, -0.6, -0.6],
+      [0, 0.6, 0.8, 0.8],
+      [0, 0, 0, 1],
+    ],
+  };
+  const objects: SceneObject[] = [{ name: 'a', label: 'cup', concept: 'cup', size_m: [0.05, 0.05, 0.05], start: [0, 0, 0] }];
+  const near = project(tilted, [0, 0, 0]);
+  const far = project(tilted, [0, 0.3, 0]);
+  const before: BeforeMask[] = [{ object: 'a', concept: 'cup', area_px: 400, rle: square(Math.round(near.x), Math.round(near.y), 10) }];
+  const at = (x: number, y: number, half: number): Segmented[] => [{ name: 'a', source: 'concept', masks: [{ objectId: '0', confidence: 0.9, area: 4 * half * half, rle: square(Math.round(x), Math.round(y), half) }] }];
+
+  test('accepts a move drawn at the same pixel size or with true perspective', () => {
+    const same = checkCandidate({ camera: tilted, objects, before, segmented: at(far.x, far.y, 10), imageSize: { width: 400, height: 400 } });
+    expect(same.passed).toBe(true);
+    const scale = near.depth / far.depth;
+    const perspective = checkCandidate({ camera: tilted, objects, before, segmented: at(far.x, far.y, Math.round(10 * scale)), imageSize: { width: 400, height: 400 } });
+    expect(perspective.passed).toBe(true);
+  });
+
+  test('rejects an object resized beyond both readings', () => {
+    const shrunk = checkCandidate({ camera: tilted, objects, before, segmented: at(near.x, near.y, 7), imageSize: { width: 400, height: 400 } });
+    expect(shrunk.reasons.join(' ')).toMatch(/changed size/);
+  });
+});

@@ -53,6 +53,8 @@ export interface Robot {
   /** Call after the simulation was reset (physics.reset()); keeps where the robot was dragged. */
   reset(): void;
   reachOf(objectName: string): ReachCheck;
+  /** Whether the robot can put something down at (x, y) (instant; used to check a plan). */
+  reachPoint(x: number, y: number): ReachCheck;
   pick(objectName: string): StepResult;
   /** Put the held object down with its grip point over (x, y), on the surface there, turned by yawDelta (rad). */
   placeAt(x: number, y: number, yawDelta?: number): StepResult;
@@ -94,6 +96,7 @@ export abstract class RobotBase implements Robot {
   abstract update(): void;
   abstract reset(): void;
   abstract reachOf(objectName: string): ReachCheck;
+  abstract reachPoint(x: number, y: number): ReachCheck;
   abstract pick(objectName: string): StepResult;
   abstract placeAt(x: number, y: number, yawDelta?: number): StepResult;
   abstract placeOn(objectName: string): StepResult;

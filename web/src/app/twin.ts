@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { PhotoCamera } from '../ayna/camera';
-import { ArmRobot, type FleetRobot } from '../ayna/fleet';
+import { fleetOf, type FleetRobot } from '../ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../ayna/glb';
 import type { BeforeMask, SceneObject } from '../ayna/goals';
 import { buildGeomLayer, GROUP } from '../render/geoms';
@@ -12,6 +12,7 @@ import { loadObjects, type ObjectLayer } from '../render/objects';
 import { loadRoomMesh } from '../render/roomMesh';
 import type { SceneMeta } from '../scene/bundle';
 import { createPhysics } from '../sim/loadPhysics';
+import { createRobots, type RobotFleet } from '../sim/robots';
 import type { Physics } from '../sim/physics';
 
 const BACKGROUND = new THREE.Color('#1b1b1c');
@@ -31,6 +32,7 @@ export interface Twin {
   readonly camera: PhotoCamera;
   readonly physics: Physics;
   readonly fleet: FleetRobot[];
+  readonly robots: RobotFleet; // the registry robots behind `fleet` (drag placement, reach map)
   readonly objects: SceneObject[];
   readonly before: BeforeMask[];
   readonly meshes: Map<string, TriangleMesh>;
@@ -121,7 +123,8 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   scene.add(room.root, geoms.root, objectLayer.root);
 
   const objects: SceneObject[] = meta.objects.map((o) => ({ name: o.name, label: o.label, concept: o.concept, size_m: o.size_m, start: o.start }));
-  const fleet: FleetRobot[] = meta.arm ? [new ArmRobot(physics, meta.arm, objects)] : [];
+  const robotFleet: RobotFleet = createRobots(physics, meta);
+  const fleet: FleetRobot[] = fleetOf(physics, robotFleet.robots);
 
   // Light and orbit around the objects.
   const bounds = new THREE.Box3().setFromObject(objectLayer.root);
@@ -199,7 +202,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
 
   const listeners: (() => void)[] = [];
   const settlers: { at: number; resolve: () => void }[] = [];
-  const control = (): void => fleet.forEach((r) => r.update());
+  const control = (): void => robotFleet.update();
   let last = performance.now();
   let frameId = 0;
   const frame = (now: number): void => {
@@ -245,6 +248,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
     camera: photoCamera,
     physics,
     fleet,
+    robots: robotFleet,
     objects,
     before: masksJson.masks,
     meshes,

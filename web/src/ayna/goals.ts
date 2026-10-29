@@ -48,7 +48,7 @@ export interface ObjectGoal {
   found: boolean;
   source: Segmented['source'];
   mask: Rle | null; // in hero photo pixels
-  areaRatio: number; // after/before, corrected for the change in distance to the camera
+  areaRatio: number; // after/before pixel area, or the same corrected for the new distance (whichever is closer to 1)
   from: Vec3;
   to: Vec3;
   distanceM: number;
@@ -161,8 +161,12 @@ export function checkCandidate(input: CheckInput): CandidateCheck {
       const { center, heading } = placeOnPlane(camera, rle, object.start[2]);
       const startDistance = Math.hypot(...object.start.map((v, k) => v - eye[k]));
       const goalDistance = center ? Math.hypot(...center.map((v, k) => v - eye[k])) : startDistance;
-      // Image area falls with the square of the distance; compare sizes as if nothing had moved.
-      const ratio = (maskStats(rle).area / before.area_px) * (goalDistance / startDistance) ** 2;
+      // Image area falls with the square of the distance, so a moved object may rightly grow or
+      // shrink. Image editors also often move an object at its old pixel size. Either reading is a
+      // faithful edit; an object that matches neither was resized (or is something else).
+      const raw = maskStats(rle).area / before.area_px;
+      const corrected = raw * (goalDistance / startDistance) ** 2;
+      const ratio = Math.abs(Math.log(raw)) < Math.abs(Math.log(corrected)) ? raw : corrected;
       const score = Math.abs(Math.log(ratio)) + 0.2 * (1 - (instance.confidence ?? 0.5));
       options.push({ object, instance, rle, ratio, center, heading, score, source: found.source });
     }

@@ -137,6 +137,14 @@ export class MobileManipulator extends RobotBase {
     return { ok: true, reason: `can park with it ${spot!.armDistance.toFixed(2)} m from the arm`, distance_m: distance };
   }
 
+  reachPoint(x: number, y: number): ReachCheck {
+    const base = this.basePose();
+    const distance = Math.hypot(x - base.x, y - base.y);
+    const spot = canPark(this.scene.navGrid(), this.scene.regionsFor(this.radius), [base.x, base.y], this.parkingQuery([x, y]));
+    if (!spot) return { ok: false, reason: this.noParkingReason([x, y]), distance_m: distance };
+    return { ok: true, reason: `can park ${spot.armDistance.toFixed(2)} m from it`, distance_m: distance };
+  }
+
   pick(objectName: string): StepResult {
     const blocked = this.busyReason();
     if (blocked) return blocked;

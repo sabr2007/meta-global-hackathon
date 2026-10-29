@@ -11,7 +11,7 @@ import { createRobots, type Robot, type RobotFleet, type StepResult } from './ro
 
 // Runs both robots on a real scene bundle (`scan2sim objects` output with robots[]). Bundles are
 // photos of a home and stay out of git, so this suite skips when the bundle is missing.
-const SCENE_DIR = resolve(process.env.SCAN2SIM_SCENE ?? 'public/scenes/desk-sam3d');
+const SCENE_DIR = resolve(process.env.SCAN2SIM_SCENE ?? '../data/scenes/desk-sam3d');
 const META: SceneMeta | null = existsSync(`${SCENE_DIR}/scene.json`) ? JSON.parse(readFileSync(`${SCENE_DIR}/scene.json`, 'utf8')) : null;
 const HAS_ROBOTS = (META?.robots ?? []).some((r) => r.kind === 'mobile');
 const STEP_S = 0.05;

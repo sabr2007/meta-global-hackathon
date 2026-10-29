@@ -51,7 +51,6 @@ interface Held {
   gripToBottom: number; // grasp point height above the object's bottom
   origin: Vec3; // where it was picked: xy and bottom height
   yaw: number; // direction the fingers closed along when it was picked
-  gripOffset: [number, number]; // grasp point minus body origin (xy) at pick time
 }
 
 const minJerk = (s: number): number => s * s * s * (10 - 15 * s + 6 * s * s);
@@ -138,7 +137,6 @@ export class ArmController {
       shape.top - palm + PALM_CLEARANCE_M,
     );
     const [x, y] = shape.center;
-    const body = this.bodyXY(name);
     const plan = this.planVertical([x, y, graspZ], [APPROACH_M, 0, LIFT_M], [shape.yaw, shape.yaw + Math.PI]);
     if (!plan) {
       this.fail(`${this.label(name)}: no grasp the arm can reach`);
@@ -157,7 +155,7 @@ export class ArmController {
         this.enqueue(this.arm.home, open, () => this.fail(`Missed ${this.label(name)}: it slipped out of the fingers`));
         return;
       }
-      this.held = { name, gripToBottom: graspZ - shape.bottom, origin: [x, y, shape.bottom], yaw, gripOffset: [x - body[0], y - body[1]] };
+      this.held = { name, gripToBottom: graspZ - shape.bottom, origin: [x, y, shape.bottom], yaw };
       this.setStatus('holding', `Holding ${this.label(name)}`);
     });
     this.setStatus('busy', `Picking up ${this.label(name)}`);
@@ -185,13 +183,8 @@ export class ArmController {
    * turned by yawDelta (radians) from the heading it was picked with. */
   placeAt(x: number, y: number, yawDelta = 0): void {
     if (!this.ready() || !this.held) return;
-    // (x, y) is where the object's body origin should land; the grasp point sits off it by the
-    // offset measured at pick time, turned with the object.
-    const [ox, oy] = this.held.gripOffset;
-    const c = Math.cos(yawDelta);
-    const s = Math.sin(yawDelta);
     const where = `at (${x.toFixed(2)}, ${y.toFixed(2)})`;
-    this.release([x + c * ox - s * oy, y + s * ox + c * oy, this.held.origin[2]], where, this.held.yaw + yawDelta);
+    this.release([x, y, this.held.origin[2]], where, this.held.yaw + yawDelta);
   }
 
   goHome(): void {
@@ -282,12 +275,6 @@ export class ArmController {
   private widthProblem(shape: Shape): string | null {
     const max = this.arm.gripper.max_width - WIDTH_MARGIN_M;
     return shape.width > max ? `${(shape.width * 100).toFixed(1)} cm wide, the gripper opens to ${(this.arm.gripper.max_width * 100).toFixed(0)} cm` : null;
-  }
-
-  private bodyXY(name: string): [number, number] {
-    const { mujoco, model, data } = this.physics;
-    const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, name);
-    return [data.xpos[body * 3], data.xpos[body * 3 + 1]];
   }
 
   private bodyZ(name: string): number {

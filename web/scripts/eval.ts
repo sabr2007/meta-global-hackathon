@@ -8,12 +8,13 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import loadMujoco from '@mujoco/mujoco';
 import { models, scans, type Session } from '../src/ayna/client';
-import { ArmRobot, runHeadless } from '../src/ayna/fleet';
+import { fleetOf, runHeadless } from '../src/ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../src/ayna/glb';
 import type { BeforeMask, SceneObject } from '../src/ayna/goals';
 import { runAyna } from '../src/ayna/pipeline';
 import type { SceneMeta } from '../src/scene/bundle';
 import { physicsFrom } from '../src/sim/physics';
+import { createRobots } from '../src/sim/robots';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const BASE = process.env.AYNA_URL ?? 'http://localhost:5190';
@@ -57,7 +58,8 @@ async function main(): Promise<void> {
     const physics = physicsFrom(mujoco, mjcf);
     physics.advance(0.5); // objects settle as in the app
     const objects: SceneObject[] = meta.objects!.map((o) => ({ name: o.name, label: o.label, concept: o.concept, size_m: o.size_m, start: o.start }));
-    const fleet = meta.arm ? [new ArmRobot(physics, meta.arm, objects)] : [];
+    const robots = createRobots(physics, meta);
+    const fleet = fleetOf(physics, robots.robots);
     const started = Date.now();
     const out = await runAyna(
       { ctx: { camera: meta.camera!, photo, objects, before: masks }, physics, fleet, meshes },

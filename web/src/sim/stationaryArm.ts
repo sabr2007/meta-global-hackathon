@@ -86,6 +86,15 @@ export class StationaryArm extends RobotBase {
     return { ok: true, reason: `${distance.toFixed(2)} m away, within reach`, distance_m: distance };
   }
 
+  reachPoint(x: number, y: number): ReachCheck {
+    const base = this.basePose();
+    const distance = Math.hypot(x - base.x, y - base.y);
+    const [min, max] = this.info.reach_m;
+    if (distance > max) return { ok: false, reason: `${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`, distance_m: distance };
+    if (distance < min) return { ok: false, reason: `${distance.toFixed(2)} m from the base, too close (${min.toFixed(2)} m)`, distance_m: distance };
+    return { ok: true, reason: `${distance.toFixed(2)} m away, within reach`, distance_m: distance };
+  }
+
   pick(objectName: string): StepResult {
     const blocked = this.busyReason();
     if (blocked) return blocked;
