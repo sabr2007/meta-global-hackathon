@@ -106,12 +106,16 @@ export function briefs(ctx: SceneContext, fleet: FleetRobot[]): SceneObjectBrief
       concept: o.concept,
       size_cm: o.size_m.map((v) => Math.round(v * 1000) / 10) as [number, number, number],
       where: mask ? where(ctx.camera, mask) : 'on the table',
-      reach: fleet.some((r) => r.reachOf(o.name).ok)
-        ? fleet.map((r) => {
-            const reach = r.reachOf(o.name);
-            return `${r.label}: ${reach.ok ? 'reaches it' : reach.reason}`;
-          })
-        : [`MUST STAY: no robot can move it (${fleet.map((r) => `${r.label}: ${r.reachOf(o.name).reason}`).join('; ')})`],
+      reach: [
+        ...(fleet.some((r) => r.reachOf(o.name).ok)
+          ? fleet.map((r) => {
+              const reach = r.reachOf(o.name);
+              return `${r.label}: ${reach.ok ? 'reaches it' : reach.reason}`;
+            })
+          : [`MUST STAY: no robot can move it (${fleet.map((r) => `${r.label}: ${r.reachOf(o.name).reason}`).join('; ')})`]),
+        // Where things can go: a destination next to a spot no robot can put things on will be refused.
+        fleet.some((r) => r.reachPoint(o.start[0], o.start[1]).ok) ? 'robots can put things down around here' : 'no robot can put things down around here',
+      ],
     };
   });
 }

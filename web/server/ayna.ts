@@ -85,6 +85,8 @@ ${input.robots.join('\n')}
 Write ONE instruction for an image-editing model that edits THIS photo into the state after the robots
 have done the job. The edited photo becomes the robots' goal, so it must be physically achievable:
 - move only objects a robot can reach and grip; objects marked MUST STAY never move;
+- put moved objects only near spots marked "robots can put things down around here", never next to
+  spots marked "no robot can put things down around here" or at the very edge of the table;
 - objects stay on the same table top, upright, the same size, not stacked unless asked;
 - make the change obvious at a glance: moved objects travel 10-30 cm, into a clear arrangement (a group,
   a row, a corner), and describe destinations relative to other objects and to the visible table edges;
