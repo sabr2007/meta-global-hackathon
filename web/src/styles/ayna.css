@@ -1,0 +1,297 @@
+/* Ayna design tokens, shared by the landing page and the app.
+   Source of truth: the iOS app's AynaDesign.swift (graphite surfaces, lime = done/verified/matches,
+   orange = needs attention/does not match/refused, Michroma for titles, Doto dot-matrix for numbers). */
+
+@font-face {
+  font-family: 'Michroma';
+  src: url('./fonts/Michroma-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Doto';
+  src: url('./fonts/Doto-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Doto';
+  src: url('./fonts/Doto-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #1b1b1c;
+  --surface: #252528;
+  --raised: #3a3a3e;
+  --neutral: #b5b5ba;
+  --text: #ffffff;
+  --secondary: #9a9aa0;
+  --reflection: #55555a;
+  --lime: #b8ff5e;
+  --on-lime: #173404;
+  --orange: #ee7f35;
+  --lime-soft: rgb(184 255 94 / 0.14);
+  --orange-soft: rgb(238 127 53 / 0.16);
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.16);
+
+  --font-title: 'Michroma', ui-sans-serif, system-ui, sans-serif;
+  --font-body: ui-sans-serif, -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-number: 'Doto', ui-monospace, monospace;
+
+  --radius-card: 22px;
+  --radius-inner: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
+  --text-xl: clamp(1.5rem, 1.1rem + 1.4vw, 2.25rem);
+  --text-hero: clamp(2.25rem, 1rem + 5vw, 5.25rem);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --fast: 160ms;
+  --normal: 320ms;
+  --slow: 900ms;
+
+  --shadow-lift: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 18px 40px -18px rgb(0 0 0 / 0.65);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+img,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- type ---- */
+
+.title {
+  font-family: var(--font-title);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.eyebrow {
+  font-family: var(--font-title);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--secondary);
+}
+
+.num {
+  font-family: var(--font-number);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.metric {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.metric .num {
+  font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem);
+}
+
+/* ---- logo: AYNA over its dotted reflection ---- */
+
+.logo {
+  --size: 22px;
+  display: inline-grid;
+  justify-items: start;
+  text-decoration: none;
+  line-height: 1;
+  user-select: none;
+}
+
+.logo__row {
+  display: flex;
+}
+
+.logo__row span {
+  display: inline-block;
+  text-align: center;
+}
+
+.logo__solid {
+  font-family: var(--font-title);
+  font-size: var(--size);
+  color: var(--text);
+}
+
+.logo__mirror {
+  font-family: var(--font-number);
+  font-weight: 900;
+  font-size: calc(var(--size) * 1.07);
+  color: var(--reflection);
+  transform: scaleY(-1);
+  margin-top: calc(var(--size) * -0.41);
+}
+
+/* ---- controls ---- */
+
+.pill {
+  --pill-bg: var(--raised);
+  --pill-fg: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font: 600 var(--text-sm) / 1 var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform var(--fast) var(--ease-out),
+    opacity var(--fast) var(--ease-out);
+}
+
+.pill:hover {
+  transform: translateY(-1px);
+}
+
+.pill:active {
+  transform: translateY(1px) scale(0.98);
+  opacity: 0.8;
+}
+
+.pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pill--lime {
+  --pill-bg: var(--lime);
+  --pill-fg: var(--on-lime);
+}
+
+.pill--outline {
+  --pill-bg: transparent;
+  border-color: var(--raised);
+}
+
+.pill--small {
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-xs);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lift);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--secondary);
+  flex: none;
+}
+
+.dot--lime {
+  background: var(--lime);
+}
+
+.dot--orange {
+  background: var(--orange);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--raised);
+  font-size: var(--text-xs);
+  color: var(--neutral);
+  white-space: nowrap;
+}
+
+.tag--lime {
+  background: var(--lime-soft);
+  color: var(--lime);
+}
+
+.tag--orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

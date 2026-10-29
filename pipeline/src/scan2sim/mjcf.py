@@ -8,7 +8,7 @@ import mujoco
 import numpy as np
 import trimesh
 
-from scan2sim import arm
+from scan2sim import robots
 from scan2sim.frames import quat_from_matrix
 from scan2sim.scene import Box, ScannedObject, SimScene
 
@@ -101,18 +101,20 @@ def _scanned_body(parent: ET.Element, obj: ScannedObject) -> None:
         )
 
 
-def _add_home_key(root: ET.Element) -> None:
-    """Keyframe 0: everything where the scene puts it, the arm in its home pose, gripper open."""
+def _add_home_key(root: ET.Element, scene: SimScene) -> None:
+    """Keyframe 0: everything where the scene puts it, every robot at rest (arm home, gripper open)."""
     model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"))
     qpos = model.qpos0.copy()
     ctrl = np.zeros(model.nu)
-    targets = {**dict(zip(arm.JOINT_NAMES, arm.HOME)), **{f: arm.GRIPPER_OPEN for f in arm.FINGER_JOINTS}}
-    for name, value in targets.items():
+    joint_targets, actuator_targets = robots.rest_state(scene)
+    for name, value in joint_targets.items():
         qpos[model.jnt_qposadr[model.joint(name).id]] = value
-    for name, value in zip((*arm.JOINT_NAMES, arm.GRIPPER_ACTUATOR), arm.home_ctrl()):
+    for name, value in actuator_targets.items():
         ctrl[model.actuator(name).id] = value
     keyframe = ET.SubElement(root, "keyframe")
-    ET.SubElement(keyframe, "key", name="home", qpos=" ".join(f"{v:.6g}" for v in qpos), ctrl=" ".join(f"{v:.6g}" for v in ctrl))
+    ET.SubElement(
+        keyframe, "key", name=robots.KEYFRAME, qpos=" ".join(f"{v:.8g}" for v in qpos), ctrl=" ".join(f"{v:.8g}" for v in ctrl)
+    )
 
 
 def scene_to_mjcf(scene: SimScene, model_name: str = "scanned-room") -> str:
@@ -177,9 +179,8 @@ def scene_to_mjcf(scene: SimScene, model_name: str = "scanned-room") -> str:
     for obj in scene.objects:
         _scanned_body(worldbody, obj)
 
-    if scene.arm is not None:
-        arm.add_arm(root, asset, worldbody, scene.arm)
-        _add_home_key(root)
+    if robots.add_robots(root, asset, worldbody, scene):
+        _add_home_key(root, scene)
 
     ET.indent(root)
     return ET.tostring(root, encoding="unicode") + "\n"

@@ -9,6 +9,7 @@ import { linearizeVertexColors } from './vertexColors';
 
 const HIGHLIGHT_EMISSIVE = new THREE.Color('#ff5a1f');
 const HIGHLIGHT_INTENSITY = 0.55;
+const TINT_INTENSITY = 0.42;
 const NO_EMISSIVE = new THREE.Color(0, 0, 0);
 
 interface ObjectView {
@@ -23,18 +24,20 @@ export interface ObjectLayer {
   sync(): void;
   setVisible(visible: boolean): void;
   highlight(name: string | null): void;
+  /** Glow per object (e.g. the reach map: lime reachable, orange not); missing names glow off. */
+  tint(colors: ReadonlyMap<string, string>): void;
 }
 
 async function loadView(
   physics: Physics,
   loader: GLTFLoader,
-  baseUrl: string,
+  urlOf: (path: string) => string,
   info: ScannedObjectInfo,
 ): Promise<ObjectView> {
   const { mujoco, model } = physics;
   const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, info.body);
   if (body < 0) throw new Error(`scene.xml has no body named "${info.body}"`);
-  const gltf = await loader.loadAsync(`${baseUrl}${info.mesh}`);
+  const gltf = await loader.loadAsync(urlOf(info.mesh));
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
   gltf.scene.traverse((node) => {
     if (node instanceof THREE.Mesh) {
@@ -51,13 +54,14 @@ async function loadView(
   return { name: info.name, body, object, material };
 }
 
+/** `urlOf` maps a bundle path (objects/<name>.glb) to where it can be fetched (signed URLs in the app). */
 export async function loadObjects(
   physics: Physics,
-  baseUrl: string,
+  urlOf: (path: string) => string,
   objects: ScannedObjectInfo[],
 ): Promise<ObjectLayer> {
   const loader = new GLTFLoader();
-  const views = await Promise.all(objects.map((info) => loadView(physics, loader, baseUrl, info)));
+  const views = await Promise.all(objects.map((info) => loadView(physics, loader, urlOf, info)));
   const root = new THREE.Group();
   root.name = 'scanned-objects';
   for (const v of views) root.add(v.object);
@@ -86,6 +90,14 @@ export async function loadObjects(
     }
   };
 
+  const tint = (colors: ReadonlyMap<string, string>): void => {
+    for (const v of views) {
+      const color = colors.get(v.name);
+      v.material.emissive.set(color ?? '#000000');
+      v.material.emissiveIntensity = color ? TINT_INTENSITY : 0;
+    }
+  };
+
   sync();
   return {
     root,
@@ -94,5 +106,6 @@ export async function loadObjects(
       root.visible = visible;
     },
     highlight,
+    tint,
   };
 }

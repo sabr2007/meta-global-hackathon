@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct AynaApp: App {
+  @UIApplicationDelegateAdaptor(AynaAppDelegate.self) private var appDelegate
+
   var body: some Scene {
     WindowGroup {
       #if DEBUG
@@ -21,6 +23,26 @@ struct AynaApp: App {
       HomeView()
       #endif
     }
+  }
+}
+
+/// Send to Ayna uploads in a background URLSession: re-attach it at launch, and keep iOS's
+/// completion handler when iOS wakes the app for its events.
+final class AynaAppDelegate: NSObject, UIApplicationDelegate {
+  func application(_ application: UIApplication,
+                   didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+    AynaUploader.shared.activate()
+    return true
+  }
+
+  func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                   completionHandler: @escaping () -> Void) {
+    guard identifier == AynaUploader.sessionIdentifier else {
+      completionHandler()
+      return
+    }
+    AynaUploader.shared.backgroundEventsDone = completionHandler
+    AynaUploader.shared.activate()
   }
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "scan2sim-web",
+  "name": "ayna-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,15 +8,20 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed": "tsx scripts/seed.ts",
+    "eval": "tsx scripts/eval.ts"
   },
   "dependencies": {
+    "@meta-sam/parser": "^0.1.0",
     "@mujoco/mujoco": "^3.17.0",
+    "@vercel/blob": "^2.8.2",
     "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^4.1.12"

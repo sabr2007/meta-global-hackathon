@@ -1,5 +1,6 @@
 import type { ArmInfo } from '../scene/bundle';
 import { ArmIk, topDown, type IkResult, type Vec3 } from './ik';
+import { objectShape } from './objectShape';
 import type { Physics } from './physics';
 
 // Scripted manipulation for the arm: top-down pick, place on another object, put back, home.
@@ -9,6 +10,8 @@ const APPROACH_M = 0.12; // pre-grasp height above the grasp point
 const LIFT_M = 0.15;
 const TABLE_GAP_M = 0.006; // fingertips stay this far above the surface the object rests on
 const TOP_MARGIN_M = 0.012; // grasp at least this far below the object's top
+const PALM_CLEARANCE_M = 0.012; // a tall object's top stays this far below the palm
+const PALM_ABOVE_GRIP_M = 0.05; // default for bundles that do not say
 const DROP_GAP_M = 0.012; // release this far above the target surface
 const WIDTH_MARGIN_M = 0.012;
 const REACH_SLACK_M = 0.02;
@@ -47,6 +50,7 @@ interface Held {
   name: string;
   gripToBottom: number; // grasp point height above the object's bottom
   origin: Vec3; // where it was picked: xy and bottom height
+  yaw: number; // direction the fingers closed along when it was picked
 }
 
 const minJerk = (s: number): number => s * s * s * (10 - 15 * s + 6 * s * s);
@@ -125,7 +129,13 @@ export class ArmController {
       return;
     }
     const tipBelow = this.arm.gripper.tip_below_grip;
-    const graspZ = Math.max(shape.bottom + tipBelow + TABLE_GAP_M, Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M));
+    const palm = this.arm.gripper.palm_above_grip ?? PALM_ABOVE_GRIP_M;
+    // Mid-height, but never so low that a tall object's top runs into the palm.
+    const graspZ = Math.max(
+      shape.bottom + tipBelow + TABLE_GAP_M,
+      Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M),
+      shape.top - palm + PALM_CLEARANCE_M,
+    );
     const [x, y] = shape.center;
     const plan = this.planVertical([x, y, graspZ], [APPROACH_M, 0, LIFT_M], [shape.yaw, shape.yaw + Math.PI]);
     if (!plan) {
@@ -135,6 +145,8 @@ export class ArmController {
     const [above, at, lift] = plan;
     const open = this.arm.gripper.open;
     const startZ = this.bodyZ(name);
+    const grip = this.ik.pose(at).rotation;
+    const yaw = Math.atan2(grip[4], grip[1]);
     this.enqueue(above, open);
     this.enqueue(at, open);
     this.queue.push({ to: [...at, 0], duration: CLOSE_S }, { to: [...at, 0], duration: SETTLE_S });
@@ -143,7 +155,7 @@ export class ArmController {
         this.enqueue(this.arm.home, open, () => this.fail(`Missed ${this.label(name)}: it slipped out of the fingers`));
         return;
       }
-      this.held = { name, gripToBottom: graspZ - shape.bottom, origin: [x, y, shape.bottom] };
+      this.held = { name, gripToBottom: graspZ - shape.bottom, origin: [x, y, shape.bottom], yaw };
       this.setStatus('holding', `Holding ${this.label(name)}`);
     });
     this.setStatus('busy', `Picking up ${this.label(name)}`);
@@ -167,6 +179,14 @@ export class ArmController {
     this.release(this.held.origin, 'back');
   }
 
+  /** Release the held object with the grip point over (x, y), on the surface it was picked from,
+   * turned by yawDelta (radians) from the heading it was picked with. */
+  placeAt(x: number, y: number, yawDelta = 0): void {
+    if (!this.ready() || !this.held) return;
+    const where = `at (${x.toFixed(2)}, ${y.toFixed(2)})`;
+    this.release([x, y, this.held.origin[2]], where, this.held.yaw + yawDelta);
+  }
+
   goHome(): void {
     if (!this.ready()) return;
     const grip = this.target[7];
@@ -180,12 +200,21 @@ export class ArmController {
     this.ik.dispose();
   }
 
-  private release(surface: Vec3, where: string): void {
+  /** `yaw`: finger direction to release with (exactly, unless only the turned-around grasp reaches);
+   * by default the current one. */
+  private release(surface: Vec3, where: string, yaw?: number): void {
     const held = this.held!;
     const z = surface[2] + held.gripToBottom + DROP_GAP_M;
-    const rotation = this.ik.pose(this.target).rotation;
-    const yaw = Math.atan2(rotation[4], rotation[1]); // keep the object's heading
-    const plan = this.planVertical([surface[0], surface[1], z], [APPROACH_M, 0, APPROACH_M], [yaw, yaw + Math.PI]);
+    const point: Vec3 = [surface[0], surface[1], z];
+    const heights: [number, number, number] = [APPROACH_M, 0, APPROACH_M];
+    let plan: number[][] | null;
+    if (yaw === undefined) {
+      const rotation = this.ik.pose(this.target).rotation;
+      const current = Math.atan2(rotation[4], rotation[1]); // keep the object's heading
+      plan = this.planVertical(point, heights, [current, current + Math.PI]);
+    } else {
+      plan = this.planVertical(point, heights, [yaw]) ?? this.planVertical(point, heights, [yaw + Math.PI]);
+    }
     const name = this.label(held.name);
     if (!plan) {
       this.fail(`Can't put ${name} ${where}: out of reach`);
@@ -254,57 +283,11 @@ export class ArmController {
     return data.xpos[body * 3 + 2];
   }
 
-  /** The object's collider (its convex hull) as it is now: footprint, height, narrow direction. */
+  /** The object's collider (its convex hull) as it is now, and how far it is from the base axis. */
   private shapeOf(name: string): Shape {
-    const { mujoco, model, data } = this.physics;
-    const geom = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM.value, `${name}_geom`);
-    if (geom < 0) throw new Error(`scene.xml has no collider named ${name}_geom`);
-    const mesh: number = model.geom_dataid[geom];
-    const adr: number = model.mesh_vertadr[mesh];
-    const count: number = model.mesh_vertnum[mesh];
-    const verts = model.mesh_vert.subarray(adr * 3, (adr + count) * 3);
-    const p = data.geom_xpos.subarray(geom * 3, geom * 3 + 3);
-    const r = data.geom_xmat.subarray(geom * 9, geom * 9 + 9);
-    const world: number[][] = [];
-    for (let i = 0; i < count; i += 1) {
-      const v = [verts[i * 3], verts[i * 3 + 1], verts[i * 3 + 2]];
-      world.push([0, 1, 2].map((row) => p[row] + r[row * 3] * v[0] + r[row * 3 + 1] * v[1] + r[row * 3 + 2] * v[2]));
-    }
-    const zs = world.map((w) => w[2]);
-    // Principal axes of the footprint; the gripper closes along the minor one.
-    const mx = world.reduce((s, w) => s + w[0], 0) / count;
-    const my = world.reduce((s, w) => s + w[1], 0) / count;
-    let sxx = 0;
-    let sxy = 0;
-    let syy = 0;
-    for (const [x, y] of world) {
-      sxx += (x - mx) ** 2;
-      sxy += (x - mx) * (y - my);
-      syy += (y - my) ** 2;
-    }
-    const major = 0.5 * Math.atan2(2 * sxy, sxx - syy);
-    const yaw = major + Math.PI / 2;
-    const extent = (angle: number): [number, number] => {
-      const proj = world.map(([x, y]) => x * Math.cos(angle) + y * Math.sin(angle));
-      return [Math.min(...proj), Math.max(...proj)];
-    };
-    const [minorLo, minorHi] = extent(yaw);
-    const [majorLo, majorHi] = extent(major);
-    const u = (majorLo + majorHi) / 2;
-    const v = (minorLo + minorHi) / 2;
-    const cx = u * Math.cos(major) + v * Math.cos(yaw);
-    const cy = u * Math.sin(major) + v * Math.sin(yaw);
-    const bottom = Math.min(...zs);
-    const top = Math.max(...zs);
-    const base = data.xpos.subarray(this.baseBody * 3, this.baseBody * 3 + 3);
-    return {
-      center: [cx, cy, (bottom + top) / 2],
-      bottom,
-      top,
-      yaw,
-      width: minorHi - minorLo,
-      distance: Math.hypot(cx - base[0], cy - base[1]),
-    };
+    const shape = objectShape(this.physics, name);
+    const base = this.physics.data.xpos.subarray(this.baseBody * 3, this.baseBody * 3 + 3);
+    return { ...shape, distance: Math.hypot(shape.center[0] - base[0], shape.center[1] - base[1]) };
   }
 
   private label(name: string): string {

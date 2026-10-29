@@ -1,0 +1,200 @@
+// Building blocks of the run panel: who did what (models by name, time, cost), the developed
+// versions with their verdicts, the robots' steps and the receipt.
+
+import type { RunCard } from '../ayna/client';
+import type { PlannedStep, Refusal } from '../ayna/dispatch';
+import type { Step, TraceEvent } from '../ayna/run';
+import type { Receipt } from '../ayna/verify';
+
+export const MODEL_OF: Record<Step, string> = {
+  listen: 'Voice Transcribe',
+  instruct: 'Muse Spark',
+  imagine: 'Muse Image',
+  check: 'SAM 3.1',
+  judge: 'Muse Spark',
+  plan: 'Muse Spark',
+  execute: 'Robots',
+  verify: 'Verifier',
+  verdict: 'Muse Spark',
+};
+
+export function h<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+const seconds = (ms: number): string => (ms >= 10_000 ? `${Math.round(ms / 1000)}s` : `${(ms / 1000).toFixed(1)}s`);
+
+/** The live log of model calls. */
+export function timeline(): { root: HTMLElement; add(event: TraceEvent): void; clear(): void } {
+  const root = h('ol', 'timeline');
+  root.setAttribute('aria-live', 'polite');
+  let working: HTMLElement | null = null;
+  return {
+    root,
+    clear() {
+      root.replaceChildren();
+      working = null;
+    },
+    add(event) {
+      const model = event.step === 'execute' ? event.text.split(':')[0] : MODEL_OF[event.step];
+      if (event.state === 'start') {
+        working?.remove();
+        working = h('li', 'timeline__row timeline__row--working');
+        working.append(h('span', 'timeline__pulse'), h('span', 'eyebrow', model), h('span', 'timeline__text', event.text));
+        root.append(working);
+        return;
+      }
+      working?.remove();
+      working = null;
+      const row = h('li', `timeline__row timeline__row--${event.state}`);
+      const tone = event.state === 'fail' ? 'dot--orange' : event.state === 'done' ? 'dot--lime' : '';
+      row.append(h('span', `dot ${tone}`), h('span', 'eyebrow', model), h('span', 'timeline__text', event.text));
+      const usage = event.usage ?? [];
+      if (usage.length) {
+        const ms = Math.max(...usage.map((u) => u.ms));
+        const cost = usage.reduce((s, u) => s + u.costUsd, 0);
+        const meter = h('span', 'timeline__meter');
+        meter.append(h('span', 'num', seconds(ms)));
+        if (cost > 0) meter.append(h('span', 'timeline__cost', `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(3)}`));
+        row.append(meter);
+      }
+      root.append(row);
+      row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    },
+  };
+}
+
+export interface VersionView {
+  id: string;
+  image: string;
+  passed: boolean;
+  reasons: string[];
+  chosen: boolean;
+}
+
+/** The developed versions of the after photo, each with SAM 3.1's verdict. */
+export function versions(onPick: (id: string) => void): { root: HTMLElement; set(list: VersionView[]): void } {
+  const root = h('div', 'versions');
+  return {
+    root,
+    set(list) {
+      root.replaceChildren(
+        ...list.map((v) => {
+          const card = h('button', `version ${v.passed ? 'version--passed' : 'version--rejected'} ${v.chosen ? 'version--chosen' : ''}`);
+          card.type = 'button';
+          card.setAttribute('aria-label', `Version ${v.id}: ${v.passed ? 'kept every object' : `rejected, ${v.reasons.join('; ')}`}`);
+          const img = h('img');
+          img.src = v.image;
+          img.alt = '';
+          img.loading = 'lazy';
+          const label = h('span', 'version__label');
+          label.append(h('span', 'num', v.id.toUpperCase()), h('span', `dot ${v.passed ? 'dot--lime' : 'dot--orange'}`));
+          card.append(img, label);
+          if (!v.passed) card.append(h('span', 'version__reason', v.reasons[0] ?? 'rejected'));
+          if (v.chosen) card.append(h('span', 'version__chosen', 'Approved goal'));
+          card.addEventListener('click', () => onPick(v.id));
+          return card;
+        }),
+      );
+    },
+  };
+}
+
+export function stepsList(steps: PlannedStep[], refusals: Refusal[], robotLabel: (id: string) => string): { root: HTMLElement; mark(object: string, ok: boolean, reason: string): void } {
+  const root = h('ol', 'steps');
+  const rows = new Map<string, HTMLElement>();
+  steps.forEach((s, i) => {
+    const row = h('li', 'steps__row');
+    row.append(h('span', 'num steps__index', String(i + 1).padStart(2, '0')), h('span', 'steps__what', s.label), h('span', 'tag', robotLabel(s.robot)));
+    if (s.why) row.append(h('span', 'steps__why', s.why));
+    rows.set(s.object, row);
+    root.append(row);
+  });
+  for (const r of refusals) {
+    const row = h('li', 'steps__row steps__row--refused');
+    row.append(h('span', 'dot dot--orange'), h('span', 'steps__what', r.label), h('span', 'tag tag--orange', 'refused'), h('span', 'steps__why', r.reason));
+    root.append(row);
+  }
+  return {
+    root,
+    mark(object, ok, reason) {
+      const row = rows.get(object);
+      if (!row) return;
+      row.classList.add(ok ? 'steps__row--done' : 'steps__row--failed');
+      if (!ok) row.append(h('span', 'steps__why', reason));
+    },
+  };
+}
+
+export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean }): HTMLElement {
+  const card = h('section', 'receipt card');
+  card.setAttribute('aria-label', 'Receipt');
+  const head = h('header', 'receipt__head');
+  const score = h('div', 'receipt__score');
+  score.append(h('span', `num ${receipt.score >= 80 ? 'is-lime' : 'is-orange'}`, String(receipt.score)), h('span', 'eyebrow', 'match score'));
+  const summary = h('div', 'receipt__summary');
+  summary.append(
+    h('p', 'receipt__line', `${receipt.matched} of ${receipt.total} objects match the after photo`),
+    h('p', 'receipt__sub', `median error ${receipt.medianErrorCm.toFixed(1)} cm · tolerance 3 cm · ${receipt.moved.done}/${receipt.moved.asked} moves done`),
+  );
+  head.append(score, summary);
+  const table = h('ul', 'receipt__rows');
+  for (const r of receipt.results) {
+    const row = h('li', `receipt__row ${r.ok ? '' : 'receipt__row--miss'}`);
+    row.append(
+      h('span', `dot ${r.ok ? 'dot--lime' : 'dot--orange'}`),
+      h('span', 'receipt__object', r.label),
+      h('span', 'receipt__wanted', r.wanted === 'move' ? 'moved' : 'stays'),
+      h('span', 'num receipt__error', `${(r.errorM * 100).toFixed(1)}`),
+      h('span', 'receipt__unit', 'cm'),
+    );
+    if (r.note) row.append(h('span', 'receipt__note', r.note.replace(/^refused: /, 'refused — ').replace(/^failed: /, 'failed — ')));
+    table.append(row);
+  }
+  card.append(head, table);
+  if (extras.verdict) {
+    const verdict = h('blockquote', 'receipt__verdict');
+    verdict.append(h('span', 'eyebrow', 'Muse Spark'), h('p', '', extras.verdict));
+    card.append(verdict);
+  }
+  const foot = h('footer', 'receipt__foot');
+  foot.append(
+    h('span', '', extras.replay ? 'Replay · robots re-ran in the twin, no model calls' : 'Live run'),
+    h('span', 'num', `${Math.round(extras.seconds)}s`),
+    h('span', 'num', `$${extras.costUsd.toFixed(2)}`),
+  );
+  card.append(foot);
+  return card;
+}
+
+export function historyStrip(runs: RunCard[], onOpen: (id: string) => void): HTMLElement {
+  const root = h('div', 'history');
+  if (!runs.length) {
+    root.append(h('p', 'history__empty', 'No runs yet. The first one is saved here.'));
+    return root;
+  }
+  for (const run of runs) {
+    const card = h('button', 'history__run');
+    card.type = 'button';
+    if (run.thumb) {
+      const img = h('img');
+      img.src = run.thumb;
+      img.alt = '';
+      img.loading = 'lazy';
+      card.append(img);
+    }
+    const meta = h('span', 'history__meta');
+    meta.append(
+      h('span', `num ${run.score !== null && run.score >= 80 ? 'is-lime' : 'is-orange'}`, run.score === null ? '—' : String(run.score)),
+      h('span', 'history__request', run.request),
+      h('span', 'history__date', new Date(run.created).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })),
+    );
+    card.append(meta);
+    card.addEventListener('click', () => onOpen(run.id));
+    root.append(card);
+  }
+  return root;
+}

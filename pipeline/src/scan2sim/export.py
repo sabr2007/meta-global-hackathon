@@ -12,12 +12,12 @@ from typing import Any
 import numpy as np
 import trimesh
 
-from scan2sim import arm
+from scan2sim import robots
 from scan2sim.capture import Capture, CapturedRoom
 from scan2sim.frames import WorldFrame
 from scan2sim.lidar_mesh import FACE_CLASSES, LidarMesh
 from scan2sim.mjcf import scene_to_mjcf
-from scan2sim.mount import REACH_MAX, REACH_MIN
+from scan2sim.navgrid import box_footprint
 from scan2sim.scene import ScannedObject, SimScene
 
 BUNDLE_FORMAT = "scan2sim/scene@1"
@@ -60,6 +60,7 @@ def export_room_mesh(mesh: LidarMesh, frame: WorldFrame, path: Path) -> dict[str
 
 def _box_metadata(box) -> dict[str, Any]:
     width, height, depth = (box.half_size * 2).tolist()
+    footprint = box_footprint(box)
     return {
         "name": box.name,
         "kind": box.kind,
@@ -67,6 +68,7 @@ def _box_metadata(box) -> dict[str, Any]:
         "confidence": box.confidence,
         "dimensions_m": {"width": round(width, 3), "depth": round(depth, 3), "height": round(height, 3)},
         "center": [round(v, 4) for v in box.center.tolist()],
+        "yaw": round(float(np.arctan2(footprint.u[1], footprint.u[0])), 4),  # heading of the width axis
         "top_z": round(box.top_z, 4),
         "collides": box.collides,
         "attributes": box.attributes,
@@ -92,6 +94,7 @@ def scene_metadata(
         "room": {
             "label": scene.room_label,
             "floor_m": [round(v, 3) for v in (scene.floor.half_size[:2] * 2).tolist()],
+            "floor_polygon": None if scene.floor_polygon is None else np.round(scene.floor_polygon, 4).tolist(),
         },
         "frame": {
             "description": "world: meters, +Z up, floor at z=0, origin at floor centre",
@@ -103,7 +106,8 @@ def scene_metadata(
             for p in scene.probes
         ],
         "objects": [_object_metadata(o) for o in scene.objects],
-        "arm": _arm_metadata(scene.arm) if scene.arm else None,
+        "arm": robots.arm_info(scene.arm) if scene.arm else None,  # the stationary arm, as before `robots`
+        "robots": robots.metadata(scene),
         "camera": camera,
         "mesh": mesh_stats,
         "files": {"mjcf": "scene.xml", "mesh": "room_mesh.glb"},
@@ -126,28 +130,6 @@ def _object_metadata(obj: ScannedObject) -> dict[str, Any]:
         "physical": None
         if obj.mass_kg is None
         else {"mass_kg": round(obj.mass_kg, 4), "friction": round(obj.friction, 3), "reason": obj.physics_reason},
-    }
-
-
-def _arm_metadata(mount: arm.ArmMount) -> dict[str, Any]:
-    return {
-        "base": arm.LINK_NAMES[0],
-        "position": [round(v, 4) for v in mount.position.tolist()],
-        "yaw": round(mount.yaw, 4),
-        "pedestal_m": round(mount.pedestal_height, 3),
-        "support": mount.support,
-        "joints": list(arm.JOINT_NAMES),
-        "home": list(arm.HOME),
-        "keyframe": "home",
-        "grip_site": arm.GRIP_SITE,
-        "gripper": {
-            "actuator": arm.GRIPPER_ACTUATOR,
-            "open": arm.GRIPPER_OPEN,
-            "fingers": list(arm.FINGER_JOINTS),
-            "max_width": round(2 * arm.FINGER_TRAVEL, 4),
-            "tip_below_grip": round(arm.PALM_BOTTOM + arm.FINGER_LENGTH - arm.GRIP_POINT, 4),
-        },
-        "reach_m": [REACH_MIN, REACH_MAX],
     }
 
 
