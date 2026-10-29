@@ -68,7 +68,7 @@ async function main(): Promise<void> {
     physics.advance(0.5); // objects settle as in the app
     const objects: SceneObject[] = meta.objects!.map((o) => ({ name: o.name, label: o.label, concept: o.concept, size_m: o.size_m, start: o.start }));
     const robots = createRobots(physics, meta);
-    const fleet = fleetOf(physics, robots.robots);
+    const fleet = fleetOf(physics, robots.robots, robots.scene);
     const started = Date.now();
     const out = await runAyna(
       { ctx: { camera: meta.camera!, photo, objects, before: masks }, physics, fleet, meshes },

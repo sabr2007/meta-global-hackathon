@@ -133,7 +133,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
 
   const objects: SceneObject[] = meta.objects.map((o) => ({ name: o.name, label: o.label, concept: o.concept, size_m: o.size_m, start: o.start }));
   const robotFleet: RobotFleet = createRobots(physics, meta);
-  const fleet: FleetRobot[] = fleetOf(physics, robotFleet.robots);
+  const fleet: FleetRobot[] = fleetOf(physics, robotFleet.robots, robotFleet.scene);
 
   // Light and orbit around the objects.
   const bounds = new THREE.Box3().setFromObject(objectLayer.root);
