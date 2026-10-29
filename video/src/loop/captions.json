@@ -1,0 +1,14 @@
+{
+ "note": "On-screen captions of AynaLoop, also written to web/public/landing/ayna-loop.vtt by scripts/render.mjs. Frames at 30 fps; {placeholders} come from the featured run.",
+ "cues": [
+  { "key": "request", "from": 4, "to": 92, "chip": "The request", "text": "“{request}”" },
+  { "key": "segment", "from": 96, "to": 216, "chip": "SAM 3.1", "text": "Finds every object on your photo" },
+  { "key": "instruct", "from": 216, "to": 336, "chip": "Muse Spark", "text": "Writes the edit for this exact photo" },
+  { "key": "develop", "from": 342, "to": 448, "chip": "Muse Image", "text": "Develops {versions} versions of the after photo" },
+  { "key": "check", "from": 448, "to": 504, "chip": "SAM 3.1", "text": "Checks every object in every version" },
+  { "key": "choose", "from": 504, "to": 576, "chip": "Muse Spark", "text": "Picks the version that follows the request" },
+  { "key": "wipe", "from": 604, "to": 786, "chip": "The after photo", "text": "It is the plan you approve before a robot touches anything" },
+  { "key": "plan", "from": 786, "to": 936, "chip": "Muse Spark", "text": "Gives each move to a robot that can do it, or says why not" },
+  { "key": "receipt", "from": 936, "to": 1116, "chip": "SAM 3D Objects · twin", "text": "Robots rehearse on SAM 3D bodies; every object is measured" }
+ ]
+}

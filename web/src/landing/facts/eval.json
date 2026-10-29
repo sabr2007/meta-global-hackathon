@@ -1,0 +1,97 @@
+{
+ "source": "Headless runs of the full Ayna loop: live Meta models, robots in MuJoCo, the same verifier as the app (web/scripts/eval.ts).",
+ "generated": "2026-10-29T02:06:42.728Z",
+ "runs": 3,
+ "attempted": 3,
+ "scans": [
+  "desk-sam3d"
+ ],
+ "requests": [
+  "Tidy up my desk",
+  "Make room for my laptop: clear the space in front of it",
+  "Group the orange toys together next to the yellow cylinder"
+ ],
+ "objects": {
+  "checked": 21,
+  "matched": 18
+ },
+ "medianErrorCm": {
+  "median": 0.18,
+  "min": 0.12,
+  "max": 0.19
+ },
+ "versions": {
+  "developed": 11,
+  "rejected": 5
+ },
+ "moves": {
+  "asked": 9,
+  "done": 6
+ },
+ "refusals": {
+  "count": 3,
+  "runsWithRefusals": 2
+ },
+ "failedSteps": 0,
+ "score": {
+  "median": 86
+ },
+ "costUsd": {
+  "median": 0.074,
+  "total": 0.23
+ },
+ "seconds": {
+  "median": 45,
+  "min": 37,
+  "max": 81
+ },
+ "list": [
+  {
+   "run": "20261029-015217-2xen",
+   "scan": "desk-sam3d",
+   "request": "Tidy up my desk",
+   "score": 86,
+   "matched": 6,
+   "total": 7,
+   "medianErrorCm": 0.18,
+   "candidates": 6,
+   "rejected": 5,
+   "refusals": [
+    "white mouse: target overlaps where obj_1_white_keyboard stays, blocked by 1 with no free space",
+    "yellow cylinder: object 10.8 cm wide cannot be done by arm gripper opens 11 cm per scan"
+   ],
+   "seconds": 81,
+   "costUsd": 0.102
+  },
+  {
+   "run": "20261029-015552-4e9u",
+   "scan": "desk-sam3d",
+   "request": "Make room for my laptop: clear the space in front of it",
+   "score": 86,
+   "matched": 6,
+   "total": 7,
+   "medianErrorCm": 0.12,
+   "candidates": 3,
+   "rejected": 0,
+   "refusals": [
+    "white mouse: white mouse cannot be moved because its target is only 0.24 m from the base, too close for the arm."
+   ],
+   "seconds": 37,
+   "costUsd": 0.074
+  },
+  {
+   "run": "20261029-015629-yxiu",
+   "scan": "desk-sam3d",
+   "request": "Group the orange toys together next to the yellow cylinder",
+   "score": 86,
+   "matched": 6,
+   "total": 7,
+   "medianErrorCm": 0.19,
+   "candidates": 2,
+   "rejected": 0,
+   "refusals": [],
+   "seconds": 45,
+   "costUsd": 0.057
+  }
+ ]
+}
