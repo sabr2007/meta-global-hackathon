@@ -12,7 +12,8 @@ import { models, scans, verdict } from '../src/ayna/client';
 import { fleetOf, runHeadless } from '../src/ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../src/ayna/glb';
 import type { BeforeMask, SceneObject } from '../src/ayna/goals';
-import { runAyna } from '../src/ayna/pipeline';
+import { refusedInEdit, runAyna } from '../src/ayna/pipeline';
+import type { Usage } from '../src/ayna/run';
 import type { SceneMeta } from '../src/scene/bundle';
 import { physicsFrom } from '../src/sim/physics';
 import { createRobots } from '../src/sim/robots';
@@ -48,11 +49,11 @@ async function main(): Promise<void> {
   const { session, owner } = await login();
   const api = models(session);
 
-  const spoken = new Map<string, string>();
+  const spoken = new Map<string, Usage[]>(); // request -> the Voice Transcribe call that heard it
   for (const file of voices) {
     const heard = await api.listen(new Uint8Array(readFileSync(file)));
     console.log(`Voice Transcribe heard: "${heard.text}" (${heard.usage[0]?.ms} ms)`);
-    spoken.set(heard.text, file);
+    spoken.set(heard.text, heard.usage);
     requests.push(heard.text);
   }
   for (const request of requests) {
@@ -78,7 +79,13 @@ async function main(): Promise<void> {
       },
       spoken.has(request) ? 'voice' : 'eval',
     );
-    if (spoken.has(request)) out.record.transcript = request;
+    const heard = spoken.get(request);
+    if (heard) {
+      // The run starts where the app's does: with the spoken request, so its replay shows Voice Transcribe too.
+      out.record.transcript = request;
+      out.record.trace.unshift({ step: 'listen', state: 'done', text: `“${request}”`, usage: heard, at: 0 });
+      out.record.costUsd += heard.reduce((sum, u) => sum + u.costUsd, 0);
+    }
     const { record } = out;
     if (!args('no-save').length && !process.argv.includes('--no-save')) await scans.saveRun(session, owner, scanId, record, out.files);
     const rejected = record.candidates.filter((c) => !c.passed).length;
@@ -98,6 +105,8 @@ async function main(): Promise<void> {
       candidates: record.candidates.length,
       rejected,
       refusals: record.refusals.map((r) => `${r.label}: ${r.reason}`),
+      // moves the request implied that Spark kept out of the edit (they count as asked and not done)
+      refusedBeforeEdit: record.instruction ? [...refusedInEdit(record.instruction, objects)].map(([name, reason]) => `${name}: ${reason}`) : [],
       failedSteps: record.executed.filter((e) => !e.ok).map((e) => `${e.object}: ${e.reason}`),
       costUsd: Number(record.costUsd.toFixed(4)),
       seconds: Math.round((Date.now() - started) / 1000),

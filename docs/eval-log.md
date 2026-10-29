@@ -265,6 +265,10 @@ moves are done, but an object that should stay gets nudged. During this round pr
 store (the free plan's operations quota) and moved to the snapshot store after run 2; the loop itself did
 not change.
 
+A note on v8's "refusals: 0": the log counted refusals in the robots' plans only. Moves Spark left out of
+the edit before drawing (no robot could do them) were counted as asked and not done in the score, but were
+not listed in the log until after v8 (`refusedBeforeEdit` in later lines).
+
 After v8, one more step went in: when every version of a round is rejected, Muse Spark decides what to do
 next (redraw with its own note to the editor, narrow the request, or stop) instead of a fixed second
 round. Verified live once on the desk ("Line the small objects up along the back edge", run ...-ekwl):
