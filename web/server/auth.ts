@@ -14,7 +14,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'owner' | 'judge' | 'member';
+  role: 'owner' | 'judge' | 'member' | 'guest';
 }
 
 interface UserRecord extends User {
@@ -88,6 +88,14 @@ function userFromSession(value: string | null): User | null {
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
   const { u, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { u: User; exp: number };
   return exp > Date.now() ? u : null;
+}
+
+/** A visitor without an account, known by a keyed hash of their IP address (Vercel sets x-real-ip): live
+ * runs are open to everyone, and the daily allowance follows the visitor rather than a cookie. */
+export function guestUser(request: Request): User {
+  const ip = request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
+  const id = createHmac('sha256', secret()).update(`guest:${ip}`).digest('hex').slice(0, 12);
+  return { id: `guest-${id}`, email: '', name: 'Visitor', role: 'guest' };
 }
 
 interface DeviceRecord {

@@ -1,4 +1,4 @@
-// "Mirrors": every scan the account can open, the newest one large, plus pairing the iPhone scanner.
+// "Mirrors": every scan, open to everyone, the featured one large; signed in, also pairing the iPhone scanner.
 
 import { account, scans, type ScanCard, type Session, type User } from '../ayna/client';
 import { h } from './panel';
@@ -66,12 +66,13 @@ export async function mirrorsPage(root: HTMLElement, session: Session, user: Use
   const page = h('section', 'mirrors');
   page.setAttribute('aria-labelledby', 'mirrors-title');
   const intro = h('header', 'mirrors__intro');
-  const title = h('h1', 'title mirrors__title', user ? 'Your mirrors' : 'The demo mirror');
+  const title = h('h1', 'title mirrors__title', 'Mirrors');
   title.id = 'mirrors-title';
+  const lede = 'Each mirror is a real table scanned with an iPhone, and its physics twin. Open one, say what it should look like, and watch the robots try.';
   intro.append(
-    h('span', 'eyebrow', user ? `${user.email}` : 'Guest · replays only'),
+    h('span', 'eyebrow', user ? `${user.email}` : 'Scanned with an iPhone · open to everyone'),
     title,
-    h('p', 'mirrors__lede', user ? 'Each mirror is a scanned table and its physics twin. Open one, say what it should look like, and watch the robots try.' : 'A real desk, scanned with an iPhone. Replays of saved runs are free; sign in to run Ayna live.'),
+    h('p', 'mirrors__lede', user ? lede : `${lede} Replays are free; live runs call Meta models, five a day for each visitor.`),
   );
   page.append(intro);
   if (!list.length) {

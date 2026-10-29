@@ -179,10 +179,12 @@ rather than independent perception noise; the noise rows are the stress test.
 
 ## Try it
 
-- **Guest:** open the [live demo](https://ayna-brown.vercel.app/app/) and replay a saved run (free, no model
-  calls: the models' outputs come from the run record and the robots re-run in the twin).
-- **Live:** sign in (judges: credentials are in the submission form) → open a mirror → hold the mic or type
-  "tidy up my desk" → watch the models work → drag the before/after slider → **Do it**.
+- **No sign-in:** open [the app](https://ayna-brown.vercel.app/app/); every mirror is open to everyone.
+  Replay a saved run (free, no model calls: the models' outputs come from the run record and the robots
+  re-run in the twin).
+- **Live:** open a mirror → hold the mic or type "tidy up my desk" → watch the models work → drag the
+  before/after slider → **Do it**. Live runs are open to everyone within a daily allowance (5 per visitor, 30
+  for all visitors together, about $3 of Meta calls), and each one is saved to the mirror's history.
 - **Who decides what, in saved runs:** [Spark redraws after a rejected round, then the person overrules its
   pick](https://ayna-brown.vercel.app/app/#/scan/f5757ba8142d/desk-sam3d/run/20261029-050201-yea3)
   ("Draw again: …", "You picked version 2c over Muse Spark's 2a") ·

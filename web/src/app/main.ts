@@ -8,8 +8,8 @@ import { h } from './panel';
 import { scanPage } from './scanPage';
 
 // Routes (hash, so the static host needs no rewrites):
-//   #/                      mirrors (the guest sees the demo mirror)
-//   #/login                 sign in
+//   #/                      mirrors: every scan, open to everyone
+//   #/login                 sign in (the owner, to pair the iPhone scanner; not linked from the app)
 //   #/scan/<owner>/<id>[/run/<run>]   one mirror; ?autoplay replays that run (or its best) in one take
 //   ?autoplay alone         the demo mirror's featured run (AYNA_DEMO_RUN), for the video
 
@@ -34,10 +34,6 @@ function header(): HTMLElement {
       render();
     });
     nav.append(h('span', 'topbar__user', user.email), out);
-  } else {
-    const signIn = h('a', 'pill pill--small pill--lime', 'Sign in');
-    signIn.href = '#/login';
-    nav.append(signIn);
   }
   bar.append(logo(20, '/'), nav);
   return bar;

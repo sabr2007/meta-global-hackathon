@@ -1043,6 +1043,12 @@ body {
   font-size: 1.5rem;
 }
 
+/* three figures in a narrow card: closer together, and a line break before one is cut off */
+.mirror--small .mirror__figures {
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+}
+
 .pairing {
   display: grid;
   gap: var(--space-3);

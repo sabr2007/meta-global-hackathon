@@ -1,4 +1,6 @@
-// Scans ("mirrors"), their saved Ayna runs, iPhone uploads, and file access.
+// Scans ("mirrors"), their saved Ayna runs, iPhone uploads, and file access. Every scan is open to
+// everyone: anyone may open it, replay its runs and run Ayna live on it (within the daily allowance,
+// quota.ts). The scan's members save runs freely; other visitors within their allowance, and only their own.
 // Layout in the private store:
 //   scans/<owner>/<scan>/meta.json                scan card: name, status, counts
 //   scans/<owner>/<scan>/bundle/<file>            scene bundle from scan2sim
@@ -8,8 +10,9 @@
 
 import { randomBytes } from 'node:crypto';
 import type { User } from '../auth.js';
-import { currentUser } from '../auth.js';
-import { HttpError, json, readJson, requireUser, type Route } from '../http.js';
+import { currentUser, guestUser } from '../auth.js';
+import { HttpError, json, limitMessage, readJson, requireUser, type Route } from '../http.js';
+import { spend } from '../quota.js';
 import { checkFileSignature, getJson, linkExpiry, putJson, store } from '../store.js';
 
 const MAX_RUN_FILE_BYTES = 4 * 1024 * 1024;
@@ -45,8 +48,7 @@ export function contentType(key: string): string {
   return CONTENT_TYPES[key.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
 }
 
-/** The guest demo: one scan anyone may open (replays only), and the run the one-take plays
- * (AYNA_DEMO_RUN; without it, the best run). */
+/** The featured scan (listed first) and the run the one-take plays (AYNA_DEMO_RUN; without it, the best run). */
 function demoScan(): { owner: string; id: string; run: string | null } | null {
   const [owner, id] = (process.env.AYNA_DEMO_SCAN ?? '').split('/');
   const run = process.env.AYNA_DEMO_RUN ?? '';
@@ -65,15 +67,22 @@ function isMember(user: User | null, meta: ScanMeta | null): boolean {
   return !!user && !!meta && (meta.owner === user.id || (meta.members ?? []).includes(user.id));
 }
 
-async function canRead(user: User | null, owner: string, scan: string): Promise<boolean> {
-  const demo = demoScan();
-  if (demo !== null && demo.owner === owner && demo.id === scan) return true;
-  return isMember(user, await scanMeta(owner, scan));
+async function existingScan(owner: string, scan: string): Promise<ScanMeta> {
+  checkIds(owner, scan);
+  const meta = await scanMeta(owner, scan);
+  if (!meta) throw new HttpError(404, 'Scan not found');
+  return meta;
 }
 
-async function requireMember(request: Request, owner: string, scan: string): Promise<User> {
-  const user = await requireUser(request);
-  if (!isMember(user, await scanMeta(owner, scan))) throw new HttpError(403, 'Only people the scan is shared with can save runs');
+/** Who saves a run's record or pictures: the scan's members freely; anyone else within their daily
+ * allowance, and never over a run someone else made (the showcase runs stay as they are). */
+async function saver(request: Request, owner: string, scan: string, run: string, kind: 'save' | 'file'): Promise<User> {
+  const meta = await existingScan(owner, scan);
+  const user = (await currentUser(request)) ?? guestUser(request);
+  if (isMember(user, meta)) return user;
+  const existing = await getJson<{ by?: string }>(store(), `scans/${owner}/${scan}/runs/${run}/run.json`);
+  if (existing && existing.by !== user.id) throw new HttpError(403, 'Only the person who made a run can change it');
+  if ((await spend(user, kind)) < 0) throw new HttpError(429, limitMessage(user, kind));
   return user;
 }
 
@@ -90,42 +99,33 @@ export const scanRoutes: Route[] = [
       const user = await currentUser(request);
       const demo = demoScan();
       const metas: ScanMeta[] = [];
-      if (user) {
-        const keys = await store().list('scans/');
-        for (const key of keys.filter((k) => /^scans\/[^/]+\/[^/]+\/meta\.json$/.test(k))) {
-          const meta = await getJson<ScanMeta>(store(), key);
-          if (isMember(user, meta)) metas.push({ ...meta!, runs: await runCount(meta!.owner, meta!.id) });
-        }
-      } else if (demo) {
-        const meta = await scanMeta(demo.owner, demo.id);
-        if (meta) metas.push({ ...meta, members: undefined, runs: await runCount(demo.owner, demo.id) });
+      for (const key of (await store().list('scans/')).filter((k) => /^scans\/[^/]+\/[^/]+\/meta\.json$/.test(k))) {
+        const meta = await getJson<ScanMeta>(store(), key);
+        if (meta) metas.push({ ...meta, members: undefined, runs: await runCount(meta.owner, meta.id) });
       }
-      metas.sort((a, b) => b.created.localeCompare(a.created));
+      // The featured scan first, then the newest.
+      const featured = (m: ScanMeta): number => Number(demo !== null && m.owner === demo.owner && m.id === demo.id);
+      metas.sort((a, b) => featured(b) - featured(a) || b.created.localeCompare(a.created));
       return json({ user, demo, scans: metas });
     },
   },
   {
     method: 'GET',
     path: '/api/scans/:owner/:scan',
-    run: async (request, { owner, scan }) => {
-      checkIds(owner, scan);
-      const user = await currentUser(request);
-      if (!(await canRead(user, owner, scan))) throw new HttpError(user ? 403 : 401, 'Sign in to open this scan');
-      const meta = await scanMeta(owner, scan);
-      if (!meta) throw new HttpError(404, 'Scan not found');
+    run: async (_request, { owner, scan }) => {
+      const meta = await existingScan(owner, scan);
       const prefix = `scans/${owner}/${scan}/bundle/`;
       const keys = await store().list(prefix);
       const files: Record<string, string> = {};
       await Promise.all(keys.map(async (key) => (files[key.slice(prefix.length)] = await store().readUrl(key))));
-      return json({ meta, files, live: isMember(user, meta) });
+      return json({ meta: { ...meta, members: undefined }, files, live: meta.status === 'ready' });
     },
   },
   {
     method: 'GET',
     path: '/api/scans/:owner/:scan/runs',
-    run: async (request, { owner, scan }) => {
-      checkIds(owner, scan);
-      if (!(await canRead(await currentUser(request), owner, scan))) throw new HttpError(401, 'Sign in to see these runs');
+    run: async (_request, { owner, scan }) => {
+      await existingScan(owner, scan);
       const keys = (await store().list(`scans/${owner}/${scan}/runs/`)).filter((k) => k.endsWith('/run.json'));
       const runs = await Promise.all(
         keys.map(async (key) => {
@@ -152,10 +152,9 @@ export const scanRoutes: Route[] = [
   {
     method: 'GET',
     path: '/api/scans/:owner/:scan/runs/:run',
-    run: async (request, { owner, scan, run }) => {
-      checkIds(owner, scan);
+    run: async (_request, { owner, scan, run }) => {
+      await existingScan(owner, scan);
       if (!ID_PATTERN.test(run)) throw new HttpError(400, 'Bad run id');
-      if (!(await canRead(await currentUser(request), owner, scan))) throw new HttpError(401, 'Sign in to see this run');
       const prefix = `scans/${owner}/${scan}/runs/${run}/`;
       const record = await getJson<Record<string, unknown>>(store(), `${prefix}run.json`);
       if (!record) throw new HttpError(404, 'Run not found');
@@ -171,10 +170,9 @@ export const scanRoutes: Route[] = [
     // goal images, metric goals and the success rule the receipt uses. Links last one hour.
     method: 'GET',
     path: '/api/scans/:owner/:scan/runs/:run/episode',
-    run: async (request, { owner, scan, run }) => {
-      checkIds(owner, scan);
+    run: async (_request, { owner, scan, run }) => {
+      await existingScan(owner, scan);
       if (!ID_PATTERN.test(run)) throw new HttpError(400, 'Bad run id');
-      if (!(await canRead(await currentUser(request), owner, scan))) throw new HttpError(401, 'Sign in to export this run');
       const prefix = `scans/${owner}/${scan}/runs/${run}/`;
       const record = await getJson<Record<string, any>>(store(), `${prefix}run.json`);
       if (!record) throw new HttpError(404, 'Run not found');
@@ -222,9 +220,8 @@ export const scanRoutes: Route[] = [
     method: 'PUT',
     path: '/api/scans/:owner/:scan/runs/:run/files/:name',
     run: async (request, { owner, scan, run, name }) => {
-      checkIds(owner, scan);
-      await requireMember(request, owner, scan);
       if (!ID_PATTERN.test(run) || !FILE_PATTERN.test(name)) throw new HttpError(400, 'Bad run file name');
+      await saver(request, owner, scan, run, 'file');
       const bytes = new Uint8Array(await request.arrayBuffer());
       if (!bytes.length || bytes.length > MAX_RUN_FILE_BYTES) throw new HttpError(413, 'Run pictures must be under 4 MB');
       await store().putBytes(`scans/${owner}/${scan}/runs/${run}/${name}`, bytes, contentType(name));
@@ -235,9 +232,8 @@ export const scanRoutes: Route[] = [
     method: 'PUT',
     path: '/api/scans/:owner/:scan/runs/:run',
     run: async (request, { owner, scan, run }) => {
-      checkIds(owner, scan);
-      const user = await requireMember(request, owner, scan);
       if (!ID_PATTERN.test(run)) throw new HttpError(400, 'Bad run id');
+      const user = await saver(request, owner, scan, run, 'save');
       const text = await request.text();
       if (text.length > MAX_RUN_JSON_BYTES) throw new HttpError(413, 'Run record too large');
       const record = JSON.parse(text) as Record<string, unknown>;

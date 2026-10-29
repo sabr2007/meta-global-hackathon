@@ -1,6 +1,6 @@
 // One mirror: the photo and its physical twin on the stage, Ayna's run on the panel.
-// Live runs call Meta models through the server (signed-in members only); saved runs replay for
-// free: the models' outputs come from the run record and the robots re-run in the twin.
+// Live runs call Meta models through the server (open to everyone, within a daily allowance); saved
+// runs replay for free: the models' outputs come from the run record and the robots re-run in the twin.
 
 import { models, scans, verdict as sparkVerdict, type RunCard, type Session, type User } from '../ayna/client';
 import type { ObjectGoal } from '../ayna/goals';
@@ -89,7 +89,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     chips.append(chip);
   }
   const guest = h('p', 'scan__guest');
-  guest.innerHTML = live ? '' : 'Live runs call Meta models and need an account. <a href="#/login">Sign in</a>, or replay a saved run below — free, no model calls.';
+  guest.textContent = live ? '' : 'Live runs open once this twin is built. Saved runs replay below — free, no model calls.';
 
   const log = timeline();
   const logBlock = h('section', 'block');

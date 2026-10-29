@@ -1,6 +1,6 @@
 // Small HTTP helpers shared by the routes: errors, JSON, body parsing, cookies and the live-call gate.
 
-import { currentUser, type User } from './auth.js';
+import { currentUser, guestUser, type User } from './auth.js';
 import { spend, type Allowance } from './quota.js';
 
 export interface Route {
@@ -49,16 +49,23 @@ export function cookie(request: Request, name: string): string | null {
   return null;
 }
 
+/** Pairing the iPhone scanner and its uploads need an account. */
 export async function requireUser(request: Request): Promise<User> {
   const user = await currentUser(request);
-  if (!user) throw new HttpError(401, 'Sign in to run Ayna live. The guest demo replays saved runs.');
+  if (!user) throw new HttpError(401, 'This needs an account (the owner pairs the iPhone scanner).');
   return user;
 }
 
-/** Live model calls need a signed-in user with allowance left today. */
+export function limitMessage(user: User, kind: Allowance): string {
+  return user.role === 'guest'
+    ? 'Today’s live runs for visitors are used up (5 each, 30 for everyone a day). Replays stay free.'
+    : `Daily limit reached for ${kind} calls. Replays stay free.`;
+}
+
+/** Live model calls are open to everyone, within the daily allowance (per account, or per visitor and for
+ * all visitors together). */
 export async function liveGate(request: Request, kind: Allowance): Promise<User> {
-  const user = await requireUser(request);
-  const left = await spend(user, kind);
-  if (left < 0) throw new HttpError(429, `Daily limit reached for ${kind} calls. Replays stay free.`);
+  const user = (await currentUser(request)) ?? guestUser(request);
+  if ((await spend(user, kind)) < 0) throw new HttpError(429, limitMessage(user, kind));
   return user;
 }
