@@ -24,7 +24,7 @@ export interface RunHooks {
   /** The checked plan, before the robots start (the browser shows it and flies into the twin). */
   onPlan?(planned: Dispatch): Promise<void>;
   render?(): Promise<string | null>;
-  verdict?(input: { request: string; after: string; render: string; results: string[]; score: number }): Promise<{ verdict: { verdict: string; matches_request: boolean }; usage: TraceEvent['usage'] }>;
+  verdict?(input: { request: string; after: string; render?: string; results: string[]; score: number }): Promise<{ verdict: { verdict: string; matches_request: boolean }; usage: TraceEvent['usage'] }>;
   trace?: Trace;
 }
 
@@ -168,9 +168,9 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
 
     const render = hooks.render ? await hooks.render() : null;
     if (render) files['render.jpg'] = render;
-    if (render && hooks.verdict) {
+    if (hooks.verdict) {
       trace({ step: 'verdict', state: 'start', text: 'Muse Spark compares the result with the goal' });
-      const said = await hooks.verdict({ request, after: chosen.image, render, results: resultLines(receipt), score: receipt.score });
+      const said = await hooks.verdict({ request, after: chosen.image, render: render ?? undefined, results: resultLines(receipt), score: receipt.score });
       record.verdict = said.verdict;
       trace({ step: 'verdict', state: 'done', text: said.verdict.verdict, usage: said.usage });
     }

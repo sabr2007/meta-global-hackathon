@@ -65,7 +65,7 @@ const modelRoutes: Route[] = [
     path: '/api/ayna/verdict',
     run: async (request) => {
       await liveGate(request, 'step');
-      return json(await ayna.verdict(await readJson<ayna.VerdictInput>(request, ['request', 'after', 'render', 'results', 'score'])));
+      return json(await ayna.verdict(await readJson<ayna.VerdictInput>(request, ['request', 'after', 'results', 'score'])));
     },
   },
 ];

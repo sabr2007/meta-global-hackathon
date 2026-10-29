@@ -48,7 +48,7 @@ export function models(session: Session): Models & { listen(wav: Blob | Uint8Arr
   };
 }
 
-export function verdict(session: Session, input: { request: string; after: string; render: string; results: string[]; score: number }): Promise<{ verdict: { verdict: string; matches_request: boolean }; usage: Usage[] }> {
+export function verdict(session: Session, input: { request: string; after: string; render?: string; results: string[]; score: number }): Promise<{ verdict: { verdict: string; matches_request: boolean }; usage: Usage[] }> {
   return post(session, '/api/ayna/verdict', input);
 }
 

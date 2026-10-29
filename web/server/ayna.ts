@@ -341,7 +341,7 @@ objects by what they are (e.g. "white mouse"), never by id.`;
 export interface VerdictInput {
   request: string;
   after: string; // the approved imagined photo
-  render: string; // the simulation rendered from the photo's camera
+  render?: string; // the simulation rendered from the photo's camera (absent in headless runs)
   results: string[]; // one line per object: error cm, IoU, status
   score: number;
 }
@@ -357,15 +357,15 @@ const VERDICT_SCHEMA = {
 };
 
 export async function verdict(input: VerdictInput): Promise<{ verdict: { verdict: string; matches_request: boolean }; usage: Usage[] }> {
-  const { value, usage } = await sparkJson<{ verdict: string; matches_request: boolean }>('ayna_verdict', VERDICT_SCHEMA, [
+  const content: InputContent[] = [
     {
       type: 'input_text',
-      text: `Request: "${input.request}". Image 1 is the approved goal photo. Image 2 is the robots' result in the
-physics twin, rendered from the same camera. Measured per object:\n${input.results.join('\n')}\nOverall score ${input.score}/100.
+      text: `Request: "${input.request}". Image 1 is the approved goal photo.${input.render ? " Image 2 is the robots' result in the physics twin, rendered from the same camera." : ''} Measured in the twin, per object:\n${input.results.join('\n')}\nOverall score ${input.score}/100.
 Say whether the result matches the goal and what is off, using the measurements.`,
     },
     { type: 'input_image', image_url: input.after },
-    { type: 'input_image', image_url: input.render },
-  ]);
+  ];
+  if (input.render) content.push({ type: 'input_image', image_url: input.render });
+  const { value, usage } = await sparkJson<{ verdict: string; matches_request: boolean }>('ayna_verdict', VERDICT_SCHEMA, content);
   return { verdict: value, usage: [usage] };
 }

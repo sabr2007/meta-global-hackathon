@@ -3,11 +3,12 @@
 //
 //   npm run dev            # in another terminal: the API on :5190
 //   npx tsx scripts/eval.ts --scan desk-sam3d --request "Tidy up my desk" [--request ...] [--no-save]
+//   npx tsx scripts/eval.ts --scan desk-sam3d --voice request.wav      # spoken request via Voice Transcribe
 
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import loadMujoco from '@mujoco/mujoco';
-import { models, scans, type Session } from '../src/ayna/client';
+import { models, scans, verdict, type Session } from '../src/ayna/client';
 import { fleetOf, runHeadless } from '../src/ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../src/ayna/glb';
 import type { BeforeMask, SceneObject } from '../src/ayna/goals';
@@ -36,7 +37,8 @@ async function login(): Promise<{ session: Session; owner: string }> {
 async function main(): Promise<void> {
   const scanId = args('scan')[0] ?? 'desk-sam3d';
   const requests = args('request');
-  if (!requests.length) throw new Error('pass at least one --request');
+  const voices = args('voice');
+  if (!requests.length && !voices.length) throw new Error('pass at least one --request or --voice');
   const dir = path.join(ROOT, '..', 'data', 'scenes', scanId);
   if (!existsSync(dir)) throw new Error(`no bundle at ${dir}`);
   const meta = JSON.parse(readFileSync(path.join(dir, 'scene.json'), 'utf8')) as SceneMeta;
@@ -54,6 +56,13 @@ async function main(): Promise<void> {
   const { session, owner } = await login();
   const api = models(session);
 
+  const spoken = new Map<string, string>();
+  for (const file of voices) {
+    const heard = await api.listen(new Uint8Array(readFileSync(file)));
+    console.log(`Voice Transcribe heard: "${heard.text}" (${heard.usage[0]?.ms} ms)`);
+    spoken.set(heard.text, file);
+    requests.push(heard.text);
+  }
   for (const request of requests) {
     const physics = physicsFrom(mujoco, mjcf);
     physics.advance(0.5); // objects settle as in the app
@@ -72,10 +81,12 @@ async function main(): Promise<void> {
           const end = physics.time() + seconds;
           while (physics.time() < end) physics.advance(0.05, () => fleet.forEach((r) => r.update()));
         },
+        verdict: (input) => verdict(session, input),
         trace: (e) => console.log(`  [${e.step}] ${e.state} ${e.text.slice(0, 160)}`),
       },
-      'eval',
+      spoken.has(request) ? 'voice' : 'eval',
     );
+    if (spoken.has(request)) out.record.transcript = request;
     const { record } = out;
     if (!args('no-save').length && !process.argv.includes('--no-save')) await scans.saveRun(session, owner, scanId, record, out.files);
     const rejected = record.candidates.filter((c) => !c.passed).length;
