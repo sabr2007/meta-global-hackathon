@@ -2,7 +2,7 @@
 // Ayna loop (live Meta models, MuJoCo robots, the app's verifier), written by scripts/eval.ts.
 //
 //   node scripts/landing-numbers.mjs [path/to/eval-runs.jsonl] [--scan desk-sam3d|all] [--since ISO-time]
-//     default log: ../.night/eval-runs.jsonl; default scan: desk-sam3d (the only scan shown in public)
+//     default log: $AYNA_EVAL_LOG or ../data/eval-runs.jsonl; default scan: desk-sam3d (the only scan shown in public)
 //
 // Writes src/landing/facts/eval.json, which the landing bundles at build time. No dependencies.
 
@@ -17,7 +17,7 @@ const flag = (name, fallback) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 };
 const positional = args.filter((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
-const input = path.resolve(positional[0] ?? path.join(WEB, '..', '.night', 'eval-runs.jsonl'));
+const input = path.resolve(positional[0] ?? process.env.AYNA_EVAL_LOG ?? path.join(WEB, '..', 'data', 'eval-runs.jsonl'));
 const scan = flag('scan', 'desk-sam3d');
 const since = flag('since', ''); // only runs of the current system, e.g. the last eval round
 const output = path.join(WEB, 'src', 'landing', 'facts', 'eval.json');

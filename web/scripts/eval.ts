@@ -5,10 +5,10 @@
 //   npx tsx scripts/eval.ts --scan desk-sam3d --request "Tidy up my desk" [--request ...] [--no-save]
 //   npx tsx scripts/eval.ts --scan desk-sam3d --voice request.wav      # spoken request via Voice Transcribe
 
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import loadMujoco from '@mujoco/mujoco';
-import { models, scans, verdict, type Session } from '../src/ayna/client';
+import { models, scans, verdict } from '../src/ayna/client';
 import { fleetOf, runHeadless } from '../src/ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../src/ayna/glb';
 import type { BeforeMask, SceneObject } from '../src/ayna/goals';
@@ -16,23 +16,15 @@ import { runAyna } from '../src/ayna/pipeline';
 import type { SceneMeta } from '../src/scene/bundle';
 import { physicsFrom } from '../src/sim/physics';
 import { createRobots } from '../src/sim/robots';
+import { BASE, login } from './session';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const BASE = process.env.AYNA_URL ?? 'http://localhost:5190';
-const LOG = path.join(ROOT, '..', '.night', 'eval-runs.jsonl');
+const LOG = process.env.AYNA_EVAL_LOG ?? path.join(ROOT, '..', 'data', 'eval-runs.jsonl'); // one JSON line per run
 
 function args(name: string): string[] {
   return process.argv.flatMap((arg, i) => (arg === `--${name}` && process.argv[i + 1] ? [process.argv[i + 1]] : []));
 }
 
-async function login(): Promise<{ session: Session; owner: string }> {
-  const creds = readFileSync(path.join(ROOT, '..', '.night', 'credentials.md'), 'utf8').match(/owner: (\S+) \/ (\S+)/);
-  if (!creds) throw new Error('owner credentials missing in .night/credentials.md');
-  const response = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: creds[1], password: creds[2] }) });
-  if (!response.ok) throw new Error(`login failed: ${response.status}`);
-  const { user } = (await response.json()) as { user: { id: string } };
-  return { session: { base: BASE, headers: { cookie: response.headers.get('set-cookie')!.split(';')[0] } }, owner: user.id };
-}
 
 async function main(): Promise<void> {
   const scanId = args('scan')[0] ?? 'desk-sam3d';
@@ -111,6 +103,7 @@ async function main(): Promise<void> {
       seconds: Math.round((Date.now() - started) / 1000),
       error: record.error ?? null,
     };
+    mkdirSync(path.dirname(LOG), { recursive: true });
     appendFileSync(LOG, `${JSON.stringify(line)}\n`);
     console.log(JSON.stringify(line));
     for (const r of record.receipt?.results ?? []) {

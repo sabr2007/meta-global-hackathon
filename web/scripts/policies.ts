@@ -12,12 +12,12 @@
 //   noise-1cm  the simulator's pose plus 1 cm of random error (seeded per episode and object)
 //   noise-2cm  the same with 2 cm
 //
-// Runs are read from the server in AYNA_URL (default http://localhost:5190) with the owner's login.
+// Runs are read from the server in AYNA_URL as AYNA_EMAIL (scripts/session.ts).
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import loadMujoco from '@mujoco/mujoco';
-import { scans, type Session } from '../src/ayna/client';
+import { scans } from '../src/ayna/client';
 import { checkPlan } from '../src/ayna/dispatch';
 import { fleetOf, runHeadless } from '../src/ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../src/ayna/glb';
@@ -29,9 +29,9 @@ import { bodyPose, measure, type BodyPose, type Receipt } from '../src/ayna/veri
 import type { SceneMeta } from '../src/scene/bundle';
 import { physicsFrom, type Physics } from '../src/sim/physics';
 import { createRobots } from '../src/sim/robots';
+import { login } from './session';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const BASE = process.env.AYNA_URL ?? 'http://localhost:5190';
 const SETTLE_S = 1.5;
 const POLICIES = ['exact', 'camera', 'noise-1cm', 'noise-2cm'] as const;
 type Policy = (typeof POLICIES)[number];
@@ -40,14 +40,6 @@ function args(name: string): string[] {
   return process.argv.flatMap((arg, i) => (arg === `--${name}` && process.argv[i + 1] ? [process.argv[i + 1]] : []));
 }
 
-async function login(): Promise<{ session: Session; owner: string }> {
-  const creds = readFileSync(path.join(ROOT, '..', '.night', 'credentials.md'), 'utf8').match(/owner: (\S+) \/ (\S+)/);
-  if (!creds) throw new Error('owner credentials missing in .night/credentials.md');
-  const response = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: creds[1], password: creds[2] }) });
-  if (!response.ok) throw new Error(`login failed: ${response.status}`);
-  const { user } = (await response.json()) as { user: { id: string } };
-  return { session: { base: BASE, headers: { cookie: response.headers.get('set-cookie')!.split(';')[0] } }, owner: user.id };
-}
 
 /** A small seeded generator (mulberry32), so a noisy policy sees the same error on every rerun. */
 function seeded(text: string): () => number {
