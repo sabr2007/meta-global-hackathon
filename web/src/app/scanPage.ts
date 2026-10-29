@@ -9,6 +9,7 @@ import { silhouette } from '../ayna/raster';
 import type { RunRecord } from '../ayna/record';
 import { execute, type Imagined, type TraceEvent } from '../ayna/run';
 import { bodyPose, measure, type BodyPose, type Receipt } from '../ayna/verify';
+import { fleetPanel, type FleetPanel } from './fleetPanel';
 import { h, historyStrip, receiptCard, stepsList, timeline, versions, type VersionView } from './panel';
 import { createStage, type InkLayer } from './stage';
 import { loadTwin, type Twin } from './twin';
@@ -37,7 +38,8 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   const title = h('h1', 'title scan__title', meta.name);
   title.id = 'scan-title';
   const facts = h('p', 'scan__facts');
-  facts.append(h('span', 'tag', `${meta.objects} objects`), h('span', 'tag', `${meta.robots || 1} robot${meta.robots > 1 ? 's' : ''}`), h('span', `tag ${live ? 'tag--lime' : ''}`, live ? 'live models' : 'replays only'));
+  const robotsTag = h('span', 'tag', `${meta.robots || 1} robot${meta.robots > 1 ? 's' : ''}`);
+  facts.append(h('span', 'tag', `${meta.objects} objects`), robotsTag, h('span', `tag ${live ? 'tag--lime' : ''}`, live ? 'live models' : 'replays only'));
   head.append(h('span', 'eyebrow', 'Mirror'), title, facts);
 
   // Composer: voice or text.
@@ -105,6 +107,10 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     throw error;
   }
   stage.setCaption(`Real photo · SAM 3.1 found ${twin.objects.length} objects`);
+  if (import.meta.env.DEV) Object.assign(window, { __ayna: { twin, stage } });
+  const fleet: FleetPanel = fleetPanel(twin, stage);
+  panel.insertBefore(fleet.root, historyBlock);
+  robotsTag.textContent = `${twin.robots.robots.length} robot${twin.robots.robots.length === 1 ? '' : 's'}`;
   stage.setInk(twin.before.map((b) => ({ key: b.object, rle: b.rle, style: 'found' })));
 
   const versionImages = new Map<string, string>();
@@ -169,6 +175,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
 
   const startRun = (): void => {
     busy = true;
+    fleet.setBusy(true);
     composer.classList.add('is-busy');
     go.disabled = true;
     mic.disabled = true;
@@ -184,6 +191,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   };
   const endRun = (): void => {
     busy = false;
+    fleet.setBusy(false);
     composer.classList.remove('is-busy');
     go.disabled = false;
     mic.disabled = false;

@@ -47,6 +47,12 @@ export interface Twin {
   renderFromPhoto(): string;
   /** Resolves after `seconds` of simulated time. */
   settle(seconds: number): Promise<void>;
+  /** The world point on the horizontal plane z under a pointer position (client pixels). */
+  pointOnPlane(clientX: number, clientY: number, z: number): [number, number] | null;
+  tintObjects(colors: ReadonlyMap<string, string>): void;
+  setOrbitEnabled(enabled: boolean): void;
+  /** Centre of the scanned objects (robots face it when placed). */
+  readonly focus: [number, number];
   onFrame(listener: () => void): void;
   dispose(): void;
 }
@@ -301,6 +307,21 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
     settle(seconds: number) {
       return new Promise<void>((resolve) => settlers.push({ at: physics.time() + seconds, resolve }));
     },
+    pointOnPlane(clientX: number, clientY: number, z: number) {
+      const box = canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((clientX - box.left) / box.width) * 2 - 1, -((clientY - box.top) / box.height) * 2 + 1);
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(ndc, camera);
+      const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -z), new THREE.Vector3());
+      return hit ? [hit.x, hit.y] : null;
+    },
+    tintObjects(colors: ReadonlyMap<string, string>) {
+      objectLayer.tint(colors);
+    },
+    setOrbitEnabled(enabled: boolean) {
+      controls.enabled = enabled && state.view === 'orbit';
+    },
+    focus: [centre.x, centre.y],
     onFrame(listener: () => void) {
       listeners.push(listener);
     },

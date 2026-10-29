@@ -9,6 +9,7 @@ import { linearizeVertexColors } from './vertexColors';
 
 const HIGHLIGHT_EMISSIVE = new THREE.Color('#ff5a1f');
 const HIGHLIGHT_INTENSITY = 0.55;
+const TINT_INTENSITY = 0.42;
 const NO_EMISSIVE = new THREE.Color(0, 0, 0);
 
 interface ObjectView {
@@ -23,6 +24,8 @@ export interface ObjectLayer {
   sync(): void;
   setVisible(visible: boolean): void;
   highlight(name: string | null): void;
+  /** Glow per object (e.g. the reach map: lime reachable, orange not); missing names glow off. */
+  tint(colors: ReadonlyMap<string, string>): void;
 }
 
 async function loadView(
@@ -87,6 +90,14 @@ export async function loadObjects(
     }
   };
 
+  const tint = (colors: ReadonlyMap<string, string>): void => {
+    for (const v of views) {
+      const color = colors.get(v.name);
+      v.material.emissive.set(color ?? '#000000');
+      v.material.emissiveIntensity = color ? TINT_INTENSITY : 0;
+    }
+  };
+
   sync();
   return {
     root,
@@ -95,5 +106,6 @@ export async function loadObjects(
       root.visible = visible;
     },
     highlight,
+    tint,
   };
 }
