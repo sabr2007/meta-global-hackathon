@@ -28,7 +28,8 @@ already share plans as pictures; Ayna makes the picture the interface. The after
 approve before anything moves, and the goal image that goal-conditioned robot planners (Meta's
 V-JEPA 2-AC, FAIR's RoboJEPA) need but cannot get in a stranger's home. Every scan + after photo +
 automatic check is also a ready evaluation episode for a robot policy in a real home, and
-`web/scripts/policies.ts` already scores robot variants on them ([Numbers](#numbers)). More in
+`web/scripts/policies.ts` already scores robot variants on them ([Numbers](#numbers); the export format is
+in [docs/episode-format.md](docs/episode-format.md)). More in
 [docs/why-ayna.md](docs/why-ayna.md).
 
 ## Meta models: what each one does
@@ -274,7 +275,7 @@ web/        Ayna (TypeScript): app (src/app), loop logic shared by browser and N
 ios/        Ayna for iPhone: LiDAR scanner, hero shot, Send to Ayna
 video/      Remotion compositions: the landing film (AynaLoop) and the demo video skeleton (AynaDemo)
 docs/       why-ayna.md (who it is for, with sources), eval-log.md (every eval round and what it
-            taught us), images
+            taught us), episode-format.md (runs as evaluation episodes), images
 ```
 
 Privacy: captures are photos of a real home. `data/` (scans, caches, local store) is git-ignored; the
