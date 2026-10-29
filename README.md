@@ -290,6 +290,8 @@ deployed app reads scans from a private store through one-hour signed URLs.
 - Our parallel grippers open to 11 cm (arm) and 16 cm (mobile): the laptop is refused by both, and the
   27 cm keyboard by both too (too wide for the arm; held by its 1.9 cm edge it slipped out of the mobile
   robot's fingers on every drive, so it is refused with that reason).
+- Replays re-run the physics in the browser, so the same saved run can land a few millimetres differently
+  each time (the frame rate decides when the next robot step starts).
 - Mirror 02 is harder than the desk: Muse Image more often duplicates its pen or bottle or moves an
   object that should stay, so more versions are rejected there.
 - LiDAR sees through transparent objects (a clear bottle) and flattens small ones; such objects are placed
