@@ -328,6 +328,24 @@ describe('receipt', () => {
     expect(receipt.medianErrorCm).toBeCloseTo(0.1, 5); // only the move that had a goal
     expect(receipt.results.find((r) => r.name === 'mouse')).toMatchObject({ wanted: 'move', ok: false, note: 'refused before the edit: no robot reaches the back edge' });
   });
+
+  test('measures the twin against the imagined photo itself, in centimetres', () => {
+    const cube = boxMesh([0.05, 0.05, 0.05]);
+    const goalPose: BodyPose = { position: [0.1, 0, 0.025], rotation: IDENTITY };
+    const imagined = silhouette(camera, cube, goalPose); // where the after photo shows the cube
+    const run = (x: number) =>
+      measure({
+        camera,
+        goals: [{ ...goal('cube', true, 0.1), mask: imagined, to: [0.1, 0, 0.025] }],
+        start: new Map([['cube', { position: [0, 0, 0.025], rotation: IDENTITY }]]),
+        final: new Map([['cube', { position: [x, 0, 0.025], rotation: IDENTITY }]]),
+        meshes: new Map([['cube', cube]]),
+        beforeMasks: new Map(),
+        notes: new Map(),
+      });
+    expect(run(0.1).photoMedianErrorCm!).toBeLessThan(0.3);
+    expect(run(0.15).photoMedianErrorCm!).toBeCloseTo(5, 0);
+  });
 });
 
 test('voice transcripts lose words heard twice in a row', () => {

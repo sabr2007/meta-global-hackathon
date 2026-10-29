@@ -41,7 +41,7 @@ const SETTLE_S = 1.0;
 const extension = (dataUrl: string): string => dataUrl.slice(5, dataUrl.indexOf(';')).split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
 
 export function receiptLine(receipt: Receipt): string {
-  const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}%`;
+  const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}%${receipt.photoMedianErrorCm === null || receipt.photoMedianErrorCm === undefined ? '' : `, ${receipt.photoMedianErrorCm.toFixed(1)} cm apart in the photo`}`;
   return `${receipt.moved.done}/${receipt.moved.asked} moves done · ${receipt.stayed.kept}/${receipt.stayed.total} others left in place · moved objects off by ${receipt.medianErrorCm.toFixed(1)} cm (median)${overlap}`;
 }
 

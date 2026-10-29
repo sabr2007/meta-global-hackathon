@@ -13,7 +13,7 @@
 // moved, since a scanned mesh never covers its photo mask exactly).
 
 import type { PhotoCamera, Vec3 } from './camera';
-import type { ObjectGoal } from './goals';
+import { placeOnPlane, type ObjectGoal } from './goals';
 import type { TriangleMesh } from './glb';
 import { silhouette } from './raster';
 import { iou, type Rle } from './rle';
@@ -32,6 +32,7 @@ export interface ObjectResult {
   iou: number | null; // rendered sim vs the imagined photo's mask
   baselineIou: number | null; // the same comparison on the real photo before anything moved
   overlap: number | null; // iou / baselineIou, capped at 1: 1 = as good as the scan itself
+  photoErrorM: number | null; // centre of the rendered twin vs centre of the imagined photo's mask, both on the table
   ok: boolean;
   note: string; // refusal or failure reason, if any
 }
@@ -44,6 +45,7 @@ export interface Receipt {
   moved: { done: number; asked: number };
   stayed: { kept: number; total: number };
   overlap: number | null; // mean contour overlap of the moved objects (independent of the goals)
+  photoMedianErrorCm: number | null; // the same comparison in centimetres: rendered twin vs imagined photo, moved objects
   results: ObjectResult[];
 }
 
@@ -94,10 +96,17 @@ export function measure(input: MeasureInput): Receipt {
     const mesh = input.meshes.get(goal.name);
     let overlap: number | null = null;
     let baseline: number | null = null;
+    let photoErrorM: number | null = null;
     if (mesh && goal.mask) {
-      overlap = iou(silhouette(input.camera, mesh, final), goal.mask);
+      const rendered = silhouette(input.camera, mesh, final);
+      overlap = iou(rendered, goal.mask);
       const before = input.beforeMasks.get(goal.name);
       if (before) baseline = iou(silhouette(input.camera, mesh, start), before);
+      // Independent of how the goal was read off the mask: both centres go through the same projection.
+      const height = final.position[2];
+      const twin = placeOnPlane(input.camera, rendered, height).center;
+      const imagined = placeOnPlane(input.camera, goal.mask, height).center;
+      if (twin && imagined) photoErrorM = Math.hypot(twin[0] - imagined[0], twin[1] - imagined[1]);
     }
     const ok = early === undefined && goal.found && errorM <= PLACE_TOLERANCE_M && (headingErrorRad === null || headingErrorRad <= HEADING_TOLERANCE);
     const relative = overlap !== null && baseline ? Math.min(1, overlap / baseline) : null;
@@ -111,6 +120,7 @@ export function measure(input: MeasureInput): Receipt {
       iou: overlap,
       baselineIou: baseline,
       overlap: relative,
+      photoErrorM,
       ok,
       note: input.notes.get(goal.name) ?? (early !== undefined ? `refused before the edit: ${early}` : ''),
     };
@@ -128,6 +138,8 @@ export function measure(input: MeasureInput): Receipt {
   const kept = stays.filter((r) => r.ok).length;
   const share = (n: number, d: number): number => (d ? n / d : 1);
   const overlaps = asked.map((r) => r.overlap).filter((v): v is number => v !== null);
+  const photo = asked.map((r) => r.photoErrorM).filter((v): v is number => v !== null).map((v) => v * 100).sort((a, b) => a - b);
+  const half = photo.length >> 1;
   return {
     score: results.length ? Math.round(100 * share(done, asked.length) * share(kept, stays.length)) : 0,
     matched,
@@ -136,6 +148,7 @@ export function measure(input: MeasureInput): Receipt {
     moved: { done, asked: asked.length },
     stayed: { kept, total: stays.length },
     overlap: overlaps.length ? overlaps.reduce((a, b) => a + b, 0) / overlaps.length : null,
+    photoMedianErrorCm: photo.length ? (photo.length % 2 ? photo[half] : (photo[half - 1] + photo[half]) / 2) : null,
     results,
   };
 }

@@ -168,10 +168,11 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
   const score = h('div', 'receipt__score');
   score.append(h('span', `num ${receipt.score >= 80 ? 'is-lime' : 'is-orange'}`, String(receipt.score)), h('span', 'eyebrow', 'score'));
   const summary = h('div', 'receipt__summary');
-  const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}% (independent check)`;
+  const overlap = receipt.overlap === null ? '' : ` · independent check against the imagined photo: contours overlap ${Math.round(receipt.overlap * 100)}%`;
+  const inPhoto = receipt.photoMedianErrorCm === null || receipt.photoMedianErrorCm === undefined ? '' : `, centres ${receipt.photoMedianErrorCm.toFixed(1)} cm apart (median)`;
   summary.append(
     h('p', 'receipt__line', `${receipt.moved.done} of ${receipt.moved.asked} requested moves done`),
-    h('p', 'receipt__sub', `${receipt.stayed.kept} of ${receipt.stayed.total} other objects left in place · moved objects off by ${receipt.medianErrorCm.toFixed(1)} cm (median), tolerance 3 cm${overlap}`),
+    h('p', 'receipt__sub', `${receipt.stayed.kept} of ${receipt.stayed.total} other objects left in place · moved objects off their goals by ${receipt.medianErrorCm.toFixed(1)} cm (median), tolerance 3 cm${overlap}${inPhoto}`),
   );
   head.append(score, summary);
   const table = h('ul', 'receipt__rows');
