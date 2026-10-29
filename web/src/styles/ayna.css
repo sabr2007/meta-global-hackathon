@@ -103,6 +103,10 @@ a {
   outline-offset: 3px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

@@ -52,7 +52,7 @@ async function start(app: HTMLElement): Promise<void> {
     createPhysics(bundle.mjcf),
   ]);
   const geoms = buildGeomLayer(physics);
-  const objects = await loadObjects(physics, bundle.baseUrl, bundle.meta.objects ?? []);
+  const objects = await loadObjects(physics, (path) => `${bundle.baseUrl}${path}`, bundle.meta.objects ?? []);
   viewport.scene.add(room.root, geoms.root, objects.root);
   // Open on the scanned objects (and the arm) when there are any: they are small next to the room.
   const objectBounds = new THREE.Box3().setFromObject(objects.root);

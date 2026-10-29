@@ -53,6 +53,8 @@ export interface TraceEvent {
   text: string;
   usage?: Usage[];
   candidate?: string;
+  image?: string; // a developed version (live only; not saved in the run's trace)
+  check?: { passed: boolean; reasons: string[] };
 }
 
 export type Trace = (event: TraceEvent) => void;
@@ -153,7 +155,7 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
         const id = `${round}${String.fromCharCode(97 + i)}`; // 1a, 1b, ...
         try {
           const { image, usage } = await models.imagine({ photo: ctx.photo, prompt: instruction!.edit_prompt });
-          trace({ step: 'imagine', state: 'done', text: `Version ${id} developed`, usage, candidate: id });
+          trace({ step: 'imagine', state: 'done', text: `Version ${id} developed`, usage, candidate: id, image });
           const size = await imageSize(image);
           trace({ step: 'check', state: 'start', text: `SAM 3.1 is looking for every object in version ${id}`, candidate: id });
           const segmented = await models.segment({ image, width: size.width, height: size.height, objects: segmentList });
@@ -167,7 +169,7 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
             intent,
           });
           const verdict = check.passed ? `Version ${id} keeps all ${ctx.objects.length} objects` : `Version ${id} rejected: ${check.reasons.join('; ')}`;
-          trace({ step: 'check', state: check.passed ? 'done' : 'fail', text: verdict, usage: segmented.usage, candidate: id });
+          trace({ step: 'check', state: check.passed ? 'done' : 'fail', text: verdict, usage: segmented.usage, candidate: id, check: { passed: check.passed, reasons: check.reasons } });
           return { id, round, image, ...size, check };
         } catch (error) {
           trace({ step: 'imagine', state: 'fail', text: `Version ${id} failed: ${error instanceof Error ? error.message : String(error)}`, candidate: id });

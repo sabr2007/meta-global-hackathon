@@ -5,7 +5,7 @@ import type { TriangleMesh } from './glb';
 import type { FleetRobot } from './fleet';
 import { newRunId, type RunRecord } from './record';
 import type { Rle } from './rle';
-import { dispatch, execute, imagineAfter, type Imagined, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
+import { dispatch, execute, imagineAfter, type Dispatch, type Imagined, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
 import { bodyPose, measure, type BodyPose, type Receipt } from './verify';
 import type { Physics } from '../sim/physics';
 
@@ -21,6 +21,8 @@ export interface RunHooks {
   drive<T>(work: Promise<T>): Promise<T>;
   /** Let the simulation run for a while (objects come to rest). */
   settle(seconds: number): Promise<void>;
+  /** The checked plan, before the robots start (the browser shows it and flies into the twin). */
+  onPlan?(planned: Dispatch): Promise<void>;
   render?(): Promise<string | null>;
   verdict?(input: { request: string; after: string; render: string; results: string[]; score: number }): Promise<{ verdict: { verdict: string; matches_request: boolean }; usage: TraceEvent['usage'] }>;
   trace?: Trace;
@@ -74,7 +76,10 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
   };
   const files: Record<string, string> = {};
   const trace: Trace = (event) => {
-    record.trace.push({ ...event, at: Date.now() - started });
+    const { image, check, ...saved } = event;
+    void image;
+    void check;
+    record.trace.push({ ...saved, at: Date.now() - started });
     record.costUsd += (event.usage ?? []).reduce((s, u) => s + u.costUsd, 0);
     hooks.trace?.(event);
   };
@@ -113,6 +118,7 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
     record.fixes = planned.fixes;
     record.orderReason = planned.orderReason;
 
+    await hooks.onPlan?.(planned);
     const start = new Map<string, BodyPose>(scene.ctx.objects.map((o) => [o.name, bodyPose(scene.physics, o.name)]));
     const executed = await hooks.drive(execute(planned.steps, scene.fleet, trace));
     record.executed = executed.map((e) => ({ object: e.step.object, robot: e.step.robot, ok: e.result.ok, reason: e.result.reason }));
