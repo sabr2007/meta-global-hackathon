@@ -41,7 +41,8 @@ export function timeline(): { root: HTMLElement; add(event: TraceEvent): void; c
     add(event) {
       // A version can fail SAM 3.1's object check or the robots' reach test; say which did.
       const reach = event.step === 'check' && /no robot can|would land on/.test(event.text);
-      const model = event.step === 'execute' ? event.text.split(':')[0] : reach ? 'SAM 3.1 · reach test' : MODEL_OF[event.step];
+      const person = event.step === 'judge' && event.text.startsWith('You picked');
+      const model = event.step === 'execute' ? event.text.split(':')[0] : reach ? 'SAM 3.1 · reach test' : person ? 'You' : MODEL_OF[event.step];
       if (event.state === 'start') {
         working?.remove();
         working = h('li', 'timeline__row timeline__row--working');
