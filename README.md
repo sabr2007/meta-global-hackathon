@@ -101,8 +101,8 @@ written here (`pipeline/src/scan2sim/arm.py`, `mobile.py`, `robots.py`; `web/src
 - **Mobile manipulator:** a round holonomic base (x, y, yaw), a lift that puts the arm base anywhere from
   0.40 to 1.00 m, and the same arm with a 16 cm gripper. It plans on a 5 cm occupancy grid of the RoomPlan
   walls and furniture (A*, inflated by its radius), parks where the arm reaches the target, lifts to
-  the surface and grasps. On the desk it takes the 10.8 cm yellow cylinder that is out of the arm's
-  reach and wider than its gripper.
+  the surface and grasps. It takes what the arm cannot: objects wider than the arm's 11 cm gripper (the
+  keyboard) and goals outside the arm's reach band, e.g. the far corner of the desk.
 - **One interface** (`web/src/sim/robot.ts`): `reachOf(object)` answers instantly with a reason ("0.77 m
   away, reach 0.76 m"), `run({ object, x, y, yawDelta })` does a whole pick and place, `setBasePose` moves
   a robot. Muse Spark assigns each move to a robot that reaches both ends and refuses the rest.
@@ -162,6 +162,13 @@ are free (~7 s). `--physics` adds Muse Spark's mass and friction per object (one
 `uv run scan2sim report ../data/scenes/mirror --capture ~/Downloads/Mirror.zip --photo 0036` grades every
 object against the capture: LiDAR distance, size against the LiDAR extents, tilt, drift in the first 2 s of
 physics, colour difference from the photo, photo IoU, how open a ring's hole stays, and mass.
+
+**Landing page and film**
+
+The landing (`web/index.html`, `web/src/landing/`) is built from real runs: `node scripts/landing-numbers.mjs`
+refreshes its numbers from the eval log. The film is a [Remotion](https://www.remotion.dev/) composition
+(`video/`) made from a saved run's real photos, masks and verdicts: `cd video && npm install && npm run render`
+writes `web/public/landing/ayna-loop.mp4`. `AynaDemo` is the skeleton of the 3-minute video.
 
 **Web app + API (Node 22+)**
 
