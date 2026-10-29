@@ -1,7 +1,42 @@
 # New work and pre-existing work
 
-This file separates what was written during the hackathon (from October 26, 2026) from the
-open-source code it builds on.
+This file separates what was written during the hackathon (from October 26, 2026, 12:24 ET) from
+the open-source code it builds on.
+
+**In short:** `pipeline/`, `web/`, `docs/` and `video/` were written from scratch during the event.
+The only imported code is the iPhone capture engine in `ios/`, taken from the MIT-licensed
+3D Model Anything app in one verbatim commit and changed since (details below). Libraries come
+from package managers and are listed in the README.
+
+## Scan to twin (`pipeline/`, Python, all new)
+
+- Parsing the `house-capture/5` export (RoomPlan, LiDAR mesh, posed photos, depth) into one metric
+  +Z-up world frame; RoomPlan walls and furniture as MuJoCo colliders.
+- Object perception with Muse Spark (discovery, crop review, box grounding) and SAM 3.1 masks;
+  LiDAR depth lifting; SAM 3D Objects meshes from fal, placed with conventions we measured
+  (`placement.py`) and scaled to the LiDAR depth.
+- The hero photo's pinhole camera in the world frame, the before masks, and a camera-alignment
+  check (`hero.py`); the table top fitted to the LiDAR surface, stands under objects resting on
+  unscanned trays, reduced colliders that never grow out of the mesh.
+- Our robots: the 7-DoF arm (Panda modified-DH kinematics, our own shells, gripper and IK), the
+  mobile manipulator (holonomic base, lift, wider gripper), the robot registry and placement
+  (`arm.py`, `mobile.py`, `robots.py`, `mount.py`, `navgrid.py`).
+- The scan quality report (`scan2sim report`).
+
+## Ayna app and server (`web/`, TypeScript, all new)
+
+- The loop shared by the browser and Node (`src/ayna/`): Spark's edit instruction, Muse Image
+  versions, the SAM 3.1 conservation check, metric goals from masks, plan checking, execution,
+  the verifier and the receipt; the headless eval (`scripts/eval.ts`).
+- The app (`src/app/`): mirrors, sign-in, the stage where the photo, the imagined photo and the
+  twin share one camera, the develop effect, the before/after slider, the model timeline, robot
+  placement with a live reach map, run history and replays, push-to-talk.
+- Physics and robots in the browser (`src/sim/`, `src/render/`): MuJoCo WASM, IK, both robot
+  controllers, A* navigation.
+- The server (`server/`, `api/`): the Meta Model API proxy, accounts, per-user limits, private
+  storage, iPhone pairing and uploads; the scan builder worker (`scripts/worker.ts`).
+- The landing page and its Remotion video (`index.html`, `src/landing/`, `video/`).
+- The design tokens follow the iOS app's `AynaDesign.swift` (both written during the hackathon).
 
 ## iOS scanner (`ios/`)
 
