@@ -17,9 +17,9 @@
 
 ![Before → imagined after → robots in the twin → receipt](docs/images/loop.jpg)
 
-*A real run on a scanned desk: the hero photo, Muse Image's approved after photo (versions that lost an
-object were rejected by SAM 3.1), the arm moving the objects in MuJoCo, and the robots' result drawn over
-the imagined photo with the error of every object.*
+*A real run on a scanned desk, “Put all the small things together in one corner”: the hero photo, Muse
+Image's approved after photo (SAM 3.1 rejected four of the six versions), the arm moving the five objects
+in MuJoCo, and the robots' result over the imagined photo: 5 of 5 moves within 3 cm, score 100.*
 
 ## Why
 
