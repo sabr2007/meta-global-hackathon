@@ -31,6 +31,24 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
 
 export async function scanPage(root: HTMLElement, session: Session, owner: string, id: string, options: PageOptions): Promise<() => void> {
   const { meta, files, live } = await scans.open(session, owner, id);
+  if (meta.status !== 'ready') {
+    const card = h('section', 'pending card');
+    card.setAttribute('role', 'status');
+    const words: Record<string, string> = {
+      queued: 'Waiting for the scan builder. It turns the iPhone capture into a twin; this page fills in when it is done.',
+      processing: 'Building the twin: objects, masks, SAM 3D meshes and robots. A new scan takes about three minutes.',
+      failed: `The build failed: ${meta.error ?? 'no reason given'}. Send the scan again from the iPhone.`,
+    };
+    const back = h('a', 'pill pill--outline', 'Back to mirrors');
+    back.href = '#/';
+    card.append(h('span', `tag ${meta.status === 'failed' ? 'tag--orange' : ''}`, meta.status), h('h1', 'title', meta.name), h('p', '', words[meta.status] ?? ''), back);
+    root.replaceChildren(card);
+    if (meta.status !== 'failed') {
+      const timer = setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 15_000);
+      return () => clearTimeout(timer);
+    }
+    return () => undefined;
+  }
   const page = h('section', 'scan');
   page.setAttribute('aria-labelledby', 'scan-title');
   const panel = h('aside', 'scan__panel');

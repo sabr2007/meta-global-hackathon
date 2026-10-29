@@ -1050,6 +1050,20 @@ body {
   font-size: var(--text-xs);
 }
 
+.pending {
+  display: grid;
+  gap: var(--space-4);
+  justify-items: start;
+  max-width: 620px;
+  margin: 10vh auto;
+  padding: clamp(24px, 4vw, 44px);
+}
+
+.pending p {
+  margin: 0;
+  color: var(--neutral);
+}
+
 .app-error {
   display: grid;
   gap: var(--space-3);
