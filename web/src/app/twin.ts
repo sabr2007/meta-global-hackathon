@@ -21,9 +21,11 @@ const FAR = 60;
 const ORBIT_FOV = 42;
 const FLIGHT_MS = 1700;
 const RENDER_WIDTH = 720; // render for the verdict and the history, at the photo's aspect
+const ROOM_CLIP_HALF_M = 1.5; // keep the scan this far around the table, so the twin reads as a stage
+const ROOM_CLIP_TOP_M = 1.3;
 const ORBIT_TURN = THREE.MathUtils.degToRad(32);
-const ORBIT_PULLBACK = 1.05;
-const ORBIT_RISE_M = 0.7; // look down on the table: the scan's walls and chairs stay out of the way
+const ORBIT_PULLBACK = 1.3;
+const ORBIT_RISE_M = 0.85; // look down on the table and the floor around it, where the robots work
 
 export type View = 'photo' | 'orbit';
 
@@ -112,6 +114,7 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.localClippingEnabled = true;
 
   const scene = new THREE.Scene();
   scene.background = BACKGROUND;
@@ -140,6 +143,18 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
   sun.position.copy(centre).add(new THREE.Vector3(1.2, -1.6, 3));
   Object.assign(sun.shadow.camera, { left: -radius * 2, right: radius * 2, top: radius * 2, bottom: -radius * 2 });
   sun.shadow.camera.updateProjectionMatrix();
+
+  // The LiDAR scan of the whole room is lumpy far from the table: keep a box around the scene.
+  const clip = [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), -(centre.x - ROOM_CLIP_HALF_M)),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), centre.x + ROOM_CLIP_HALF_M),
+    new THREE.Plane(new THREE.Vector3(0, 1, 0), -(centre.y - ROOM_CLIP_HALF_M)),
+    new THREE.Plane(new THREE.Vector3(0, -1, 0), centre.y + ROOM_CLIP_HALF_M),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), ROOM_CLIP_TOP_M),
+  ];
+  room.root.traverse((node) => {
+    if (node instanceof THREE.Mesh) (node.material as THREE.Material).clippingPlanes = clip;
+  });
 
   const camera = new THREE.PerspectiveCamera(ORBIT_FOV, 1, NEAR, FAR);
   const photoPose = new THREE.Matrix4();
@@ -319,7 +334,9 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
       objectLayer.tint(colors);
     },
     setOrbitEnabled(enabled: boolean) {
-      controls.enabled = enabled && state.view === 'orbit';
+      // While a robot is dragged, the pointer places it; the wheel still zooms.
+      controls.enableRotate = enabled;
+      controls.enablePan = enabled;
     },
     focus: [centre.x, centre.y],
     onFrame(listener: () => void) {

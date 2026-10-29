@@ -134,11 +134,12 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
   card.setAttribute('aria-label', 'Receipt');
   const head = h('header', 'receipt__head');
   const score = h('div', 'receipt__score');
-  score.append(h('span', `num ${receipt.score >= 80 ? 'is-lime' : 'is-orange'}`, String(receipt.score)), h('span', 'eyebrow', 'match score'));
+  score.append(h('span', `num ${receipt.score >= 80 ? 'is-lime' : 'is-orange'}`, String(receipt.score)), h('span', 'eyebrow', 'score'));
   const summary = h('div', 'receipt__summary');
+  const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}% (independent check)`;
   summary.append(
-    h('p', 'receipt__line', `${receipt.matched} of ${receipt.total} objects match the after photo`),
-    h('p', 'receipt__sub', `median error ${receipt.medianErrorCm.toFixed(1)} cm · tolerance 3 cm · ${receipt.moved.done}/${receipt.moved.asked} moves done`),
+    h('p', 'receipt__line', `${receipt.moved.done} of ${receipt.moved.asked} requested moves done`),
+    h('p', 'receipt__sub', `${receipt.stayed.kept} of ${receipt.stayed.total} other objects left in place · median error ${receipt.medianErrorCm.toFixed(1)} cm, tolerance 3 cm${overlap}`),
   );
   head.append(score, summary);
   const table = h('ul', 'receipt__rows');
@@ -147,7 +148,7 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
     row.append(
       h('span', `dot ${r.ok ? 'dot--lime' : 'dot--orange'}`),
       h('span', 'receipt__object', r.label),
-      h('span', 'receipt__wanted', r.wanted === 'move' ? 'moved' : 'stays'),
+      h('span', 'receipt__wanted', r.wanted === 'move' ? (r.overlap === null ? 'moved' : `moved · overlap ${Math.round(r.overlap * 100)}%`) : 'stays'),
       h('span', 'num receipt__error', `${(r.errorM * 100).toFixed(1)}`),
       h('span', 'receipt__unit', 'cm'),
     );
@@ -187,9 +188,14 @@ export function historyStrip(runs: RunCard[], onOpen: (id: string) => void): HTM
       card.append(img);
     }
     const meta = h('span', 'history__meta');
+    const outcome =
+      run.score === null
+        ? `SAM 3.1 rejected all ${run.versions} after photos`
+        : `${run.moves ? `${run.moves.done}/${run.moves.asked} moves` : ''}${run.rejected ? ` · ${run.rejected} of ${run.versions} versions rejected` : ''}`;
     meta.append(
       h('span', `num ${run.score !== null && run.score >= 80 ? 'is-lime' : 'is-orange'}`, run.score === null ? '—' : String(run.score)),
       h('span', 'history__request', run.request),
+      h('span', 'history__outcome', outcome),
       h('span', 'history__date', new Date(run.created).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })),
     );
     card.append(meta);

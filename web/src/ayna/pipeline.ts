@@ -5,7 +5,7 @@ import type { TriangleMesh } from './glb';
 import type { FleetRobot } from './fleet';
 import { newRunId, type RunRecord } from './record';
 import type { Rle } from './rle';
-import { dispatch, execute, imagineAfter, type Dispatch, type Imagined, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
+import { dispatch, dispatchGoals, execute, imagineAfter, type Dispatch, type Imagined, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
 import { bodyPose, measure, type BodyPose, type Receipt } from './verify';
 import type { Physics } from '../sim/physics';
 
@@ -38,6 +38,11 @@ export interface RunOutput {
 const SETTLE_S = 1.0;
 
 const extension = (dataUrl: string): string => dataUrl.slice(5, dataUrl.indexOf(';')).split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+
+export function receiptLine(receipt: Receipt): string {
+  const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}%`;
+  return `${receipt.moved.done}/${receipt.moved.asked} moves done · ${receipt.stayed.kept}/${receipt.stayed.total} others left in place · median error ${receipt.medianErrorCm.toFixed(1)} cm${overlap}`;
+}
 
 export function resultLines(receipt: Receipt): string[] {
   return receipt.results.map(
@@ -125,22 +130,41 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
     await hooks.settle(SETTLE_S); // let everything come to rest before measuring
 
     trace({ step: 'verify', state: 'start', text: 'Measuring every object against the after photo' });
-    const final = new Map<string, BodyPose>(scene.ctx.objects.map((o) => [o.name, bodyPose(scene.physics, o.name)]));
     const notes = new Map<string, string>();
     for (const r of planned.refusals) notes.set(r.object, `refused: ${r.reason}`);
     for (const e of executed) if (!e.result.ok) notes.set(e.step.object, `failed: ${e.result.reason}`);
-    const receipt = measure({
-      camera: scene.ctx.camera,
-      goals: chosen.check.goals,
-      start,
-      final,
-      meshes: scene.meshes,
-      beforeMasks: new Map<string, Rle>(scene.ctx.before.map((b) => [b.object, b.rle])),
-      notes,
-    });
+    const measureNow = (): Receipt =>
+      measure({
+        camera: scene.ctx.camera,
+        goals: chosen.check.goals,
+        start,
+        final: new Map<string, BodyPose>(scene.ctx.objects.map((o) => [o.name, bodyPose(scene.physics, o.name)])),
+        meshes: scene.meshes,
+        beforeMasks: new Map<string, Rle>(scene.ctx.before.map((b) => [b.object, b.rle])),
+        notes,
+      });
+    let receipt = measureNow();
+
+    // Close the loop once: objects a robot handled but that ended off goal get a second plan from
+    // where they are now (refused ones would only be refused again).
+    const missed = receipt.results.filter((r) => r.wanted === 'move' && !r.ok && !r.note.startsWith('refused'));
+    if (missed.length) {
+      trace({ step: 'verify', state: 'info', text: `${missed.map((m) => m.label).join(', ')} ended off goal; planning a second pass from where ${missed.length === 1 ? 'it is' : 'they are'}` });
+      const retry = chosen.check.goals
+        .filter((g) => missed.some((m) => m.name === g.name))
+        .map((g) => ({ ...g, from: bodyPose(scene.physics, g.name).position, moves: true }));
+      const again = await dispatchGoals(scene.ctx, request, retry, scene.fleet, models, trace, 'Second pass · ');
+      await hooks.onPlan?.(again);
+      const executedAgain = await hooks.drive(execute(again.steps, scene.fleet, trace));
+      await hooks.settle(SETTLE_S);
+      for (const e of executedAgain) notes.set(e.step.object, e.result.ok ? '' : `failed again: ${e.result.reason}`);
+      record.steps = [...record.steps, ...again.steps];
+      record.executed = [...record.executed, ...executedAgain.map((e) => ({ object: e.step.object, robot: e.step.robot, ok: e.result.ok, reason: e.result.reason }))];
+      receipt = measureNow();
+    }
     record.receipt = receipt;
     record.score = receipt.score;
-    trace({ step: 'verify', state: 'done', text: `${receipt.matched}/${receipt.total} objects match the after photo · median error ${receipt.medianErrorCm.toFixed(1)} cm` });
+    trace({ step: 'verify', state: 'done', text: receiptLine(receipt) });
 
     const render = hooks.render ? await hooks.render() : null;
     if (render) files['render.jpg'] = render;

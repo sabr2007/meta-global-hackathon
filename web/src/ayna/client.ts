@@ -80,6 +80,9 @@ export interface RunCard {
   durationMs: number;
   status: string;
   thumb: string | null;
+  rejected: number;
+  versions: number;
+  moves: { done: number; asked: number } | null;
 }
 
 export const account = {

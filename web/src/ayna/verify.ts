@@ -4,6 +4,12 @@
 // clear long axis, within 15° of the goal heading). 3 cm is about half the smallest object on our
 // desks (a 5.5 cm earbud case), so a miss is visible in the photo; it is 5x stricter than the 15 cm
 // Meta's Habitat "tidy house" benchmark uses at room scale.
+//
+// Score: the share of requested moves done, times the share of the other objects left in place, so
+// a refused or failed move always costs points. Positions are checked against the goals the robots
+// were sent to; the independent check is the overlap of the twin, rendered from the photo's camera,
+// with the imagined photo's masks (relative to the same overlap on the real photo before anything
+// moved, since a scanned mesh never covers its photo mask exactly).
 
 import type { PhotoCamera, Vec3 } from './camera';
 import type { ObjectGoal } from './goals';
@@ -24,16 +30,19 @@ export interface ObjectResult {
   headingErrorDeg: number | null;
   iou: number | null; // rendered sim vs the imagined photo's mask
   baselineIou: number | null; // the same comparison on the real photo before anything moved
+  overlap: number | null; // iou / baselineIou, capped at 1: 1 = as good as the scan itself
   ok: boolean;
   note: string; // refusal or failure reason, if any
 }
 
 export interface Receipt {
-  score: number; // 0-100: share of objects that match the imagined photo
-  matched: number;
+  score: number; // 0-100: moves done / asked × objects left in place / objects that should stay
+  matched: number; // objects that match the imagined photo
   total: number;
   medianErrorCm: number;
   moved: { done: number; asked: number };
+  stayed: { kept: number; total: number };
+  overlap: number | null; // mean contour overlap of the moved objects (independent of the goals)
   results: ObjectResult[];
 }
 
@@ -88,6 +97,7 @@ export function measure(input: MeasureInput): Receipt {
       if (before) baseline = iou(silhouette(input.camera, mesh, start), before);
     }
     const ok = goal.found && errorM <= PLACE_TOLERANCE_M && (headingErrorRad === null || headingErrorRad <= HEADING_TOLERANCE);
+    const relative = overlap !== null && baseline ? Math.min(1, overlap / baseline) : null;
     return {
       name: goal.name,
       label: goal.label,
@@ -97,6 +107,7 @@ export function measure(input: MeasureInput): Receipt {
       headingErrorDeg: headingErrorRad === null ? null : (headingErrorRad * 180) / Math.PI,
       iou: overlap,
       baselineIou: baseline,
+      overlap: relative,
       ok,
       note: input.notes.get(goal.name) ?? '',
     };
@@ -106,12 +117,19 @@ export function measure(input: MeasureInput): Receipt {
   const medianErrorCm = errors.length ? (errors.length % 2 ? errors[mid] : (errors[mid - 1] + errors[mid]) / 2) : 0;
   const matched = results.filter((r) => r.ok).length;
   const asked = results.filter((r) => r.wanted === 'move');
+  const stays = results.filter((r) => r.wanted === 'stay');
+  const done = asked.filter((r) => r.ok).length;
+  const kept = stays.filter((r) => r.ok).length;
+  const share = (n: number, d: number): number => (d ? n / d : 1);
+  const overlaps = asked.map((r) => r.overlap).filter((v): v is number => v !== null);
   return {
-    score: results.length ? Math.round((100 * matched) / results.length) : 0,
+    score: results.length ? Math.round(100 * share(done, asked.length) * share(kept, stays.length)) : 0,
     matched,
     total: results.length,
     medianErrorCm,
-    moved: { done: asked.filter((r) => r.ok).length, asked: asked.length },
+    moved: { done, asked: asked.length },
+    stayed: { kept, total: stays.length },
+    overlap: overlaps.length ? overlaps.reduce((a, b) => a + b, 0) / overlaps.length : null,
     results,
   };
 }

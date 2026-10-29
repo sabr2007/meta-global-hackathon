@@ -4,7 +4,7 @@
 
 import { models, scans, verdict as sparkVerdict, type RunCard, type Session, type User } from '../ayna/client';
 import type { ObjectGoal } from '../ayna/goals';
-import { runAyna, type RunHooks } from '../ayna/pipeline';
+import { receiptLine, runAyna, type RunHooks } from '../ayna/pipeline';
 import { silhouette } from '../ayna/raster';
 import type { RunRecord } from '../ayna/record';
 import { execute, type Imagined, type TraceEvent } from '../ayna/run';
@@ -164,7 +164,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       }
     }
     stage.setInk(ink);
-    stage.setCaption(`Robots' result over the imagined photo · ${receipt.matched}/${receipt.total} match`, receipt.score >= 80 ? 'lime' : 'orange');
+    stage.setCaption(`Robots' result over the imagined photo · ${receipt.moved.done}/${receipt.moved.asked} moves done`, receipt.score >= 80 ? 'lime' : 'orange');
   };
 
   const refreshHistory = async (): Promise<RunCard[]> => {
@@ -382,7 +382,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       beforeMasks: new Map(twin.before.map((b) => [b.object, b.rle])),
       notes,
     });
-    log.add({ step: 'verify', state: 'done', text: `${receipt.matched}/${receipt.total} objects match the after photo · median error ${receipt.medianErrorCm.toFixed(1)} cm` });
+    log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
     const chosen = run.candidates.find((c) => c.id === run.chosen)!;
     await showResult(receipt, goals, url(chosen.file));
     receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true }));

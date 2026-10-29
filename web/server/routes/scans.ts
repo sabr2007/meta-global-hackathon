@@ -129,12 +129,19 @@ export const scanRoutes: Route[] = [
         keys.map(async (key) => {
           const run = await getJson<Record<string, unknown>>(store(), key);
           if (!run) return null;
-          const { id, created, request: text, score, costUsd, durationMs, status, thumb } = run;
+          const { id, created, request: text, score, costUsd, durationMs, status, thumb, candidates, receipt } = run as Record<string, unknown> & {
+            candidates?: { passed: boolean }[];
+            receipt?: { moved?: { done: number; asked: number } } | null;
+          };
           const thumbUrl = typeof thumb === 'string' ? await store().readUrl(key.replace(/run\.json$/, thumb)) : null;
-          return { id, created, request: text, score, costUsd, durationMs, status, thumb: thumbUrl };
+          const rejected = (candidates ?? []).filter((c) => !c.passed).length;
+          return { id, created, request: text, score, costUsd, durationMs, status, thumb: thumbUrl, rejected, versions: (candidates ?? []).length, moves: receipt?.moved ?? null };
         }),
       );
-      return json({ runs: runs.filter(Boolean).sort((a, b) => String(b!.created).localeCompare(String(a!.created))) });
+      // Best first, then newest: a guest opens the strongest run, failures stay visible further along.
+      const rank = (r: { score?: unknown }): number => (typeof r.score === 'number' ? r.score : -1);
+      const sorted = runs.filter(Boolean).sort((a, b) => rank(b!) - rank(a!) || String(b!.created).localeCompare(String(a!.created)));
+      return json({ runs: sorted });
     },
   },
   {

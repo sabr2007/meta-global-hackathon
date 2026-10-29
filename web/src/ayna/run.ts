@@ -4,7 +4,7 @@
 import type { PhotoCamera } from './camera';
 import { checkPlan, planFacts, type PlannedStep, type Refusal, type SparkPlan } from './dispatch';
 import type { FleetRobot, StepResult } from './fleet';
-import { checkCandidate, conceptCounts, footprint, type BeforeMask, type CandidateCheck, type SceneObject, type Segmented } from './goals';
+import { checkCandidate, conceptCounts, footprint, type BeforeMask, type CandidateCheck, type ObjectGoal, type SceneObject, type Segmented } from './goals';
 import { imageSize } from './images';
 
 export interface Usage {
@@ -111,10 +111,12 @@ export function briefs(ctx: SceneContext, fleet: FleetRobot[]): SceneObjectBrief
       concept: o.concept,
       size_cm: o.size_m.map((v) => Math.round(v * 1000) / 10) as [number, number, number],
       where: mask ? where(ctx.camera, mask) : 'on the table',
-      reach: fleet.map((r) => {
-        const reach = r.reachOf(o.name);
-        return `${r.label}: ${reach.ok ? 'reaches it' : reach.reason}`;
-      }),
+      reach: fleet.some((r) => r.reachOf(o.name).ok)
+        ? fleet.map((r) => {
+            const reach = r.reachOf(o.name);
+            return `${r.label}: ${reach.ok ? 'reaches it' : reach.reason}`;
+          })
+        : [`MUST STAY: no robot can move it (${fleet.map((r) => `${r.label}: ${r.reachOf(o.name).reason}`).join('; ')})`],
     };
   });
 }
@@ -211,27 +213,31 @@ export interface Dispatch {
 }
 
 /** Step 5: Spark orders the moves and picks a robot for each; the plan is checked against reach. */
-export async function dispatch(ctx: SceneContext, request: string, chosen: Candidate, fleet: FleetRobot[], models: Models, trace: Trace): Promise<Dispatch> {
+export function dispatch(ctx: SceneContext, request: string, chosen: Candidate, fleet: FleetRobot[], models: Models, trace: Trace): Promise<Dispatch> {
+  return dispatchGoals(ctx, request, chosen.check.goals, fleet, models, trace);
+}
+
+export async function dispatchGoals(ctx: SceneContext, request: string, goals: ObjectGoal[], fleet: FleetRobot[], models: Models, trace: Trace, label = ''): Promise<Dispatch> {
   const footprints = new Map(
     ctx.before.map((b) => {
       const object = ctx.objects.find((o) => o.name === b.object);
       return [b.object, object ? footprint(ctx.camera, b.rle, object.start[2] - object.size_m[2] / 2) : []] as [string, [number, number][]];
     }),
   );
-  const facts = planFacts(chosen.check.goals, ctx.objects, fleet, footprints);
+  const facts = planFacts(goals, ctx.objects, fleet, footprints);
   if (!facts.moves.length) {
     trace({ step: 'plan', state: 'done', text: 'Nothing needs to move' });
     return { steps: [], refusals: [], fixes: [], orderReason: '' };
   }
-  trace({ step: 'plan', state: 'start', text: `Muse Spark is ordering ${facts.moves.length} moves across ${fleet.length} robot${fleet.length > 1 ? 's' : ''}` });
+  trace({ step: 'plan', state: 'start', text: `${label}Muse Spark is ordering ${facts.moves.length} move${facts.moves.length === 1 ? '' : 's'} across ${fleet.length} robot${fleet.length > 1 ? 's' : ''}` });
   const planned = await models.plan({ request, ...facts });
-  const checked = checkPlan(planned.plan, chosen.check.goals, fleet, footprints);
+  const checked = checkPlan(planned.plan, goals, fleet, footprints);
   const summary = [
     `${checked.steps.length} step${checked.steps.length === 1 ? '' : 's'}`,
     checked.refusals.length ? `${checked.refusals.length} refused` : '',
     planned.plan.order_reason,
   ].filter(Boolean);
-  trace({ step: 'plan', state: 'done', text: summary.join(' · '), usage: planned.usage });
+  trace({ step: 'plan', state: 'done', text: label + summary.join(' · '), usage: planned.usage });
   return { ...checked, orderReason: planned.plan.order_reason };
 }
 
@@ -246,7 +252,11 @@ export async function execute(steps: PlannedStep[], fleet: FleetRobot[], trace: 
   for (const step of steps) {
     const robot = fleet.find((r) => r.id === step.robot)!;
     trace({ step: 'execute', state: 'start', text: `${robot.label}: ${step.label}` });
-    const result = await robot.run({ object: step.object, x: step.x, y: step.y, yawDelta: step.yawDelta });
+    let result = await robot.run({ object: step.object, x: step.x, y: step.y, yawDelta: step.yawDelta });
+    if (!result.ok && /slipped|missed/i.test(result.reason)) {
+      trace({ step: 'execute', state: 'info', text: `${robot.label}: ${step.label} — ${result.reason}; trying the grasp once more` });
+      result = await robot.run({ object: step.object, x: step.x, y: step.y, yawDelta: step.yawDelta });
+    }
     trace({ step: 'execute', state: result.ok ? 'done' : 'fail', text: `${robot.label}: ${step.label} — ${result.reason}` });
     done.push({ step, result });
   }
