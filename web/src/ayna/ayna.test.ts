@@ -131,6 +131,15 @@ describe('plan check', () => {
     const alone = checkPlan(plan, [goal('far')], [robot('arm', (n) => n !== 'far')]);
     expect(alone.refusals[0].reason).toMatch(/0.80 m away/);
   });
+
+  test('keeps a move Spark refused when the checks say a robot can do it', () => {
+    const fleet = [robot('arm', (n) => n !== 'far')];
+    const plan = { steps: [], refusals: [{ object: 'near', reason: 'its target overlaps the keyboard' }, { object: 'far', reason: 'out of reach' }], order_reason: '' };
+    const checked = checkPlan(plan, [goal('near'), goal('far')], fleet);
+    expect(checked.steps.map((s) => [s.object, s.robot])).toEqual([['near', 'arm']]);
+    expect(checked.fixes[0]).toMatch(/Spark refused \(its target overlaps the keyboard\), but arm can do it/);
+    expect(checked.refusals).toEqual([{ object: 'far', label: 'far', reason: 'out of reach' }]);
+  });
 });
 
 test('reads image sizes from headers', async () => {

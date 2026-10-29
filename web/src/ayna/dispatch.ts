@@ -160,6 +160,15 @@ export function checkPlan(
     const goal = moving.get(refusal.object);
     if (!goal || handled.has(refusal.object)) continue;
     handled.add(refusal.object);
+    // Spark's refusals are claims about reach and space; the checks above decide. A move a robot can
+    // do is kept, and the receipt measures how it went.
+    const able = capable(goal);
+    if (able.length) {
+      const robot = able.find((r) => r.kind === 'arm') ?? able[0];
+      steps.push({ object: goal.name, label: goal.label, robot: robot.id, why: 'kept: the checks say it can be done', x: goal.to[0], y: goal.to[1], yawDelta: goal.yawDelta });
+      fixes.push(`${goal.label}: Spark refused (${refusal.reason}), but ${robot.label} can do it`);
+      continue;
+    }
     refusals.push({ object: goal.name, label: goal.label, reason: refusal.reason });
   }
   for (const goal of moving.values()) {
