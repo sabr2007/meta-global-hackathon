@@ -1,5 +1,4 @@
-import loadMujoco, { type MainModule, type MjData, type MjModel } from '@mujoco/mujoco';
-import wasmUrl from '@mujoco/mujoco/mujoco.wasm?url';
+import type { MainModule, MjData, MjModel } from '@mujoco/mujoco';
 
 // Never try to catch up more than this much wall-clock time in one frame
 // (e.g. after the tab was in the background).
@@ -16,17 +15,6 @@ export interface Physics {
   time(): number;
   contactCount(): number;
   dispose(): void;
-}
-
-let modulePromise: Promise<MainModule> | null = null;
-
-function mujocoModule(): Promise<MainModule> {
-  modulePromise ??= loadMujoco({ locateFile: () => wasmUrl });
-  return modulePromise;
-}
-
-export async function createPhysics(mjcf: string): Promise<Physics> {
-  return physicsFrom(await mujocoModule(), mjcf);
 }
 
 /** Physics for an already loaded MuJoCo module (tests load it themselves in Node). */

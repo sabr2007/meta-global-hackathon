@@ -1,0 +1,5 @@
+# Private captures never leave this machine through a deploy.
+public/scenes
+node_modules
+dist
+.env*

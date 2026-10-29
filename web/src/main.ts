@@ -8,7 +8,7 @@ import { loadRoomMesh } from './render/roomMesh';
 import { createViewport } from './render/viewport';
 import { BundleError, loadBundle, sceneIdFromUrl } from './scene/bundle';
 import { ArmController } from './sim/armController';
-import { createPhysics } from './sim/physics';
+import { createPhysics } from './sim/loadPhysics';
 import { INITIAL_LAYERS, mountPanel, type LayerId, type Panel } from './ui/panel';
 
 const DEFAULT_SCENE = 'living-room';

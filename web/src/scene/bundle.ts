@@ -1,5 +1,7 @@
 // A scene bundle is produced by `scan2sim build` into public/scenes/<id>/.
 
+import type { PhotoCamera } from '../ayna/camera';
+
 export const BUNDLE_FORMAT = 'scan2sim/scene@1';
 const SCENE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -21,9 +23,11 @@ export interface ElementInfo {
 export interface ScannedObjectInfo {
   name: string;
   label: string;
+  concept: string; // the SAM 3.1 noun phrase that finds it in a photo
   body: string;
   mesh: string;
   size_m: [number, number, number]; // length, width, height
+  start: [number, number, number]; // body origin when the scene starts, world metres
   fit_error_mm: number;
 }
 
@@ -63,6 +67,7 @@ export interface SceneMeta {
   probes: { name: string; shape: string }[];
   objects?: ScannedObjectInfo[]; // absent in bundles from `scan2sim build`
   arm?: ArmInfo | null;
+  camera?: PhotoCamera & { masks: string; alignment: Record<string, { iou: number; centroid_offset_px: number }> }; // the hero photo (scan2sim objects)
   files: { mjcf: string; mesh: string };
 }
 
