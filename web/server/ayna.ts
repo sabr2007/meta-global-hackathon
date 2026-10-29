@@ -325,10 +325,11 @@ ${input.robots.join('\n')}
 Facts:
 ${input.facts.length ? input.facts.join('\n') : '- none'}
 
-Order the moves so no object is put where another still stands (free the space first), assign each move
+Order the moves so no object is put where another still stands (move the one standing there first), assign each move
 to a robot that reaches BOTH the object and its target and whose gripper is wide enough, prefer the
 stationary arm when both can, and refuse moves no robot can do with the blocking number in the reason.
-Every object to move appears exactly once, in steps or in refusals. Write reasons for a person: name
+Every object to move appears exactly once, in steps or in refusals; never refuse a move a robot can do just
+because of the order, reorder instead. Write reasons for a person: name
 objects by what they are (e.g. "white mouse"), never by id.`;
   const { value, usage } = await sparkJson<Plan>('ayna_plan', PLAN_SCHEMA, [{ type: 'input_text', text }]);
   return { plan: value, usage: [usage] };

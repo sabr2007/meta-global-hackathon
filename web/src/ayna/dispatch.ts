@@ -82,8 +82,42 @@ export function planFacts(goals: ObjectGoal[], objects: SceneObject[], fleet: Fl
   return { moves, robots, facts };
 }
 
-/** Keep Spark's order, but only with assignments the robots can carry out; explain every change. */
-export function checkPlan(plan: SparkPlan, goals: ObjectGoal[], fleet: FleetRobot[]): { steps: PlannedStep[]; refusals: Refusal[]; fixes: string[] } {
+/** Objects that must be moved before each object, because its target covers where they stand now. */
+export function blockers(goals: ObjectGoal[], footprints: Footprints): Map<string, string[]> {
+  const result = new Map<string, string[]>();
+  for (const g of goals) {
+    const mine = footprints.get(g.name);
+    if (!g.moves || !mine) continue;
+    const shift: [number, number] = [g.to[0] - g.from[0], g.to[1] - g.from[1]];
+    const blocking = goals.filter((other) => other.name !== g.name && footprints.has(other.name) && overlaps(mine, shift, footprints.get(other.name)!));
+    result.set(g.name, blocking.map((b) => b.name));
+  }
+  return result;
+}
+
+/** Stable topological order: a step waits for the steps that clear its target; cycles keep their order. */
+export function orderSteps(steps: PlannedStep[], before: Map<string, string[]>): { steps: PlannedStep[]; moved: string[] } {
+  const pending = steps.slice();
+  const ordered: PlannedStep[] = [];
+  const moved: string[] = [];
+  while (pending.length) {
+    const waiting = new Set(pending.map((s) => s.object));
+    const index = pending.findIndex((s) => !(before.get(s.object) ?? []).some((b) => waiting.has(b) && b !== s.object));
+    const next = pending.splice(index >= 0 ? index : 0, 1)[0];
+    if (index > 0) moved.push(next.label);
+    ordered.push(next);
+  }
+  return { steps: ordered, moved };
+}
+
+/** Keep Spark's order, but only with assignments the robots can carry out and an order that clears
+ * every target first; explain every change. */
+export function checkPlan(
+  plan: SparkPlan,
+  goals: ObjectGoal[],
+  fleet: FleetRobot[],
+  footprints: Footprints = new Map(),
+): { steps: PlannedStep[]; refusals: Refusal[]; fixes: string[] } {
   const moving = new Map(goals.filter((g) => g.found && g.moves).map((g) => [g.name, g]));
   const steps: PlannedStep[] = [];
   const refusals: Refusal[] = [];
@@ -132,5 +166,7 @@ export function checkPlan(plan: SparkPlan, goals: ObjectGoal[], fleet: FleetRobo
       refusals.push({ object: goal.name, label: goal.label, reason: blocker(goal) });
     }
   }
-  return { steps, refusals, fixes };
+  const ordered = orderSteps(steps, blockers(goals, footprints));
+  for (const label of ordered.moved) fixes.push(`${label}: moved earlier, its spot had to be cleared first`);
+  return { steps: ordered.steps, refusals, fixes };
 }

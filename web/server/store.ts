@@ -2,7 +2,7 @@
 // disk in local development. Browsers never get store credentials, only short-lived file URLs.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const URL_TTL_MS = 60 * 60 * 1000;
@@ -70,7 +70,10 @@ function diskStore(root: string): Store {
     },
     async putBytes(key, bytes) {
       await mkdir(path.dirname(file(key)), { recursive: true });
-      await writeFile(file(key), bytes);
+      // Write then rename, so a concurrent reader never sees half a file.
+      const temporary = `${file(key)}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+      await writeFile(temporary, bytes);
+      await rename(temporary, file(key));
     },
     async list(prefix) {
       const base = file(prefix.endsWith('/') ? prefix : `${prefix}/`);

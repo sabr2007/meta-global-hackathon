@@ -133,3 +133,15 @@ test('reads image sizes from headers', async () => {
   const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAEklEQVR4nGNgYGD4z8DAwMDAAAAMAAH1D7m3AAAAAElFTkSuQmCC';
   expect(await imageSize(png)).toEqual({ width: 3, height: 2 });
 });
+
+describe('step order', () => {
+  test('a step waits for the object standing on its target', async () => {
+    const { orderSteps } = await import('./dispatch');
+    const step = (object: string) => ({ object, label: object, robot: 'arm', why: '', x: 0, y: 0, yawDelta: 0 });
+    const ordered = orderSteps([step('ring'), step('figurine'), step('cup')], new Map([['ring', ['figurine']], ['figurine', []], ['cup', []]]));
+    expect(ordered.steps.map((s) => s.object)).toEqual(['figurine', 'ring', 'cup']);
+    expect(ordered.moved).toEqual(['figurine']);
+    const cycle = orderSteps([step('a'), step('b')], new Map([['a', ['b']], ['b', ['a']]]));
+    expect(cycle.steps.map((s) => s.object)).toEqual(['a', 'b']);
+  });
+});

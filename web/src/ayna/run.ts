@@ -223,7 +223,7 @@ export async function dispatch(ctx: SceneContext, request: string, chosen: Candi
   }
   trace({ step: 'plan', state: 'start', text: `Muse Spark is ordering ${facts.moves.length} moves across ${fleet.length} robot${fleet.length > 1 ? 's' : ''}` });
   const planned = await models.plan({ request, ...facts });
-  const checked = checkPlan(planned.plan, chosen.check.goals, fleet);
+  const checked = checkPlan(planned.plan, chosen.check.goals, fleet, footprints);
   const summary = [
     `${checked.steps.length} step${checked.steps.length === 1 ? '' : 's'}`,
     checked.refusals.length ? `${checked.refusals.length} refused` : '',
