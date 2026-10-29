@@ -235,6 +235,12 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     go.disabled = false;
     mic.disabled = false;
   };
+  /** A run that breaks says why, in the log and on the stage, instead of going quiet. */
+  const failRun = (error: unknown): void => {
+    const text = `The run stopped: ${error instanceof Error ? error.message : String(error)}`;
+    log.add({ step: 'verify', state: 'fail', text });
+    stage.setCaption(text, 'orange');
+  };
 
   const traceToUi = (event: TraceEvent): void => {
     log.add(event);
@@ -369,7 +375,6 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   async function runLive(request: string, source: RunRecord['source'], transcript?: string): Promise<void> {
     if (busy || !request.trim()) return;
     startRun();
-    await resetTwin();
     let list: ReturnType<typeof stepsList> | null = null;
     const hooks: RunHooks = {
       trace: (event) => {
@@ -390,6 +395,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       verdict: (input) => sparkVerdict(session, input),
     };
     try {
+      await resetTwin();
       const scene = { ctx: { camera: twin.camera, photo: await photoDataUrl(), objects: twin.objects, before: twin.before }, physics: twin.physics, fleet: twin.fleet, meshes: twin.meshes };
       const out = await runAyna(scene, request, models(session), hooks, source);
       if (transcript) out.record.transcript = transcript;
@@ -404,6 +410,8 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       }
       await scans.saveRun(session, owner, id, out.record, out.files).catch((error: unknown) => log.add({ step: 'verify', state: 'fail', text: `Could not save the run: ${String(error)}` }));
       await refreshHistory();
+    } catch (error) {
+      failRun(error);
     } finally {
       endRun();
     }
@@ -412,7 +420,11 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   let photoCache: string | null = null;
   async function photoDataUrl(): Promise<string> {
     if (photoCache) return photoCache;
-    const blob = await (await fetch(twin.photoUrl)).blob();
+    // The stage's <img> has already cached this photo, and R2 sends CORS headers only to requests that carry
+    // an Origin, so the cached copy would fail the read: fetch it from the bucket again.
+    const response = await fetch(twin.photoUrl, { cache: 'reload' });
+    if (!response.ok) throw new Error(`could not load the table photo (HTTP ${response.status}); reload the page`);
+    const blob = await response.blob();
     photoCache = await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -424,65 +436,66 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   async function replay(runId: string, auto: boolean): Promise<void> {
     if (busy) return;
     startRun();
-    // The address names the run, so it can be shared; replaceState does not fire hashchange (no re-render).
-    history.replaceState(null, '', `${location.pathname}${location.search}#/scan/${owner}/${id}/run/${runId}`);
-    const { run, files: runFiles } = await scans.run(session, owner, id, runId);
-    await resetTwin();
-    const url = (file: string): string => runFiles[file] ?? '';
-    log.add({ step: 'verify', state: 'info', text: `Replay of a saved run · “${run.request}” · no model calls` });
-    // The recorded timeline, faster.
-    let last = 0;
-    const beforeApproval = run.trace.filter((e) => e.step !== 'plan' && e.step !== 'execute' && e.step !== 'verify' && e.step !== 'verdict');
-    for (const event of beforeApproval) {
-      await wait(Math.min((event.at - last) / REPLAY_SPEED, REPLAY_MAX_WAIT_MS));
-      last = event.at;
-      const candidate = run.candidates.find((c) => c.id === event.candidate);
-      traceToUi({
-        ...event,
-        image: event.step === 'imagine' && event.state === 'done' && candidate ? url(candidate.file) : undefined,
-        check: event.step === 'check' && candidate && event.state !== 'start' ? { passed: candidate.passed, reasons: candidate.reasons } : undefined,
+    try {
+      // The address names the run, so it can be shared; replaceState does not fire hashchange (no re-render).
+      history.replaceState(null, '', `${location.pathname}${location.search}#/scan/${owner}/${id}/run/${runId}`);
+      const { run, files: runFiles } = await scans.run(session, owner, id, runId);
+      await resetTwin();
+      const url = (file: string): string => runFiles[file] ?? '';
+      log.add({ step: 'verify', state: 'info', text: `Replay of a saved run · “${run.request}” · no model calls` });
+      // The recorded timeline, faster.
+      let last = 0;
+      const beforeApproval = run.trace.filter((e) => e.step !== 'plan' && e.step !== 'execute' && e.step !== 'verify' && e.step !== 'verdict');
+      for (const event of beforeApproval) {
+        await wait(Math.min((event.at - last) / REPLAY_SPEED, REPLAY_MAX_WAIT_MS));
+        last = event.at;
+        const candidate = run.candidates.find((c) => c.id === event.candidate);
+        traceToUi({
+          ...event,
+          image: event.step === 'imagine' && event.state === 'done' && candidate ? url(candidate.file) : undefined,
+          check: event.step === 'check' && candidate && event.state !== 'start' ? { passed: candidate.passed, reasons: candidate.reasons } : undefined,
+        });
+      }
+      if (!run.chosen || !run.instruction) {
+        stage.setCaption('This run found no imagined photo that kept every object', 'orange');
+        return;
+      }
+      const goals: ObjectGoal[] = run.goals.map((g) => ({ ...g, source: 'concept', areaRatio: 1 }));
+      goalsByVersion.set(run.chosen, goals);
+      const approved = await approveStep(run.chosen, run.instruction.summary, run.instruction.refusals, auto);
+      if (!approved) return;
+      for (const event of run.trace.filter((e) => e.step === 'plan' && e.state !== 'start')) traceToUi(event);
+      const list = await beginExecution(run.steps, run.refusals);
+      const start = new Map<string, BodyPose>(twin.objects.map((o) => [o.name, bodyPose(twin.physics, o.name)]));
+      const executed = await execute(run.steps, twin.fleet, (event) => {
+        log.add(event);
+        markStep(list, event);
       });
-    }
-    if (!run.chosen || !run.instruction) {
-      stage.setCaption('This run found no imagined photo that kept every object', 'orange');
+      await twin.settle(1);
+      const notes = new Map<string, string>();
+      for (const r of run.refusals) notes.set(r.object, `refused: ${r.reason}`);
+      for (const e of executed) if (!e.result.ok) notes.set(e.step.object, `failed: ${e.result.reason}`);
+      const receipt = measure({
+        camera: twin.camera,
+        goals,
+        start,
+        final: new Map(twin.objects.map((o) => [o.name, bodyPose(twin.physics, o.name)])),
+        meshes: twin.meshes,
+        beforeMasks: new Map(twin.before.map((b) => [b.object, b.rle])),
+        notes,
+        refusedBefore: run.instruction ? refusedInEdit(run.instruction, twin.objects) : undefined,
+      });
+      log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
+      const chosen = run.candidates.find((c) => c.id === run.chosen)!;
+      await showResult(receipt, goals, url(chosen.file));
+      window.setTimeout(() => reveal(receiptSlot), narrow() ? 2500 : 300); // on a phone, hold the result on the photo first
+      receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true, usage: run.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${runId}/episode` }));
+      document.body.dataset.autoplay = 'done';
+    } catch (error) {
+      failRun(error);
+    } finally {
       endRun();
-      return;
     }
-    const goals: ObjectGoal[] = run.goals.map((g) => ({ ...g, source: 'concept', areaRatio: 1 }));
-    goalsByVersion.set(run.chosen, goals);
-    const approved = await approveStep(run.chosen, run.instruction.summary, run.instruction.refusals, auto);
-    if (!approved) {
-      endRun();
-      return;
-    }
-    for (const event of run.trace.filter((e) => e.step === 'plan' && e.state !== 'start')) traceToUi(event);
-    const list = await beginExecution(run.steps, run.refusals);
-    const start = new Map<string, BodyPose>(twin.objects.map((o) => [o.name, bodyPose(twin.physics, o.name)]));
-    const executed = await execute(run.steps, twin.fleet, (event) => {
-      log.add(event);
-      markStep(list, event);
-    });
-    await twin.settle(1);
-    const notes = new Map<string, string>();
-    for (const r of run.refusals) notes.set(r.object, `refused: ${r.reason}`);
-    for (const e of executed) if (!e.result.ok) notes.set(e.step.object, `failed: ${e.result.reason}`);
-    const receipt = measure({
-      camera: twin.camera,
-      goals,
-      start,
-      final: new Map(twin.objects.map((o) => [o.name, bodyPose(twin.physics, o.name)])),
-      meshes: twin.meshes,
-      beforeMasks: new Map(twin.before.map((b) => [b.object, b.rle])),
-      notes,
-      refusedBefore: run.instruction ? refusedInEdit(run.instruction, twin.objects) : undefined,
-    });
-    log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
-    const chosen = run.candidates.find((c) => c.id === run.chosen)!;
-    await showResult(receipt, goals, url(chosen.file));
-    window.setTimeout(() => reveal(receiptSlot), narrow() ? 2500 : 300); // on a phone, hold the result on the photo first
-    receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true, usage: run.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${runId}/episode` }));
-    endRun();
-    document.body.dataset.autoplay = 'done';
   }
 
   // Voice: hold the mic (or press it twice) to record; Voice Transcribe fills the request and runs it.
