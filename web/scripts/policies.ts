@@ -160,6 +160,9 @@ async function main(): Promise<void> {
       receipts.push(out.receipt);
       slipped += out.slipped;
       console.log(`  ${policy.padEnd(9)} ${run.id} ${String(out.receipt.score).padStart(3)}  ${out.receipt.moved.done}/${out.receipt.moved.asked} moves  ${run.request.slice(0, 60)}`);
+      if (process.env.AYNA_SHOW_PHOTO) {
+        for (const r of out.receipt.results.filter((x) => x.wanted === 'move')) console.log(`      ${r.label.padEnd(20)} goal ${(r.errorM * 100).toFixed(1)} cm · photo ${r.photoErrorM === null ? '-' : (r.photoErrorM * 100).toFixed(1)} cm · overlap ${r.overlap === null ? '-' : Math.round(r.overlap * 100)}% ${r.ok ? 'ok' : 'MISS'}`);
+      }
     }
     const moveErrors = receipts.flatMap((r) => r.results.filter((x) => x.wanted === 'move').map((x) => x.errorM * 100));
     table.push({

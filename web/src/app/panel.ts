@@ -162,7 +162,8 @@ export function modelSummary(usage: Usage[]): { model: string; calls: number; ms
 function wantedLabel(r: Receipt['results'][number]): string {
   if (r.wanted === 'stay') return 'stays';
   if (/^refused/.test(r.note)) return 'move refused';
-  return r.overlap === null ? 'moved' : `moved · overlap ${Math.round(r.overlap * 100)}%`;
+  const photo = r.photoErrorM === null || r.photoErrorM === undefined ? '' : ` · in the photo ${(r.photoErrorM * 100).toFixed(1)} cm`;
+  return r.overlap === null ? `moved${photo}` : `moved · overlap ${Math.round(r.overlap * 100)}%${photo}`;
 }
 
 export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean; usage?: Usage[]; episodeUrl?: string }): HTMLElement {
