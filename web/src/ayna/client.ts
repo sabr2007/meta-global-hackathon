@@ -93,7 +93,7 @@ export const account = {
 };
 
 export const scans = {
-  list: (session: Session) => request<{ user: User | null; demo: { owner: string; id: string } | null; scans: ScanCard[] }>(session, '/api/scans'),
+  list: (session: Session) => request<{ user: User | null; demo: { owner: string; id: string; run: string | null } | null; scans: ScanCard[] }>(session, '/api/scans'),
   open: (session: Session, owner: string, id: string) => request<{ meta: ScanCard; files: Record<string, string>; live: boolean }>(session, `/api/scans/${owner}/${id}`),
   runs: (session: Session, owner: string, id: string) => request<{ runs: RunCard[] }>(session, `/api/scans/${owner}/${id}/runs`),
   run: (session: Session, owner: string, id: string, run: string) => request<{ run: RunRecord; files: Record<string, string> }>(session, `/api/scans/${owner}/${id}/runs/${run}`),

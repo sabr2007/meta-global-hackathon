@@ -45,10 +45,12 @@ export function contentType(key: string): string {
   return CONTENT_TYPES[key.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
 }
 
-/** The guest demo: one scan anyone may open (replays only). */
-function demoScan(): { owner: string; id: string } | null {
+/** The guest demo: one scan anyone may open (replays only), and the run the one-take plays
+ * (AYNA_DEMO_RUN; without it, the best run). */
+function demoScan(): { owner: string; id: string; run: string | null } | null {
   const [owner, id] = (process.env.AYNA_DEMO_SCAN ?? '').split('/');
-  return owner && id ? { owner, id } : null;
+  const run = process.env.AYNA_DEMO_RUN ?? '';
+  return owner && id ? { owner, id, run: ID_PATTERN.test(run) ? run : null } : null;
 }
 
 function checkIds(owner: string, scan: string): void {

@@ -138,8 +138,10 @@ over (5.2 → 0.5 cm), and masses and friction come from Muse Spark with a one-l
   calls: the models' outputs come from the run record and the robots re-run in the twin).
 - **Live:** sign in (judges: credentials are in the submission form) → open a mirror → hold the mic or type
   "tidy up my desk" → watch the models work → drag the before/after slider → **Do it**.
-- **One take for video:** [`/app/?autoplay`](https://ayna-brown.vercel.app/app/?autoplay) replays the best
-  run of the demo mirror without clicks.
+- **One take for video:** [`/app/?autoplay`](https://ayna-brown.vercel.app/app/?autoplay) replays the demo
+  mirror's featured run without clicks ("Put all the small things together in one corner": SAM 3.1 rejected
+  four of six versions, five objects move, 5 of 5 done). Any saved run plays the same way with
+  `?autoplay#/scan/<owner>/<scan>/run/<run>`.
 
 ## Quick start
 
@@ -203,7 +205,8 @@ xcodebuild -project Ayna.xcodeproj -scheme Ayna -configuration Release \
 ```
 
 **Deploy:** `cd web && vercel deploy --prod` (one Vercel Function serves `/api`; scans and runs live in a
-private Vercel Blob store; set `META_API_KEY`, `META_API_BASE`, `AUTH_SECRET`, `AYNA_DEMO_SCAN` with
+private Vercel Blob store; set `META_API_KEY`, `META_API_BASE`, `AUTH_SECRET`, `AYNA_DEMO_SCAN` (and
+optionally `AYNA_DEMO_RUN`, the run the one-take plays) with
 `vercel env add`).
 
 ## Repository

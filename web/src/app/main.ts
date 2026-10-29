@@ -10,7 +10,8 @@ import { scanPage } from './scanPage';
 // Routes (hash, so the static host needs no rewrites):
 //   #/                      mirrors (the guest sees the demo mirror)
 //   #/login                 sign in
-//   #/scan/<owner>/<id>     one mirror; ?autoplay replays its best run in one take (for video)
+//   #/scan/<owner>/<id>[/run/<run>]   one mirror; ?autoplay replays that run (or its best) in one take
+//   ?autoplay alone         the demo mirror's featured run (AYNA_DEMO_RUN), for the video
 
 const session: Session = { base: '' };
 let user: User | null = null;
@@ -80,7 +81,7 @@ async function render(): Promise<void> {
       // One take for the video: straight into the demo mirror.
       const { demo } = await scans.list(session);
       if (demo) {
-        location.hash = `#/scan/${demo.owner}/${demo.id}`;
+        location.hash = `#/scan/${demo.owner}/${demo.id}${demo.run ? `/run/${demo.run}` : ''}`;
         return;
       }
     }
