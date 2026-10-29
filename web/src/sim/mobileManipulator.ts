@@ -20,6 +20,8 @@ const PALM_CLEARANCE_M = 0.012; // a tall object's top stays this far below the 
 const PALM_ABOVE_GRIP_M = 0.05; // default for bundles that do not say
 const DROP_GAP_M = 0.012; // release this far above the target surface
 const WIDTH_MARGIN_M = 0.012;
+const LONG_CARRY_M = 0.2; // a flat object longer than this, held by an edge thinner than THIN_EDGE_M,
+const THIN_EDGE_M = 0.025; // swings out of the fingers while the base drives (the desk's keyboard did, every time)
 const LIFTED_M = 0.04; // the object has to rise this much for a grasp to count
 const HELD_NEAR_M = 0.12; // a held object stays this close to the grip point
 const JOINT_SPEED = 0.9; // rad/s for the joint that moves the most
@@ -128,7 +130,7 @@ export class MobileManipulator extends RobotBase {
     const base = this.basePose();
     const distance = Math.hypot(shape.center[0] - base.x, shape.center[1] - base.y);
     const problems: string[] = [];
-    const width = this.widthProblem(shape);
+    const width = this.widthProblem(shape) ?? this.carryProblem(shape);
     if (width) problems.push(width);
     const lift = this.liftFor(this.graspHeight(shape));
     if (typeof lift === 'string') problems.push(lift);
@@ -155,7 +157,7 @@ export class MobileManipulator extends RobotBase {
     if (!this.hasObject(objectName)) return refused(`No object named ${objectName}`);
     const label = this.name(objectName);
     const shape = perceivedShape(this.physics, objectName);
-    const width = this.widthProblem(shape);
+    const width = this.widthProblem(shape) ?? this.carryProblem(shape);
     if (width) return this.refuse(`${label}: ${width}`);
     const graspZ = this.graspHeight(shape);
     const target: Vec2 = [shape.center[0], shape.center[1]];
@@ -353,6 +355,12 @@ export class MobileManipulator extends RobotBase {
       Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M),
       shape.top - palm + PALM_CLEARANCE_M,
     );
+  }
+
+  private carryProblem(shape: ObjectShape): string | null {
+    const edge = shape.top - shape.bottom;
+    if (shape.length <= LONG_CARRY_M || edge >= THIN_EDGE_M) return null;
+    return `${(shape.length * 100).toFixed(0)} cm long and ${(edge * 100).toFixed(1)} cm thin: held by that edge it slips out while the base drives`;
   }
 
   private widthProblem(shape: ObjectShape): string | null {

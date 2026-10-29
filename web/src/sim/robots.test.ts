@@ -125,6 +125,8 @@ describe.skipIf(!HAS_ROBOTS)('robots on a scanned desk', async () => {
     const check = rover.reachOf(laptop);
     expect(check.ok).toBe(false);
     expect(check.reason).toMatch(/cm wide, needs [0-9.]+ cm with clearance, gripper opens 16 cm/);
+    // The keyboard fits the 16 cm gripper, but held by its 2 cm edge it swung out on every drive.
+    expect(rover.reachOf(byLabel('keyboard')).reason).toMatch(/27 cm long and 1\.9 cm thin: held by that edge it slips out while the base drives/);
     expect(rover.pick(laptop)).toMatchObject({ ok: false });
     expect(rover.status.error).toBe(true);
     expect(rover.placeAt(-1, 2.5)).toEqual({ ok: false, reason: 'Not holding anything' });
