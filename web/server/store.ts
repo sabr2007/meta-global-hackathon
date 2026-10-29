@@ -9,6 +9,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 export const URL_TTL_MS = 60 * 60 * 1000;
+const URL_BUCKET_MS = 10 * 60 * 1000; // expiries round up to this, so a file keeps one URL (and one cache entry) for a while
+
+/** When a link signed now expires: at least URL_TTL_MS away, the same for every link signed in the same 10 minutes. */
+export const linkExpiry = (): number => Math.ceil((Date.now() + URL_TTL_MS) / URL_BUCKET_MS) * URL_BUCKET_MS;
 
 export interface UploadTarget {
   url: string;
@@ -109,11 +113,11 @@ function diskStore(root: string): Store {
       await rm(file(key), { force: true });
     },
     async readUrl(key) {
-      const expires = Date.now() + URL_TTL_MS;
+      const expires = linkExpiry();
       return `/api/files/${safeKey(key)}?exp=${expires}&sig=${signFileUrl(key, expires)}`;
     },
     async uploadTarget(key, contentType) {
-      const expires = Date.now() + URL_TTL_MS;
+      const expires = linkExpiry();
       return {
         url: `/api/files/${safeKey(key)}?exp=${expires}&sig=${signFileUrl(key, expires)}`,
         method: 'PUT',
@@ -195,7 +199,7 @@ function blobStore(): Store {
         operation: 'get',
         pathname: safeKey(key),
         access: 'private',
-        validUntil: Date.now() + URL_TTL_MS,
+        validUntil: linkExpiry(),
       });
       return presignedUrl;
     },
