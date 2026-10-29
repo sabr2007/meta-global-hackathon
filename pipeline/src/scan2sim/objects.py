@@ -16,7 +16,7 @@ from scan2sim.frames import WorldFrame
 from scan2sim.hero import full_raster, upright_camera
 from scan2sim.images import UprightImage
 from scan2sim.object_mesh import collider_pieces, convex_hull, mean_color, oriented_size, simplify
-from scan2sim.placement import place_mesh
+from scan2sim.placement import level_rotation, place_mesh
 from scan2sim.reconstruct import ObjectReconstruction
 from scan2sim.scene import Box, ScannedObject
 from scan2sim.segmentation import ObjectMask
@@ -120,26 +120,33 @@ def build_scanned_object(
         camera = upright_camera(view, image, frame)
         placed = trimesh.Trimesh(world, light.faces, vertex_colors=colors, process=False)
         colors = bake_photo_colors(placed, camera, np.asarray(image.image), full_raster(mask, (camera.width, camera.height)))
+    # Settle the collider itself onto the face below its centre of mass (its vertices move with the
+    # mesh: picking them again after turning could pick a slightly different, tilted, base).
+    hull_vertices, hull_faces = convex_hull(world)
+    settle = level_rotation(hull_vertices)
+    pivot = hull_vertices.mean(axis=0)
+    world, hull_vertices = ((points - pivot) @ settle.T + pivot for points in (world, hull_vertices))
     low, high = world.min(axis=0), world.max(axis=0)
     # Lift objects out of the RoomPlan collider they rest on; never push them down.
     support = support_top(boxes, (low[:2] + high[:2]) / 2, low[2])
-    world = world + np.array([0.0, 0.0, max(0.0, support + DROP_GAP_M - low[2])])
+    lift = np.array([0.0, 0.0, max(0.0, support + DROP_GAP_M - low[2])])
+    world, hull_vertices = world + lift, hull_vertices + lift
     low, high = world.min(axis=0), world.max(axis=0)
     origin = (low + high) / 2
     visual = trimesh.Trimesh(world - origin, light.faces, vertex_colors=colors, process=False)
-    hull_vertices, hull_faces = convex_hull(visual.vertices)
+    settled_deg = float(np.degrees(np.arccos(np.clip((np.trace(settle) - 1) / 2, -1.0, 1.0))))
     return ScannedObject(
         name=name,
         label=label,
         position=origin,
         visual_glb=visual.export(file_type="glb"),
-        hull_vertices=hull_vertices,
+        hull_vertices=hull_vertices - origin,
         hull_faces=hull_faces,
         size=oriented_size(visual.vertices),
         rgba=mean_color(visual),
         depth_scale=placement.depth_scale,
         fit_error_m=placement.fit_error_m,
-        level_deg=placement.level_deg,
+        level_deg=placement.level_deg + settled_deg,
         photo_scale=placement.photo_scale,
         depth_source=placement.depth_source,
         collider_pieces=tuple(collider_pieces(visual.vertices, visual.faces)),

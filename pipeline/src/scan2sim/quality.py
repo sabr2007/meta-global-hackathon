@@ -6,8 +6,8 @@ One row per object:
   sees them) across the line of sight, along it (on the ground) and up from the base; 1.00 is a
   match. Across is the sharpest: LiDAR depth noise stretches "along", and its low resolution
   flattens small objects, which shows in "up" (needs the capture);
-- tilt_deg: angle between the mesh's up axis (the normal of the base its convex hull stands on) and
-  the table normal (+Z);
+- tilt_deg: angle between the mesh's up axis (the normal of its collider's face below the centre of
+  mass, which it settles on) and the table normal (+Z);
 - drift_cm: how far the body moves in the first SETTLE_SECONDS of simulation;
 - color_de: CIE76 difference between the object's mean colour in the hero photo (inside its mask)
   and the mean colour of the visible side of its mesh;
@@ -163,7 +163,9 @@ def object_quality(
         color_de = mean_color_difference(photo, full_raster(mask, (camera.width, camera.height)), colors)
     hole = hole_open(mesh_world, colliders) if colliders is not None else None
     mass_g = None if mass_kg is None else mass_kg * 1000
-    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth, hole, mass_g)
+    # Tilt as the simulation sees it: the colliders when the bundle has them, else the mesh's own hull.
+    outline = np.vstack([v for v, _ in colliders]) if colliders else vertices
+    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(outline)), drift_m * 100, color_de, iou, depth, hole, mass_g)
 
 
 def lidar_points(capture_dir: Path, photo_stem: str, masks: dict[str, ObjectMask], frame: WorldFrame) -> dict[str, np.ndarray]:

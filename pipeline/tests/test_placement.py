@@ -113,14 +113,17 @@ def test_place_mesh_puts_the_object_where_the_lidar_saw_it():
     camera[:3, 3] = [0.3, 0.1, 0.5]
     view = CameraView(image=None, width=SENSOR[0], height=SENSOR[1], intrinsics=np.eye(3), camera_to_world=camera, timestamp=0.0)
     frame = WorldFrame(origin_arkit=np.array([0.0, -1.2, 0.0]))
-    x, y, z, w = Rotation.from_euler("xyz", [20, -40, 70], degrees=True).as_quat()
+    to_world = camera_to_world(view, frame, image)
+    # A pose that leaves the box lying flat (turned 70 degrees about the vertical): levelling has nothing to do.
+    lying = Rotation.from_euler("z", 70, degrees=True).as_matrix()
+    rotation = GLB_TO_SAM3D @ lying.T @ to_world[:3, :3] @ PYTORCH3D_TO_CV
+    x, y, z, w = Rotation.from_matrix(rotation).as_quat()
     pose = ObjectPose(rotation_wxyz=np.array([w, x, y, z]), translation=np.array([0.2, -0.1, 1.4]), scale=0.25)
     box = _box_mesh()
     true_k = 0.86
     truth_cv = mesh_in_camera(box.vertices, pose) * true_k
-    to_world = camera_to_world(view, frame, image)
     lidar_world = _nearest_per_ray(truth_cv) @ to_world[:3, :3].T + to_world[:3, 3]
-    assert level_rotation(truth_cv @ to_world[:3, :3].T) == pytest.approx(np.eye(3))  # no base near the table
+    assert level_rotation(truth_cv @ to_world[:3, :3].T) == pytest.approx(np.eye(3))
 
     placed = place_mesh(box.vertices, box.faces, pose, image, view, frame, lidar_world)
 
@@ -140,17 +143,19 @@ def test_levelling_stands_a_slightly_tilted_box_on_its_base():
     assert tilt_deg(up_axis(points @ level_rotation(points).T)) < 0.2
 
 
-def test_levelling_leaves_a_steep_tilt_alone():
-    points = _tilted(trimesh.creation.box(extents=[0.07, 0.05, 0.03]), LEVEL_MAX_DEG + 10)
+def test_levelling_leaves_a_leaning_book_alone():
+    book = trimesh.creation.box(extents=[0.20, 0.15, 0.02])
+    points = _tilted(book, LEVEL_MAX_DEG + 10, axis=(1.0, 0.0, 0.0))  # its cover faces the table at 55 degrees
     assert level_rotation(points) == pytest.approx(np.eye(3))
 
 
-def test_levelling_never_makes_a_base_steeper():
+def test_levelling_rolls_a_pen_onto_a_face_it_stays_on():
     pen = trimesh.creation.cylinder(radius=0.006, height=0.12, sections=10)
-    pen.apply_transform(trimesh.transformations.rotation_matrix(np.radians(90), [1.0, 0.0, 0.0]))
-    points = _tilted(pen, 2.0, axis=(0.2, 1.0, 0.0))
-    before = tilt_deg(up_axis(points))
-    assert tilt_deg(up_axis(points @ level_rotation(points).T)) <= before + 1e-9
+    pen.apply_transform(trimesh.transformations.rotation_matrix(np.radians(90), [1.0, 0.0, 0.0]))  # lying along y
+    pen.apply_transform(trimesh.transformations.rotation_matrix(np.radians(15), [0.0, 1.0, 0.0]))  # rolled off its face
+    points = _tilted(pen, 2.0, axis=(1.0, 0.0, 0.0))  # and one end up
+    assert tilt_deg(up_axis(points)) > 10.0
+    assert tilt_deg(up_axis(points @ level_rotation(points).T)) < 0.2
 
 
 def test_place_mesh_levels_a_slightly_tilted_object():

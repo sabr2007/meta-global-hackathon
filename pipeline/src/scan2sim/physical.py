@@ -63,8 +63,9 @@ class PhysicalProperties:
 
 
 def objects_key(objects: list[tuple[str, str, tuple[float, ...]]]) -> str:
-    """Fingerprint of the question: names, labels and sizes (to the millimetre)."""
-    rows = [[name, label, [round(float(v), 3) for v in size]] for name, label, size in objects]
+    """Fingerprint of the question: model, prompt, names and labels. Sizes are context only, so a
+    rebuild that places an object a millimetre differently does not pay for a new answer."""
+    rows = [[name, label] for name, label, _ in objects]
     return hashlib.sha256(json.dumps([SPARK_MODEL, PHYSICAL_PROMPT, rows]).encode()).hexdigest()[:16]
 
 
@@ -122,5 +123,6 @@ async def physical_properties(
         payload, usage = await ask_spark(client, image, objects)
     if path:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"key": key, "model": SPARK_MODEL, "usage": usage, "answer": json.loads(payload)}, indent=1) + "\n")
+        record = {"key": key, "model": SPARK_MODEL, "asked": object_listing(objects), "usage": usage, "answer": json.loads(payload)}
+        path.write_text(json.dumps(record, indent=1) + "\n")
     return parse_properties(payload, names)

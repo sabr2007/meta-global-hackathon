@@ -56,12 +56,12 @@ def test_spark_is_asked_once_and_the_answer_cached(tmp_path, monkeypatch):
     image = UprightImage(Image.new("RGB", (8, 8)), (8, 8), 0, 1.0)
     settings = MetaSettings(api_key="test", base_url="https://example.invalid/v1")
     first = asyncio.run(physical_properties(settings, image, OBJECTS, tmp_path))
-    again = asyncio.run(physical_properties(settings, image, OBJECTS, tmp_path))
-    resized = asyncio.run(physical_properties(settings, image, [OBJECTS[0][:2] + ((0.07, 0.06, 0.10),)], tmp_path))
+    resized = asyncio.run(physical_properties(settings, image, [OBJECTS[0][:2] + ((0.079, 0.06, 0.10),), OBJECTS[1]], tmp_path))
+    fewer = asyncio.run(physical_properties(settings, image, OBJECTS[:1], tmp_path))
 
-    assert first == again and first["obj_1_ring"] == PhysicalProperties(0.04, 0.8, "soft rubber toy")
-    assert len(calls) == 2  # the resized cup is a new question
-    assert set(resized) == {"obj_0_cup"}
+    assert first == resized and first["obj_1_ring"] == PhysicalProperties(0.04, 0.8, "soft rubber toy")
+    assert len(calls) == 2  # a re-placed cup is the same question; a different set of objects is not
+    assert set(fewer) == {"obj_0_cup"}
     assert json.loads((tmp_path / physical.CACHE_FILE).read_text())["usage"]["output_tokens"] == 150
 
 

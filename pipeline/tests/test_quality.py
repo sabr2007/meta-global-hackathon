@@ -52,10 +52,13 @@ def test_tilt_is_the_angle_of_the_base_off_the_table():
     assert tilt_deg(up_axis(box.vertices)) == pytest.approx(7.0, abs=0.01)
 
 
-def test_a_round_object_has_no_tilt_to_fix():
-    sphere = trimesh.creation.icosphere(subdivisions=4, radius=0.04)
-    sphere.apply_transform(trimesh.transformations.rotation_matrix(np.radians(25.0), [1.0, 0.0, 0.0]))
-    assert tilt_deg(up_axis(sphere.vertices)) < 1.0
+def test_a_base_that_looks_level_but_rocks_on_a_corner_is_tilted():
+    # A 6 x 6 x 3 cm block whose bottom bulges 2 mm in the middle (one corner of the bulge lower):
+    # its base averages out level, but it settles onto one of the bulge's faces.
+    block = trimesh.creation.box(extents=[0.06, 0.06, 0.03])
+    vertices = np.vstack([block.vertices, [[0.002, 0.001, -0.017]]])
+    up = up_axis(vertices)
+    assert tilt_deg(up) == pytest.approx(np.degrees(np.arctan(0.002 / 0.03)), abs=1.5)
 
 
 def test_the_photo_does_not_see_the_far_side_of_a_box():

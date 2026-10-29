@@ -13,8 +13,8 @@ next best candidate out of 96 gave 10.6 mm):
 
 Before the depth is fitted, two corrections from the photo itself:
 - level: SAM 3D poses come out 1-13 degrees off the table (the mouse on our desk 12.9), and a tilted
-  base rocks down onto the table in the first steps of the simulation. The mesh turns about its
-  centre until the base of its convex hull is flat;
+  mesh rocks onto its base in the first steps of the simulation. The mesh turns about its centre
+  until the collider face below its centre of mass, the face it would settle on, is flat;
 - silhouette: seen through the phone's camera, SAM 3D meshes cover 10-40% more pixels than their
   SAM 3.1 masks and sit 10-35 px off (SAM 3D lays objects out in MoGe's estimated camera, not the
   phone's), so after the depth fit small objects came out 15-25% too large. The mesh is scaled about
@@ -46,9 +46,9 @@ GLB_TO_SAM3D = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]])
 PYTORCH3D_TO_CV = np.diag([-1.0, -1.0, 1.0])  # both look along +z; flip x left -> right, y up -> down
 DEPTH_BIN_RAD = 0.004  # about 4 px at the photo's focal length
 MIN_DEPTH_MATCHES = 20
-LEVEL_MAX_DEG = 20.0  # a base tilted further is not a pose error (a book leaning on something)
+LEVEL_MAX_DEG = 45.0  # a pen rolls up to ~45 degrees onto its flattest side; a mesh turned further is not a pose error
 LEVEL_DONE_DEG = 0.2
-LEVEL_STEPS = 3  # the hull's base changes as it turns; three steps settle every object we scanned
+LEVEL_STEPS = 6  # rolling onto the next face below the centre of mass; six steps settle every object we scanned
 SILHOUETTE_STEPS = 2  # the second step absorbs perspective; a third changes nothing we can measure
 MAX_PHOTO_SCALE = 1.25  # a partly hidden mask must not shrink (or grow) a mesh by more than this
 SEE_THROUGH_M = 0.02  # LiDAR depth this deep inside the table means it saw past the object
@@ -76,25 +76,22 @@ def rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def level_rotation(points: np.ndarray) -> np.ndarray:
-    """World rotation about the points' centre that stands them flat on their base (see up_axis).
+    """World rotation that sets the points down on the face they come to rest on (see up_axis).
 
-    Identity when the base is tilted beyond LEVEL_MAX_DEG, and a step is only kept when it makes the
-    base flatter: a thin cylinder (a pen) has no base to stand on, and turning it only rolls it."""
-    points = np.asarray(points, dtype=np.float64)
-    center = points.mean(axis=0)
+    Each step turns the face below the centre of mass flat, which can bring another face below it
+    (a pen rolls, a spoon tips onto its bowl): a few steps follow that roll to a face the mesh stays
+    on. Identity when the roll would exceed LEVEL_MAX_DEG (not a pose error) or ends no flatter."""
+    points = np.asarray(points, dtype=np.float64) - np.mean(points, axis=0)
+    start = tilt_deg(up_axis(points))
     rotation = np.eye(3)
-    tilt = tilt_deg(up_axis(points))
-    if tilt > LEVEL_MAX_DEG:
-        return rotation
     for _ in range(LEVEL_STEPS):
-        if tilt < LEVEL_DONE_DEG:
+        up = up_axis(points @ rotation.T)
+        if tilt_deg(up) < LEVEL_DONE_DEG:
             break
-        turned = (points - center) @ rotation.T
-        candidate = rotation_between(up_axis(turned), [0.0, 0.0, 1.0]) @ rotation
-        candidate_tilt = tilt_deg(up_axis((points - center) @ candidate.T))
-        if candidate_tilt >= tilt:
-            break
-        rotation, tilt = candidate, candidate_tilt
+        rotation = rotation_between(up, [0.0, 0.0, 1.0]) @ rotation
+    turned_deg = np.degrees(np.arccos(np.clip((np.trace(rotation) - 1) / 2, -1.0, 1.0)))
+    if turned_deg > LEVEL_MAX_DEG or tilt_deg(up_axis(points @ rotation.T)) >= start:
+        return np.eye(3)
     return rotation
 
 

@@ -14,7 +14,6 @@ from scipy.spatial import cKDTree
 
 VISUAL_FACES = 20_000  # raw SAM 3D meshes have ~800k faces, far too heavy for a browser scene
 HULL_MAX_VERTICES = 96  # raw hulls reach ~3000 vertices; contact cost grows with them
-BASE_CONE_DEG = 30.0  # convex hull faces this close to straight down form the base an object stands on
 NEAREST_FACES = 16  # candidate triangles per point for exact point-to-surface distances
 SURFACE_SAMPLES = 60_000  # dense enough for a 3 px z-buffer of a laptop-sized object in the photo
 SAMPLE_SEED = 0
@@ -146,15 +145,14 @@ def surface_samples(mesh: trimesh.Trimesh, count: int = SURFACE_SAMPLES) -> np.n
 
 
 def up_axis(vertices: np.ndarray) -> np.ndarray:
-    """The mesh's up axis: the normal of the base it stands on, i.e. minus the area-weighted mean
-    normal of the convex hull faces that look down (within BASE_CONE_DEG of -Z)."""
-    hull = trimesh.convex.convex_hull(np.asarray(vertices, dtype=np.float64))
-    normals, areas = hull.face_normals, hull.area_faces
-    down = normals[:, 2] < -np.cos(np.radians(BASE_CONE_DEG))
-    if not down.any():
-        return np.array([0.0, 0.0, 1.0])
-    base = -(normals[down] * areas[down, None]).sum(axis=0)
-    return base / np.linalg.norm(base)
+    """The mesh's up axis as it rests: minus the normal of its collider's face straight below its
+    centre of mass. A convex body on a table rolls onto that face, so a mesh whose up axis is +Z
+    stays still when the simulation starts (a level-looking base can still rock on one corner)."""
+    hull = trimesh.Trimesh(*convex_hull(vertices))
+    normals = hull.face_normals
+    down = normals[:, 2] < -1e-9
+    reach = np.einsum("ij,ij->i", normals[down], hull.center_mass - hull.triangles[down, 0]) / normals[down, 2]
+    return -normals[down][int(np.argmin(reach))]
 
 
 def tilt_deg(up: np.ndarray) -> float:
