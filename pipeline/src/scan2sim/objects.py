@@ -100,8 +100,9 @@ def build_scanned_object(
     frame: WorldFrame,
     boxes: tuple[Box, ...],
 ) -> ScannedObject:
-    mesh = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
-    placement = place_mesh(mesh.vertices, reconstruction.pose, image, view, frame, lidar_points_world)
+    raw = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
+    light = simplify(raw)  # decimate first: placement measures the mesh many times
+    placement = place_mesh(light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world)
     world = placement.vertices_world
     low, high = world.min(axis=0), world.max(axis=0)
     # Lift objects out of the RoomPlan collider they rest on; never push them down.
@@ -109,8 +110,7 @@ def build_scanned_object(
     world = world + np.array([0.0, 0.0, max(0.0, support + DROP_GAP_M - low[2])])
     low, high = world.min(axis=0), world.max(axis=0)
     origin = (low + high) / 2
-    local = trimesh.Trimesh(world - origin, mesh.faces, vertex_colors=mesh.visual.vertex_colors, process=False)
-    visual = simplify(local)
+    visual = trimesh.Trimesh(world - origin, light.faces, vertex_colors=light.visual.vertex_colors, process=False)
     hull_vertices, hull_faces = convex_hull(visual.vertices)
     return ScannedObject(
         name=name,
@@ -123,4 +123,5 @@ def build_scanned_object(
         rgba=mean_color(visual),
         depth_scale=placement.depth_scale,
         fit_error_m=placement.fit_error_m,
+        level_deg=placement.level_deg,
     )

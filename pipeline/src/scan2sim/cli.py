@@ -165,7 +165,7 @@ def objects(args: argparse.Namespace) -> int:
     for b in bodies:
         size = " x ".join(f"{v * 100:.1f}" for v in b.size)
         print(
-            f"  {b.label:<22} {size} cm  depth x{b.depth_scale:.2f}  "
+            f"  {b.label:<22} {size} cm  depth x{b.depth_scale:.2f}  levelled {b.level_deg:.1f} deg  "
             f"fit {b.fit_error_m * 1000:.1f} mm  moves {moved[b.name] * 100:.1f} cm in {SETTLE_SECONDS:.0f} s"
         )
     if mount:

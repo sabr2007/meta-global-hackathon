@@ -3,8 +3,9 @@
 One row per object:
 - lidar_mm: mean distance from the object's LiDAR points to its mesh surface (needs the capture);
 - size: extent of the mesh's visible surface / extent of the object's LiDAR points (both as the photo
-  sees them) along the mesh's principal ground axes and up from its base: length, width, height;
-  1.00 is a match (needs the capture);
+  sees them) across the line of sight, along it (on the ground) and up from the base; 1.00 is a
+  match. Across is the sharpest: LiDAR depth noise stretches "along", and its low resolution
+  flattens small objects, which shows in "up" (needs the capture);
 - tilt_deg: angle between the mesh's up axis (the normal of the base its convex hull stands on) and
   the table normal (+Z);
 - drift_cm: how far the body moves in the first SETTLE_SECONDS of simulation;
@@ -43,7 +44,7 @@ class ObjectQuality:
     name: str
     label: str
     lidar_mm: float | None
-    size: tuple[float, float, float] | None  # length, width, height ratios (mesh / LiDAR)
+    size: tuple[float, float, float] | None  # across, along, up ratios (mesh / LiDAR)
     tilt_deg: float
     drift_cm: float
     color_de: float | None
@@ -63,11 +64,11 @@ def settle_drift(mjcf: Path, bodies: list[str], seconds: float = SETTLE_SECONDS)
     return {name: float(np.linalg.norm(data.body(name).xpos - start[name])) for name in bodies}
 
 
-def ground_axes(points: np.ndarray) -> np.ndarray:
-    """(2, 2) principal axes of the points' footprint on the ground, major axis first."""
-    xy = np.asarray(points, dtype=np.float64)[:, :2]
-    _, _, axes = np.linalg.svd(xy - xy.mean(axis=0), full_matrices=False)
-    return axes
+def view_axes(camera: PhotoCamera, point: np.ndarray) -> np.ndarray:
+    """(2, 2) ground directions across and along the line of sight from the camera to `point`."""
+    along = (np.asarray(point, dtype=np.float64) - camera.camera_to_world[:3, 3])[:2]
+    along /= np.linalg.norm(along)
+    return np.array([[-along[1], along[0]], along])
 
 
 def robust_extents(points: np.ndarray, axes: np.ndarray, base_z: float) -> np.ndarray:
@@ -103,7 +104,7 @@ def object_quality(
     lidar_mm = size = color_de = None
     if camera is not None and lidar_points is not None and len(lidar_points):
         lidar_mm = float(surface_distances(vertices, mesh_world.faces, lidar_points).mean() * 1000)
-        axes, base_z = ground_axes(surface), float(vertices[:, 2].min())
+        axes, base_z = view_axes(camera, vertices.mean(axis=0)), float(vertices[:, 2].min())
         seen = surface[camera.seen(surface, surface)]
         ratio = robust_extents(seen, axes, base_z) / robust_extents(lidar_points, axes, base_z)
         size = tuple(round(float(v), 3) for v in ratio)
@@ -160,7 +161,7 @@ def _cell(value: float | None, spec: str) -> str:
 
 def format_table(rows: list[ObjectQuality]) -> str:
     """Fixed-width table with a median row (per column; per axis for the size ratios)."""
-    lines = [f"{'object':<24}{'lidar mm':>9}  {'size L / W / H':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}"]
+    lines = [f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}"]
     for r in rows:
         size = " / ".join(f"{v:.2f}" for v in r.size) if r.size else "-"
         lines.append(

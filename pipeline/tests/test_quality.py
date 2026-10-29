@@ -12,7 +12,7 @@ from scan2sim.export import _object_metadata
 from scan2sim.hero import MASKS_FILE, PhotoCamera, encode_rle, silhouette
 from scan2sim.mjcf import scene_to_mjcf
 from scan2sim.object_mesh import surface_distances, surface_samples, tilt_deg, up_axis
-from scan2sim.quality import ground_axes, mean_color_difference, report, robust_extents, settle_drift
+from scan2sim.quality import mean_color_difference, report, robust_extents, settle_drift, view_axes
 from scan2sim.roomplan import parse_room
 from scan2sim.scene import build_scene
 from scan2sim.segmentation import ObjectMask
@@ -77,9 +77,14 @@ def test_a_mesh_matching_its_scan_has_size_ratio_one_and_a_bigger_mesh_shows_it(
         mesh.apply_translation([0.0, 0.0, -mesh.vertices[:, 2].min()])
         surface = surface_samples(mesh)
         seen = surface[camera.seen(surface, surface)]
-        axes = ground_axes(surface)
+        axes = view_axes(camera, [0.0, 0.0, 0.0])
         ratio = robust_extents(seen, axes, 0.0) / robust_extents(lidar, axes, 0.0)
         assert ratio == pytest.approx([scale] * 3, rel=0.03)
+
+
+def test_view_axes_run_across_and_along_the_line_of_sight():
+    camera = _camera([0.0, 0.0, 0.0])  # looks along +y
+    assert view_axes(camera, [0.0, 0.0, 0.0]) == pytest.approx(np.array([[-1.0, 0.0], [0.0, 1.0]]))
 
 
 def test_colour_difference_tells_orange_from_red():

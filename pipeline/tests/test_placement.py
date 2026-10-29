@@ -1,15 +1,21 @@
 import numpy as np
 import pytest
+import trimesh
 from PIL import Image
 from scipy.spatial.transform import Rotation
 
 from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
 from scan2sim.images import UprightImage
+from scan2sim.object_mesh import tilt_deg, up_axis
 from scan2sim.placement import (
     DEPTH_BIN_RAD,
+    GLB_TO_SAM3D,
+    LEVEL_MAX_DEG,
+    PYTORCH3D_TO_CV,
     camera_to_world,
     depth_scale,
+    level_rotation,
     mesh_in_camera,
     place_mesh,
     upright_cv_to_arkit,
@@ -37,6 +43,14 @@ def _box_vertices(n=12) -> np.ndarray:
             p[:, (axis + 1) % 3], p[:, (axis + 2) % 3] = u.ravel(), v.ravel()
             faces.append(p)
     return np.vstack(faces) * np.array([1.0, 0.4, 0.6])
+
+
+def _box_mesh() -> trimesh.Trimesh:
+    """The same 1 x 0.4 x 0.6 box as a dense triangle mesh."""
+    box = trimesh.creation.box(extents=[1.0, 0.4, 0.6])
+    for _ in range(4):
+        box = box.subdivide()
+    return box
 
 
 def _nearest_per_ray(points_cv: np.ndarray) -> np.ndarray:
@@ -98,15 +112,60 @@ def test_place_mesh_puts_the_object_where_the_lidar_saw_it():
     frame = WorldFrame(origin_arkit=np.array([0.0, -1.2, 0.0]))
     x, y, z, w = Rotation.from_euler("xyz", [20, -40, 70], degrees=True).as_quat()
     pose = ObjectPose(rotation_wxyz=np.array([w, x, y, z]), translation=np.array([0.2, -0.1, 1.4]), scale=0.25)
-    vertices = _box_vertices()
+    box = _box_mesh()
     true_k = 0.86
-    truth_cv = mesh_in_camera(vertices, pose) * true_k
+    truth_cv = mesh_in_camera(box.vertices, pose) * true_k
     to_world = camera_to_world(view, frame, image)
     lidar_world = _nearest_per_ray(truth_cv) @ to_world[:3, :3].T + to_world[:3, 3]
+    assert level_rotation(truth_cv @ to_world[:3, :3].T) == pytest.approx(np.eye(3))  # no base near the table
 
-    placed = place_mesh(vertices, pose, image, view, frame, lidar_world)
+    placed = place_mesh(box.vertices, box.faces, pose, image, view, frame, lidar_world)
 
     assert placed.depth_scale == pytest.approx(true_k, abs=0.005)
     truth_world = truth_cv @ to_world[:3, :3].T + to_world[:3, 3]
     assert placed.vertices_world == pytest.approx(truth_world, abs=0.005)
     assert placed.fit_error_m < 0.01
+
+
+def _tilted(mesh: trimesh.Trimesh, degrees: float, axis=(1.0, 0.3, 0.0)) -> np.ndarray:
+    return mesh.vertices @ Rotation.from_rotvec(np.radians(degrees) * np.asarray(axis) / np.linalg.norm(axis)).as_matrix().T
+
+
+def test_levelling_stands_a_slightly_tilted_box_on_its_base():
+    points = _tilted(trimesh.creation.box(extents=[0.07, 0.05, 0.03]), 6.0)
+    assert tilt_deg(up_axis(points)) == pytest.approx(6.0, abs=0.01)
+    assert tilt_deg(up_axis(points @ level_rotation(points).T)) < 0.2
+
+
+def test_levelling_leaves_a_steep_tilt_alone():
+    points = _tilted(trimesh.creation.box(extents=[0.07, 0.05, 0.03]), LEVEL_MAX_DEG + 10)
+    assert level_rotation(points) == pytest.approx(np.eye(3))
+
+
+def test_levelling_never_makes_a_base_steeper():
+    pen = trimesh.creation.cylinder(radius=0.006, height=0.12, sections=10)
+    pen.apply_transform(trimesh.transformations.rotation_matrix(np.radians(90), [1.0, 0.0, 0.0]))
+    points = _tilted(pen, 2.0, axis=(0.2, 1.0, 0.0))
+    before = tilt_deg(up_axis(points))
+    assert tilt_deg(up_axis(points @ level_rotation(points).T)) <= before + 1e-9
+
+
+def test_place_mesh_levels_a_slightly_tilted_object():
+    image = _upright(0)
+    camera = np.eye(4)
+    camera[:3, :3] = Rotation.from_euler("x", -50, degrees=True).as_matrix()  # ARKit is +Y up: looking down
+    view = CameraView(image=None, width=SENSOR[0], height=SENSOR[1], intrinsics=np.eye(3), camera_to_world=camera, timestamp=0.0)
+    frame = WorldFrame(origin_arkit=np.zeros(3))
+    to_world = camera_to_world(view, frame, image)
+    box = _box_mesh()
+    box.apply_scale(0.1)
+    world = _tilted(box, 5.0) + [0.0, 0.6, -0.4]  # a box 0.6 m ahead, resting 5 degrees off level
+    cv = (world - to_world[:3, 3]) @ to_world[:3, :3]  # its vertices in the camera
+    glb = cv @ PYTORCH3D_TO_CV @ GLB_TO_SAM3D  # inverse of mesh_in_camera with an identity pose
+    lidar_world = _nearest_per_ray(cv) @ to_world[:3, :3].T + to_world[:3, 3]
+
+    placed = place_mesh(glb, box.faces, IDENTITY, image, view, frame, lidar_world)
+
+    assert placed.level_deg == pytest.approx(5.0, abs=0.2)
+    assert tilt_deg(up_axis(placed.vertices_world)) < 0.2
+    assert placed.depth_scale == pytest.approx(1.0, abs=0.02)
