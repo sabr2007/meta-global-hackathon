@@ -12,6 +12,8 @@ One row per object:
 - color_de: CIE76 difference between the object's mean colour in the hero photo (inside its mask)
   and the mean colour of the visible side of its mesh;
 - iou: photo camera vs placed mesh, as stored in scene.json (camera.alignment);
+- hole_open: for an object with a hole straight through it (a ring), the share of that hole, seen
+  from above, that its colliders leave open (a single convex hull closes it: 0.0);
 - depth: where the object's depth came from, as stored in scene.json ("table" means the LiDAR saw
   past it, so its LiDAR columns measure the background, not the object).
 """
@@ -33,7 +35,7 @@ from scan2sim.frames import WorldFrame
 from scan2sim.hero import HERO_FILE, PhotoCamera, full_raster, load_masks
 from scan2sim.images import load_upright
 from scan2sim.lift import MASK_ERODE_PX, erode, lift_masks
-from scan2sim.object_mesh import surface_distances, surface_samples, tilt_deg, up_axis
+from scan2sim.object_mesh import surface_distances, surface_samples, through_hole, tilt_deg, up_axis
 from scan2sim.perceive import MODEL_MAX_SIDE
 from scan2sim.segmentation import ObjectMask
 
@@ -52,19 +54,58 @@ class ObjectQuality:
     color_de: float | None
     iou: float | None
     depth: str | None = None
+    hole_open: float | None = None
 
 
-def settle_drift(mjcf: Path, bodies: list[str], seconds: float = SETTLE_SECONDS) -> dict[str, float]:
-    """How far each body moves in the first seconds: a few mm means it rests where it was scanned."""
+def start_state(mjcf: Path) -> tuple[mujoco.MjModel, mujoco.MjData]:
+    """A scene's model at its first instant (keyframe 0 when it has one)."""
     model = mujoco.MjModel.from_xml_path(str(mjcf))
     data = mujoco.MjData(model)
     if model.nkey:
         mujoco.mj_resetDataKeyframe(model, data, 0)
     mujoco.mj_forward(model, data)
+    return model, data
+
+
+def drift(model: mujoco.MjModel, data: mujoco.MjData, bodies: list[str], seconds: float = SETTLE_SECONDS) -> dict[str, float]:
+    """How far each body moves in the next seconds of simulation."""
     start = {name: data.body(name).xpos.copy() for name in bodies}
     for _ in range(int(seconds / model.opt.timestep)):
         mujoco.mj_step(model, data)
     return {name: float(np.linalg.norm(data.body(name).xpos - start[name])) for name in bodies}
+
+
+def settle_drift(mjcf: Path, bodies: list[str], seconds: float = SETTLE_SECONDS) -> dict[str, float]:
+    """How far each body moves in the first seconds: a few mm means it rests where it was scanned."""
+    return drift(*start_state(mjcf), bodies, seconds)
+
+
+def collider_meshes(model: mujoco.MjModel, data: mujoco.MjData, body: str) -> list[tuple[np.ndarray, np.ndarray]]:
+    """World vertices and faces of a body's colliding mesh geoms, where they are now."""
+    meshes = []
+    body_id = model.body(body).id
+    for g in range(model.ngeom):
+        if model.geom_bodyid[g] != body_id or model.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
+            continue
+        if model.geom_contype[g] == 0 and model.geom_conaffinity[g] == 0:
+            continue
+        m = model.geom_dataid[g]
+        vertices = model.mesh_vert[model.mesh_vertadr[m] : model.mesh_vertadr[m] + model.mesh_vertnum[m]]
+        faces = model.mesh_face[model.mesh_faceadr[m] : model.mesh_faceadr[m] + model.mesh_facenum[m]]
+        meshes.append((vertices @ data.geom_xmat[g].reshape(3, 3).T + data.geom_xpos[g], faces))
+    return meshes
+
+
+def hole_open(mesh_world: trimesh.Trimesh, colliders: list[tuple[np.ndarray, np.ndarray]]) -> float | None:
+    """Share of the mesh's hole straight through it (from above) that the colliders leave open."""
+    found = through_hole(mesh_world.vertices, mesh_world.faces)
+    if found is None:
+        return None
+    grid, hole = found
+    covered = np.zeros(grid.shape, dtype=bool)
+    for vertices, faces in colliders:
+        covered |= grid.cover(vertices, faces)
+    return float((hole & ~covered).sum() / hole.sum())
 
 
 def view_axes(camera: PhotoCamera, point: np.ndarray) -> np.ndarray:
@@ -101,6 +142,7 @@ def object_quality(
     drift_m: float,
     iou: float | None,
     depth: str | None = None,
+    colliders: list[tuple[np.ndarray, np.ndarray]] | None = None,
 ) -> ObjectQuality:
     """All metrics of one object whose mesh is already placed in the world."""
     vertices = np.asarray(mesh_world.vertices, dtype=np.float64)
@@ -116,7 +158,8 @@ def object_quality(
         visible = camera.seen(vertices, surface) & (camera.facing(vertices, mesh_world.vertex_normals) > 0)
         colors = np.asarray(mesh_world.visual.vertex_colors)[visible]
         color_de = mean_color_difference(photo, full_raster(mask, (camera.width, camera.height)), colors)
-    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth)
+    hole = hole_open(mesh_world, colliders) if colliders is not None else None
+    return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth, hole)
 
 
 def lidar_points(capture_dir: Path, photo_stem: str, masks: dict[str, ObjectMask], frame: WorldFrame) -> dict[str, np.ndarray]:
@@ -149,12 +192,14 @@ def report(bundle: Path, capture: Path | None = None, photo_stem: str | None = N
     points = {}
     if capture is not None and photo_stem is not None and masks:
         points = lidar_points(capture, photo_stem, masks, WorldFrame.from_matrix(meta["frame"]["arkit_to_world"]))
-    drift = settle_drift(bundle / meta["files"]["mjcf"], [o["body"] for o in objects])
+    model, data = start_state(bundle / meta["files"]["mjcf"])
+    colliders = {o["body"]: collider_meshes(model, data, o["body"]) for o in objects}
+    moved = drift(model, data, [o["body"] for o in objects])
     alignment = (camera_block or {}).get("alignment", {})
     return [
         object_quality(
             o["name"], o["label"], placed_mesh(bundle, o), camera, photo, masks.get(o["name"]), points.get(o["name"]),
-            drift[o["body"]], alignment.get(o["name"], {}).get("iou"), o.get("depth_source"),
+            moved[o["body"]], alignment.get(o["name"], {}).get("iou"), o.get("depth_source"), colliders[o["body"]],
         )
         for o in objects
     ]
@@ -166,12 +211,12 @@ def _cell(value: float | None, spec: str) -> str:
 
 def format_table(rows: list[ObjectQuality]) -> str:
     """Fixed-width table with a median row (per column; per axis for the size ratios)."""
-    lines = [f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}  depth"]
+    lines = [f"{'object':<24}{'lidar mm':>9}  {'size ac / al / up':>18}{'tilt°':>7}{'drift cm':>9}{'ΔE':>7}{'IoU':>6}{'hole':>6}  depth"]
     for r in rows:
         size = " / ".join(f"{v:.2f}" for v in r.size) if r.size else "-"
         lines.append(
             f"{r.label[:23]:<24}{_cell(r.lidar_mm, '.1f'):>9}  {size:>18}{r.tilt_deg:>7.1f}{r.drift_cm:>9.2f}"
-            f"{_cell(r.color_de, '.1f'):>7}{_cell(r.iou, '.2f'):>6}  {r.depth or '-'}"
+            f"{_cell(r.color_de, '.1f'):>7}{_cell(r.iou, '.2f'):>6}{_cell(r.hole_open, '.0%'):>6}  {r.depth or '-'}"
         )
     median = lambda values: float(np.median(values)) if values else None  # noqa: E731
     sizes = np.array([r.size for r in rows if r.size])

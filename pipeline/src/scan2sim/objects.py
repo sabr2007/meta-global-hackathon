@@ -15,7 +15,7 @@ from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
 from scan2sim.hero import full_raster, upright_camera
 from scan2sim.images import UprightImage
-from scan2sim.object_mesh import convex_hull, mean_color, oriented_size, simplify
+from scan2sim.object_mesh import collider_pieces, convex_hull, mean_color, oriented_size, simplify
 from scan2sim.placement import place_mesh
 from scan2sim.reconstruct import ObjectReconstruction
 from scan2sim.scene import Box, ScannedObject
@@ -142,4 +142,5 @@ def build_scanned_object(
         level_deg=placement.level_deg,
         photo_scale=placement.photo_scale,
         depth_source=placement.depth_source,
+        collider_pieces=tuple(collider_pieces(visual.vertices, visual.faces)),
     )

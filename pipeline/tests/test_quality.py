@@ -6,14 +6,14 @@ import pytest
 import trimesh
 from PIL import Image
 
-from fixtures import CUP_RGB, DROP_GAP, cup_on_table, look_at, room_document
+from fixtures import CUP_RGB, DROP_GAP, cup_on_table, look_at, ring_on_table, room_document
 from scan2sim.cli import main
 from scan2sim.color import lab_to_srgb, srgb_to_lab
 from scan2sim.export import _object_metadata
 from scan2sim.hero import MASKS_FILE, PhotoCamera, encode_rle, silhouette
 from scan2sim.mjcf import scene_to_mjcf
 from scan2sim.object_mesh import surface_distances, surface_samples, tilt_deg, up_axis
-from scan2sim.quality import mean_color_difference, report, robust_extents, settle_drift, view_axes
+from scan2sim.quality import collider_meshes, hole_open, mean_color_difference, report, robust_extents, settle_drift, start_state, view_axes
 from scan2sim.roomplan import parse_room
 from scan2sim.scene import build_scene
 from scan2sim.segmentation import ObjectMask
@@ -152,3 +152,16 @@ def test_report_command_prints_the_table_and_writes_json(scene, tmp_path, capsys
 def test_lab_round_trips_to_srgb():
     rgb = np.array([[230, 120, 30], [200, 35, 30], [40, 200, 60], [250, 250, 250], [5, 5, 5]], dtype=np.float64)
     assert lab_to_srgb(srgb_to_lab(rgb)) == pytest.approx(rgb, abs=1e-6)
+
+
+@pytest.mark.parametrize("decomposed", [False, True])
+def test_hole_open_measures_how_much_of_a_ring_the_colliders_leave_open(scene, tmp_path, decomposed):
+    ring = ring_on_table(scene, decomposed)
+    mjcf = tmp_path / "scene.xml"
+    mjcf.write_text(scene_to_mjcf(dataclasses.replace(scene, objects=(ring,))))
+    colliders = collider_meshes(*start_state(mjcf), ring.name)
+    mesh = trimesh.load(trimesh.util.wrap_as_stream(ring.visual_glb), file_type="glb", force="mesh")
+    mesh.apply_translation(ring.position)
+    opened = hole_open(mesh, colliders)
+    assert opened > 0.9 if decomposed else opened == 0.0
+    assert hole_open(_box(), [(_box().vertices, _box().faces)]) is None  # nothing to leave open

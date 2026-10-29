@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import trimesh
 
+from scan2sim.object_mesh import collider_pieces, convex_hull
 from scan2sim.scene import ScannedObject, SimScene
 
 FLOOR_Y = -1.2  # ARKit floor height (the phone starts ~1.2 m above the floor)
@@ -111,4 +112,22 @@ def cup_on_table(scene: SimScene, name: str = "obj_0_cup") -> ScannedObject:
         rgba=(0.9, 0.5, 0.2, 1.0),
         depth_scale=0.86,
         fit_error_m=0.005,
+    )
+
+
+def ring_mesh() -> trimesh.Trimesh:
+    """A 7.4 cm ring, 2 cm thick, with a 3.4 cm hole."""
+    return trimesh.creation.torus(major_radius=0.027, minor_radius=0.01)
+
+
+def ring_on_table(scene: SimScene, decomposed: bool) -> ScannedObject:
+    """The ring lying on the table, simulated as convex pieces around its hole or as one hull."""
+    (table,) = [b for b in scene.boxes if b.category == "table"]
+    ring = ring_mesh()
+    hull_vertices, hull_faces = convex_hull(ring.vertices)
+    return ScannedObject(
+        name="obj_0_ring", label="ring", position=np.array([table.center[0], table.center[1], TABLE_H + 0.01 + DROP_GAP]),
+        visual_glb=ring.export(file_type="glb"), hull_vertices=hull_vertices, hull_faces=hull_faces,
+        size=np.array([0.074, 0.074, 0.02]), rgba=(0.9, 0.4, 0.1, 1.0), depth_scale=0.86, fit_error_m=0.004,
+        collider_pieces=tuple(collider_pieces(ring.vertices, ring.faces)) if decomposed else (),
     )

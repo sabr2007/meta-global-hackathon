@@ -64,28 +64,26 @@ def _box_geom(parent: ET.Element, box: Box) -> None:
     )
 
 
+def _mesh_asset(asset: ET.Element, name: str, vertices: np.ndarray, faces: np.ndarray) -> None:
+    ET.SubElement(asset, "mesh", name=name, vertex=_fmt(vertices), face=" ".join(str(int(i)) for i in np.ravel(faces)))
+
+
 def _hull_mesh(asset: ET.Element, obj: ScannedObject) -> None:
-    ET.SubElement(
-        asset,
-        "mesh",
-        name=f"{obj.name}_hull",
-        vertex=_fmt(obj.hull_vertices),
-        face=" ".join(str(int(i)) for i in np.ravel(obj.hull_faces)),
-    )
+    _mesh_asset(asset, f"{obj.name}_hull", obj.hull_vertices, obj.hull_faces)
+    for i, (vertices, faces) in enumerate(obj.collider_pieces):
+        _mesh_asset(asset, f"{obj.name}_piece{i}", vertices, faces)
 
 
 def _scanned_body(parent: ET.Element, obj: ScannedObject) -> None:
     body = ET.SubElement(parent, "body", name=obj.name, pos=_fmt(obj.position))
     ET.SubElement(body, "freejoint", name=f"{obj.name}_free")
-    ET.SubElement(
-        body,
-        "geom",
-        {"class": "scanned"},
-        name=f"{obj.name}_geom",
-        type="mesh",
-        mesh=f"{obj.name}_hull",
-        rgba=_fmt([*obj.rgba[:3], COLLIDER_ALPHA]),
-    )
+    rgba = _fmt([*obj.rgba[:3], COLLIDER_ALPHA])
+    hull = ET.SubElement(body, "geom", {"class": "scanned"}, name=f"{obj.name}_geom", type="mesh", mesh=f"{obj.name}_hull", rgba=rgba)
+    if obj.collider_pieces:
+        # The pieces collide and weigh; the whole hull stays as the object's outline (the arm plans grasps on it).
+        hull.attrib.update(contype="0", conaffinity="0", mass="0")
+        for i in range(len(obj.collider_pieces)):
+            ET.SubElement(body, "geom", {"class": "scanned"}, name=f"{obj.name}_piece{i}", type="mesh", mesh=f"{obj.name}_piece{i}", rgba=rgba)
 
 
 def _add_home_key(root: ET.Element) -> None:
