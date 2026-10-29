@@ -149,7 +149,7 @@ export function modelSummary(usage: Usage[]): { model: string; calls: number; ms
   return [...byModel.values()];
 }
 
-export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean; usage?: Usage[] }): HTMLElement {
+export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean; usage?: Usage[]; episodeUrl?: string }): HTMLElement {
   const card = h('section', 'receipt card');
   card.setAttribute('aria-label', 'Receipt');
   const head = h('header', 'receipt__head');
@@ -198,6 +198,12 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
     h('span', 'num', `$${extras.costUsd.toFixed(2)}`),
   );
   card.append(foot);
+  if (extras.episodeUrl) {
+    const episode = h('a', 'pill pill--small pill--outline receipt__episode', 'Export as an evaluation episode');
+    episode.href = extras.episodeUrl;
+    episode.setAttribute('download', '');
+    card.append(episode);
+  }
   return card;
 }
 

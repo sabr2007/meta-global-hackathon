@@ -162,6 +162,56 @@ export const scanRoutes: Route[] = [
     },
   },
   {
+    // A run as an evaluation episode for a goal-conditioned robot policy: the twin, the start and
+    // goal images, metric goals and the success rule the receipt uses. Links last one hour.
+    method: 'GET',
+    path: '/api/scans/:owner/:scan/runs/:run/episode',
+    run: async (request, { owner, scan, run }) => {
+      checkIds(owner, scan);
+      if (!ID_PATTERN.test(run)) throw new HttpError(400, 'Bad run id');
+      if (!(await canRead(await currentUser(request), owner, scan))) throw new HttpError(401, 'Sign in to export this run');
+      const prefix = `scans/${owner}/${scan}/runs/${run}/`;
+      const record = await getJson<Record<string, any>>(store(), `${prefix}run.json`);
+      if (!record) throw new HttpError(404, 'Run not found');
+      if (!record.chosen) throw new HttpError(409, 'This run has no approved goal image');
+      const bundlePrefix = `scans/${owner}/${scan}/bundle/`;
+      const scene: Record<string, string> = {};
+      for (const key of await store().list(bundlePrefix)) scene[key.slice(bundlePrefix.length)] = await store().readUrl(key);
+      const goalFile = (record.candidates as { id: string; file: string }[]).find((c) => c.id === record.chosen)?.file;
+      const episode = {
+        format: 'ayna/episode@1',
+        scan: `${owner}/${scan}`,
+        run,
+        request: record.request,
+        scene, // scene.json (camera, objects, robots), scene.xml (MJCF), meshes
+        start_image: scene['hero.jpg'] ?? null,
+        goal_image: goalFile ? await store().readUrl(`${prefix}${goalFile}`) : null,
+        goals: (record.goals as { name: string; label: string; moves: boolean; to: number[]; yawDelta: number }[]).map((g) => ({
+          object: g.name,
+          label: g.label,
+          moves: g.moves,
+          position_m: g.to,
+          yaw_delta_rad: g.yawDelta,
+        })),
+        success: {
+          position_tolerance_m: 0.03,
+          heading_tolerance_deg: 15,
+          score: 'requested moves within tolerance / requested moves × objects left in place / objects that should stay',
+        },
+        reference: record.receipt
+          ? { robots: 'Ayna arm + mobile manipulator (MuJoCo)', score: record.receipt.score, moved: record.receipt.moved, stayed: record.receipt.stayed, median_error_cm: record.receipt.medianErrorCm }
+          : null,
+      };
+      return new Response(JSON.stringify(episode, null, 2), {
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'content-disposition': `attachment; filename="ayna-episode-${scan}-${run}.json"`,
+          'cache-control': 'no-store',
+        },
+      });
+    },
+  },
+  {
     method: 'PUT',
     path: '/api/scans/:owner/:scan/runs/:run/files/:name',
     run: async (request, { owner, scan, run, name }) => {

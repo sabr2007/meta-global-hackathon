@@ -305,7 +305,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       if (transcript) out.record.transcript = transcript;
       if (out.receipt && out.imagined?.chosen) {
         await showResult(out.receipt, out.imagined.chosen.check.goals, out.imagined.chosen.image);
-        receiptSlot.replaceChildren(receiptCard(out.receipt, { seconds: out.record.durationMs / 1000, costUsd: out.record.costUsd, verdict: out.record.verdict?.verdict ?? null, replay: false, usage: out.record.trace.flatMap((e) => e.usage ?? []) }));
+        receiptSlot.replaceChildren(receiptCard(out.receipt, { seconds: out.record.durationMs / 1000, costUsd: out.record.costUsd, verdict: out.record.verdict?.verdict ?? null, replay: false, usage: out.record.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${out.record.id}/episode` }));
       } else if (out.record.status === 'no-after') {
         stage.setCaption('No imagined photo kept every object — Ayna will not plan from it', 'orange');
       } else if (out.record.error) {
@@ -385,7 +385,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
     const chosen = run.candidates.find((c) => c.id === run.chosen)!;
     await showResult(receipt, goals, url(chosen.file));
-    receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true, usage: run.trace.flatMap((e) => e.usage ?? []) }));
+    receiptSlot.replaceChildren(receiptCard(receipt, { seconds: run.durationMs / 1000, costUsd: run.costUsd, verdict: run.verdict?.verdict ?? null, replay: true, usage: run.trace.flatMap((e) => e.usage ?? []), episodeUrl: `/api/scans/${owner}/${id}/runs/${runId}/episode` }));
     endRun();
     document.body.dataset.autoplay = 'done';
   }

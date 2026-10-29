@@ -771,6 +771,10 @@ body {
   color: var(--secondary);
 }
 
+.receipt__episode {
+  justify-self: start;
+}
+
 .receipt__foot {
   display: flex;
   flex-wrap: wrap;
