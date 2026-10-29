@@ -6,7 +6,8 @@
 // Meta's Habitat "tidy house" benchmark uses at room scale.
 //
 // Score: the share of requested moves done, times the share of the other objects left in place, so
-// a refused or failed move always costs points. Positions are checked against the goals the robots
+// a refused or failed move always costs points, including a move Spark declined before the edit
+// was drawn because no robot could do it. Positions are checked against the goals the robots
 // were sent to; the independent check is the overlap of the twin, rendered from the photo's camera,
 // with the imagined photo's masks (relative to the same overlap on the real photo before anything
 // moved, since a scanned mesh never covers its photo mask exactly).
@@ -77,13 +78,15 @@ export interface MeasureInput {
   meshes: Map<string, TriangleMesh>;
   beforeMasks: Map<string, Rle>;
   notes: Map<string, string>; // refusals and failed steps
+  refusedBefore?: Map<string, string>; // moves the request implied that Spark kept out of the edit (no robot could do them)
 }
 
 export function measure(input: MeasureInput): Receipt {
   const results: ObjectResult[] = input.goals.map((goal) => {
     const start = input.start.get(goal.name)!;
     const final = input.final.get(goal.name)!;
-    const wanted = goal.moves ? 'move' : 'stay';
+    const early = goal.moves ? undefined : input.refusedBefore?.get(goal.name);
+    const wanted = goal.moves || early !== undefined ? 'move' : 'stay';
     const target = goal.moves ? goal.to : start.position;
     const errorM = Math.hypot(final.position[0] - target[0], final.position[1] - target[1]);
     const turned = yawOf(final.rotation) - yawOf(start.rotation);
@@ -96,7 +99,7 @@ export function measure(input: MeasureInput): Receipt {
       const before = input.beforeMasks.get(goal.name);
       if (before) baseline = iou(silhouette(input.camera, mesh, start), before);
     }
-    const ok = goal.found && errorM <= PLACE_TOLERANCE_M && (headingErrorRad === null || headingErrorRad <= HEADING_TOLERANCE);
+    const ok = early === undefined && goal.found && errorM <= PLACE_TOLERANCE_M && (headingErrorRad === null || headingErrorRad <= HEADING_TOLERANCE);
     const relative = overlap !== null && baseline ? Math.min(1, overlap / baseline) : null;
     return {
       name: goal.name,
@@ -109,11 +112,12 @@ export function measure(input: MeasureInput): Receipt {
       baselineIou: baseline,
       overlap: relative,
       ok,
-      note: input.notes.get(goal.name) ?? '',
+      note: input.notes.get(goal.name) ?? (early !== undefined ? `refused before the edit: ${early}` : ''),
     };
   });
-  // The headline error is over the requested moves; objects that only had to stay would flatter it.
-  const moving = results.filter((r) => r.wanted === 'move');
+  // The headline error is over the requested moves that got a goal; objects that only had to stay
+  // would flatter it, and a move refused before the edit has no goal to be off from.
+  const moving = results.filter((r) => r.wanted === 'move' && !input.refusedBefore?.has(r.name));
   const errors = (moving.length ? moving : results).map((r) => r.errorM * 100).sort((a, b) => a - b);
   const mid = errors.length >> 1;
   const medianErrorCm = errors.length ? (errors.length % 2 ? errors[mid] : (errors[mid - 1] + errors[mid]) / 2) : 0;

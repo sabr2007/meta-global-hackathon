@@ -23,6 +23,7 @@ import { checkPlan } from '../src/ayna/dispatch';
 import { fleetOf, runHeadless } from '../src/ayna/fleet';
 import { parseGlb, type TriangleMesh } from '../src/ayna/glb';
 import { placeOnPlane, type BeforeMask, type ObjectGoal, type SceneObject } from '../src/ayna/goals';
+import { refusedInEdit } from '../src/ayna/pipeline';
 import type { RunRecord } from '../src/ayna/record';
 import type { Rle } from '../src/ayna/rle';
 import { execute, footprintsOf, type SceneContext } from '../src/ayna/run';
@@ -124,6 +125,7 @@ async function replay(mujoco: Awaited<ReturnType<typeof loadMujoco>>, scene: Sce
     meshes: scene.meshes,
     beforeMasks: new Map<string, Rle>(scene.ctx.before.map((b) => [b.object, b.rle])),
     notes,
+    refusedBefore: run.instruction ? refusedInEdit(run.instruction, scene.ctx.objects) : undefined,
   });
   robots.dispose(); // each robot's IK holds a scratch MjData in the WASM heap
   physics.dispose();

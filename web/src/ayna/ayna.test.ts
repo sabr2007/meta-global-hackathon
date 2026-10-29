@@ -7,6 +7,7 @@ import type { TriangleMesh } from './glb';
 import { imageSize } from './images';
 import { silhouette } from './raster';
 import { decodeRle, encodeRle, iou, maskStats, scaleRle, type Rle } from './rle';
+import { measure, type BodyPose } from './verify';
 
 // A camera 1 m above the table origin looking straight down; image x = world +x, image y = world -y.
 const camera: PhotoCamera = {
@@ -290,5 +291,40 @@ describe('feasibility', () => {
     expect(infeasible(onBook, [reachUpTo(0.76)], footprints).join(' ')).toMatch(/cup would land on the book/);
     const bookMoves = [goal('cup', true, [0.2, 0, 0]), { ...goal('book', true, [0.4, 0, 0]), from: [0.2, 0, 0] as [number, number, number] }];
     expect(infeasible(bookMoves, [reachUpTo(0.76)], footprints)).toEqual([]);
+  });
+});
+
+describe('receipt', () => {
+  const pose = (x: number): BodyPose => ({ position: [x, 0, 0], rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1] });
+  const goal = (name: string, moves: boolean, to: number) => ({
+    name,
+    label: name,
+    found: true,
+    source: 'concept' as const,
+    mask: null,
+    areaRatio: 1,
+    from: [0, 0, 0] as [number, number, number],
+    to: [to, 0, 0] as [number, number, number],
+    distanceM: Math.abs(to),
+    yawDelta: 0,
+    moves,
+  });
+
+  test('a move Spark refused before the edit counts as asked and not done', () => {
+    const receipt = measure({
+      camera,
+      goals: [goal('cup', true, 0.1), goal('mouse', false, 0), goal('pen', false, 0)],
+      start: new Map([['cup', pose(0)], ['mouse', pose(0)], ['pen', pose(0)]]),
+      final: new Map([['cup', pose(0.101)], ['mouse', pose(0)], ['pen', pose(0)]]),
+      meshes: new Map(),
+      beforeMasks: new Map(),
+      notes: new Map(),
+      refusedBefore: new Map([['mouse', 'no robot reaches the back edge']]),
+    });
+    expect(receipt.moved).toEqual({ done: 1, asked: 2 });
+    expect(receipt.stayed).toEqual({ kept: 1, total: 1 });
+    expect(receipt.score).toBe(50);
+    expect(receipt.medianErrorCm).toBeCloseTo(0.1, 5); // only the move that had a goal
+    expect(receipt.results.find((r) => r.name === 'mouse')).toMatchObject({ wanted: 'move', ok: false, note: 'refused before the edit: no robot reaches the back edge' });
   });
 });

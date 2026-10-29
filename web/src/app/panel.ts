@@ -155,6 +155,12 @@ export function modelSummary(usage: Usage[]): { model: string; calls: number; ms
   return [...byModel.values()];
 }
 
+function wantedLabel(r: Receipt['results'][number]): string {
+  if (r.wanted === 'stay') return 'stays';
+  if (/^refused/.test(r.note)) return 'move refused';
+  return r.overlap === null ? 'moved' : `moved · overlap ${Math.round(r.overlap * 100)}%`;
+}
+
 export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd: number; verdict: string | null; replay: boolean; usage?: Usage[]; episodeUrl?: string }): HTMLElement {
   const card = h('section', 'receipt card');
   card.setAttribute('aria-label', 'Receipt');
@@ -174,11 +180,11 @@ export function receiptCard(receipt: Receipt, extras: { seconds: number; costUsd
     row.append(
       h('span', `dot ${r.ok ? 'dot--lime' : 'dot--orange'}`),
       h('span', 'receipt__object', r.label),
-      h('span', 'receipt__wanted', r.wanted === 'move' ? (r.overlap === null ? 'moved' : `moved · overlap ${Math.round(r.overlap * 100)}%`) : 'stays'),
-      h('span', 'num receipt__error', `${(r.errorM * 100).toFixed(1)}`),
+      h('span', 'receipt__wanted', wantedLabel(r)),
+      h('span', 'num receipt__error', /^refused before the edit/.test(r.note) ? '—' : `${(r.errorM * 100).toFixed(1)}`),
       h('span', 'receipt__unit', 'cm'),
     );
-    if (r.note) row.append(h('span', 'receipt__note', r.note.replace(/^refused: /, 'refused — ').replace(/^failed: /, 'failed — ')));
+    if (r.note) row.append(h('span', 'receipt__note', r.note.replace(/^refused: /, 'refused — ').replace(/^refused before the edit: /, 'refused before the edit — ').replace(/^failed: /, 'failed — ')));
     table.append(row);
   }
   card.append(head, table);

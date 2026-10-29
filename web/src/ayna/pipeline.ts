@@ -3,9 +3,10 @@
 
 import type { TriangleMesh } from './glb';
 import type { FleetRobot } from './fleet';
+import type { SceneObject } from './goals';
 import { newRunId, type RunRecord } from './record';
 import type { Rle } from './rle';
-import { dispatch, dispatchGoals, execute, imagineAfter, type Dispatch, type Imagined, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
+import { dispatch, dispatchGoals, execute, imagineAfter, type Dispatch, type Imagined, type Instruction, type Models, type RunOptions, type SceneContext, type Trace, type TraceEvent, DEFAULT_OPTIONS } from './run';
 import { bodyPose, measure, type BodyPose, type Receipt } from './verify';
 import type { Physics } from '../sim/physics';
 
@@ -42,6 +43,18 @@ const extension = (dataUrl: string): string => dataUrl.slice(5, dataUrl.indexOf(
 export function receiptLine(receipt: Receipt): string {
   const overlap = receipt.overlap === null ? '' : ` · contours overlap ${Math.round(receipt.overlap * 100)}%`;
   return `${receipt.moved.done}/${receipt.moved.asked} moves done · ${receipt.stayed.kept}/${receipt.stayed.total} others left in place · moved objects off by ${receipt.medianErrorCm.toFixed(1)} cm (median)${overlap}`;
+}
+
+/** Moves the request implied that Spark kept out of the edit because no robot could do them, by object
+ * name (Spark may name an object by its label). */
+export function refusedInEdit(instruction: Instruction, objects: SceneObject[]): Map<string, string> {
+  const byKey = new Map(objects.flatMap((o) => [[o.name, o.name] as const, [o.label.toLowerCase(), o.name] as const]));
+  return new Map(
+    instruction.refusals.flatMap((r) => {
+      const name = byKey.get(r.object) ?? byKey.get(r.object.toLowerCase());
+      return name ? [[name, r.reason] as const] : [];
+    }),
+  );
 }
 
 export function resultLines(receipt: Receipt): string[] {
@@ -132,6 +145,7 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
     trace({ step: 'verify', state: 'start', text: 'Measuring every object against the after photo' });
     const notes = new Map<string, string>();
     for (const r of planned.refusals) notes.set(r.object, `refused: ${r.reason}`);
+    const refusedBefore = refusedInEdit(imagined.instruction, scene.ctx.objects);
     for (const e of executed) if (!e.result.ok) notes.set(e.step.object, `failed: ${e.result.reason}`);
     const measureNow = (): Receipt =>
       measure({
@@ -142,6 +156,7 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
         meshes: scene.meshes,
         beforeMasks: new Map<string, Rle>(scene.ctx.before.map((b) => [b.object, b.rle])),
         notes,
+        refusedBefore,
       });
     let receipt = measureNow();
 

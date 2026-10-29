@@ -4,7 +4,7 @@
 
 import { models, scans, verdict as sparkVerdict, type RunCard, type Session, type User } from '../ayna/client';
 import type { ObjectGoal } from '../ayna/goals';
-import { receiptLine, runAyna, type RunHooks } from '../ayna/pipeline';
+import { receiptLine, refusedInEdit, runAyna, type RunHooks } from '../ayna/pipeline';
 import { silhouette } from '../ayna/raster';
 import type { RunRecord } from '../ayna/record';
 import { execute, type Imagined, type TraceEvent } from '../ayna/run';
@@ -410,6 +410,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       meshes: twin.meshes,
       beforeMasks: new Map(twin.before.map((b) => [b.object, b.rle])),
       notes,
+      refusedBefore: run.instruction ? refusedInEdit(run.instruction, twin.objects) : undefined,
     });
     log.add({ step: 'verify', state: 'done', text: receiptLine(receipt) });
     const chosen = run.candidates.find((c) => c.id === run.chosen)!;
