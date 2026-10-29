@@ -3,7 +3,7 @@ import { ArmController } from './armController';
 import { objectShape } from './objectShape';
 import type { Physics } from './physics';
 import { RobotBase, ok, refused, type BasePose, type ReachCheck, type RobotStatus, type StepResult } from './robot';
-import { discOnRect, type SceneGeometry } from './sceneGeometry';
+import { discOnRect, PLACE_HEADROOM_M, type SceneGeometry } from './sceneGeometry';
 
 // The stationary arm as a Robot: ArmController does the manipulation; this adds the shared API
 // (reach checks, run(), placeAt on another surface) and moving its mocap base across the table.
@@ -117,7 +117,8 @@ export class StationaryArm extends RobotBase {
     const [min, max] = this.info.reach_m;
     if (distance > max + REACH_SLACK_M) return refused(`(${x.toFixed(2)}, ${y.toFixed(2)}) is ${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`);
     if (distance < min) return refused(`(${x.toFixed(2)}, ${y.toFixed(2)}) is too close to the base`);
-    const surface = this.scene.placeSurface(x, y, objectShape(this.physics, held).radius * FOOTPRINT_SHARE, this.bodyOf(held));
+    const ceiling = this.pickedFrom === null ? undefined : this.pickedFrom + PLACE_HEADROOM_M;
+    const surface = this.scene.placeSurface(x, y, objectShape(this.physics, held).radius * FOOTPRINT_SHARE, this.bodyOf(held), ceiling);
     if (typeof surface === 'string') return refused(`Can't put ${this.name(held)} down: ${surface}`);
     // On top of another object: stack it there; anything else must be the surface it came from.
     if (surface.object) return this.placeOn(surface.object);

@@ -4,7 +4,7 @@
 import { objectShape, type ObjectShape } from '../sim/objectShape';
 import type { Physics } from '../sim/physics';
 import type { Robot } from '../sim/robot';
-import type { SceneGeometry } from '../sim/sceneGeometry';
+import { PLACE_HEADROOM_M, type SceneGeometry } from '../sim/sceneGeometry';
 
 const NUDGE_STEP_M = 0.01; // a goal projected just off the table edge is moved onto it in 1 cm steps
 const NUDGE_MAX_M = 0.06;
@@ -81,7 +81,7 @@ class RegistryRobot implements FleetRobot {
     if (object) {
       const landing = this.landing(object, x, y, yawDelta);
       [px, py] = landing.point;
-      const surface = this.scene.placeSurface(px, py, landing.shape.radius * FOOTPRINT_SHARE, landing.body);
+      const surface = this.scene.placeSurface(px, py, landing.shape.radius * FOOTPRINT_SHARE, landing.body, landing.shape.bottom + PLACE_HEADROOM_M);
       if (typeof surface === 'string') return { ok: false, reason: `can't put it down there: ${surface}`, distanceM: 0 };
       if (!surface.object && Math.abs(surface.z - landing.shape.bottom) > SAME_SURFACE_M) {
         return { ok: false, reason: `can't put it down there: (${px.toFixed(2)}, ${py.toFixed(2)}) is off the ${surface.name.replace(/_\d+$/, '')} it stands on`, distanceM: 0 };
@@ -113,7 +113,7 @@ class RegistryRobot implements FleetRobot {
    * (goals read off a photo can land just past a table edge). The receipt still measures against the goal. */
   private placeable(x: number, y: number, radius: number, body: number, bottom: number): [number, number] {
     const ok = (px: number, py: number): boolean => {
-      const surface = this.scene.placeSurface(px, py, radius, body);
+      const surface = this.scene.placeSurface(px, py, radius, body, bottom + PLACE_HEADROOM_M);
       return typeof surface !== 'string' && (Boolean(surface.object) || Math.abs(surface.z - bottom) <= SAME_SURFACE_M);
     };
     if (ok(x, y)) return [x, y];

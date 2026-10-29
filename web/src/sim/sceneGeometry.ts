@@ -8,6 +8,9 @@ import type { Physics } from './physics';
 
 const MAX_OBSTACLE_BOTTOM_M = 1.6; // a shelf higher than this does not block a robot base (pipeline navgrid.py)
 const RAY_START_Z = 3.0;
+/** Putting something down looks for surfaces below its own height plus this much: a desk under a
+ * wall shelf is still the desk (the shelf's top is where a ray from the ceiling lands first). */
+export const PLACE_HEADROOM_M = 0.3;
 // Geom groups a downward ray sees: probes, structure, furniture, scanned objects; not openings or robots.
 const RAY_GROUPS = [1, 1, 1, 0, 1, 0];
 // RoomPlan boxes whose top is not a surface (a chair's box includes the air around its backrest).
@@ -123,17 +126,17 @@ export class SceneGeometry {
   }
 
   /** The highest surface straight below (x, y), ignoring robots and the body `exclude`. */
-  surfaceUnder(x: number, y: number, exclude = -1): Surface | null {
+  surfaceUnder(x: number, y: number, exclude = -1, ceiling = RAY_START_Z): Surface | null {
     const { mujoco, model, data } = this.physics;
     const geomId = new mujoco.IntBuffer(1);
     const normal = new mujoco.DoubleBuffer(3);
     try {
-      const distance = mujoco.mj_ray(model, data, [x, y, RAY_START_Z], [0, 0, -1], RAY_GROUPS, true, exclude, geomId, normal);
+      const distance = mujoco.mj_ray(model, data, [x, y, ceiling], [0, 0, -1], RAY_GROUPS, true, exclude, geomId, normal);
       const geom: number = geomId.GetView()[0];
       if (distance < 0 || geom < 0) return null;
       const body: number = model.geom_bodyid[geom];
       return {
-        z: RAY_START_Z - distance,
+        z: ceiling - distance,
         geom,
         name: mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM.value, geom) ?? `geom_${geom}`,
         object: this.objectBodies.get(body) ?? null,
@@ -145,10 +148,10 @@ export class SceneGeometry {
   }
 
   /** Where an object of footprint `radius` can be put down at (x, y): the surface under its centre
-   * when the whole footprint rests flat on it (or on top of another object), else why not. */
-  placeSurface(x: number, y: number, radius: number, exclude = -1): Surface | string {
+   * (below `ceiling`) when the whole footprint rests flat on it (or on top of another object), else why not. */
+  placeSurface(x: number, y: number, radius: number, exclude = -1, ceiling = RAY_START_Z): Surface | string {
     const where = `(${x.toFixed(2)}, ${y.toFixed(2)})`;
-    const center = this.surfaceUnder(x, y, exclude);
+    const center = this.surfaceUnder(x, y, exclude, ceiling);
     if (!center) return `nothing to stand on at ${where}`;
     const element = this.element(center.name);
     if (element && (element.kind === 'wall' || NOT_SURFACES.has(element.category))) {
@@ -157,7 +160,7 @@ export class SceneGeometry {
     if (center.object) return center; // stacking: the object below decides
     for (let k = 0; k < FOOTPRINT_SAMPLES; k += 1) {
       const angle = (2 * Math.PI * k) / FOOTPRINT_SAMPLES;
-      const rim = this.surfaceUnder(x + radius * Math.cos(angle), y + radius * Math.sin(angle), exclude);
+      const rim = this.surfaceUnder(x + radius * Math.cos(angle), y + radius * Math.sin(angle), exclude, ceiling);
       if (!rim || rim.z < center.z - FLAT_M) return `${where} is at the edge of ${center.name}`;
       if (rim.z > center.z + FLAT_M) return `${where} is too close to ${rim.object ?? rim.name}`;
     }
