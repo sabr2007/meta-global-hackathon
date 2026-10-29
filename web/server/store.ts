@@ -8,7 +8,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const URL_TTL_MS = 60 * 60 * 1000;
+export const URL_TTL_MS = 60 * 60 * 1000;
 
 export interface UploadTarget {
   url: string;

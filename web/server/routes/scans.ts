@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto';
 import type { User } from '../auth.js';
 import { currentUser } from '../auth.js';
 import { HttpError, json, readJson, requireUser, type Route } from '../http.js';
-import { checkFileSignature, getJson, putJson, store } from '../store.js';
+import { checkFileSignature, getJson, putJson, store, URL_TTL_MS } from '../store.js';
 
 const MAX_RUN_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_RUN_JSON_BYTES = 1024 * 1024;
@@ -188,6 +188,8 @@ export const scanRoutes: Route[] = [
         scan: `${owner}/${scan}`,
         run,
         request: record.request,
+        // file links are signed: export the episode again for fresh ones
+        links_expire_at: new Date(Date.now() + URL_TTL_MS).toISOString(),
         scene, // scene.json (camera, objects, robots), scene.xml (MJCF), meshes
         start_image: scene['hero.jpg'] ?? null,
         goal_image: goalFile ? await store().readUrl(`${prefix}${goalFile}`) : null,
