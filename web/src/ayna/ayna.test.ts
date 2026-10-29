@@ -172,7 +172,7 @@ describe('size check', () => {
   });
 
   test('rejects an object resized beyond both readings', () => {
-    const shrunk = checkCandidate({ camera: tilted, objects, before, segmented: at(near.x, near.y, 7), imageSize: { width: 400, height: 400 } });
+    const shrunk = checkCandidate({ camera: tilted, objects, before, segmented: at(near.x, near.y, 6), imageSize: { width: 400, height: 400 } });
     expect(shrunk.reasons.join(' ')).toMatch(/changed size/);
   });
 });

@@ -4,8 +4,10 @@
 import { hitPlane, pixelRay, cameraPosition, type PhotoCamera, type Vec3 } from './camera';
 import { forEachPixel, iou, maskStats, scaleRle, type Rle } from './rle';
 
-export const AREA_RATIO_MIN = 0.85;
-export const AREA_RATIO_MAX = 1.15;
+// SAM 3.1 alone varies by about ±8% on the unedited photo (0.92-0.99 on the desk); the image model
+// redraws objects on top of that. ±20% (log-symmetric) separates redrawing from a different object.
+export const AREA_RATIO_MIN = 0.8;
+export const AREA_RATIO_MAX = 1.25;
 const STILL_M = 0.015; // closer than this to where it was = not moved
 const UNASKED_MOVE_M = 0.06; // an object told to stay that moves further than this fails the check
 const ROTATION_MIN = (8 * Math.PI) / 180;

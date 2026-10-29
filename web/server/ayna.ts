@@ -173,7 +173,10 @@ export async function segment(input: SegmentInput): Promise<{ objects: Segmented
     const masks = byConcept.get(o.concept) ?? [];
     return { name: o.name, source: masks.length ? 'concept' : 'none', masks };
   });
-  const missing = input.objects.filter((o) => !(byConcept.get(o.concept)?.length));
+  // Objects SAM missed, and objects that share a phrase with others when SAM found fewer instances
+  // than objects (an earbud case found as a "white mouse"): Spark boxes each by its own label.
+  const sharing = (concept: string): number => input.objects.filter((o) => o.concept === concept).length;
+  const missing = input.objects.filter((o) => (byConcept.get(o.concept)?.length ?? 0) < sharing(o.concept));
   if (missing.length) {
     const listing = missing.map((o) => `- ${o.name}: ${o.label}`).join('\n');
     const located = await sparkJson<{ found: { name: string; visible: boolean; box_2d: number[] }[] }>(

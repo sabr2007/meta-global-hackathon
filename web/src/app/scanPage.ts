@@ -16,7 +16,7 @@ import { loadTwin, type Twin } from './twin';
 import { startRecording, type Recording } from './voice';
 
 
-const SUGGESTIONS = ['Tidy up my desk', 'Make room for my laptop', 'Group the orange toys together', 'Прибери стол'];
+const SUGGESTIONS = ['Tidy up my desk', 'Clear the front half of the table', 'Group the orange toys together', 'Line the small things up along the back'];
 const REPLAY_SPEED = 3; // replays play the recorded model timeline this many times faster
 const REPLAY_MAX_WAIT_MS = 1400;
 const REVIEW_AUTOPLAY_MS = 3200;
