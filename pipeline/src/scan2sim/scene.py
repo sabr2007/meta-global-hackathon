@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from scan2sim.arm import ArmMount
 from scan2sim.frames import WorldFrame
 from scan2sim.roomplan import Room, RoomElement
+
+if TYPE_CHECKING:
+    from scan2sim.mobile import MobileMount
 
 WALL_THICKNESS = 0.12  # RoomPlan walls are planes; give them a body for collisions
 OPENING_THICKNESS = 0.02  # windows/doors/openings are visual markers only
@@ -83,6 +87,8 @@ class SimScene:
     room_label: str | None
     objects: tuple[ScannedObject, ...] = ()
     arm: ArmMount | None = None
+    mobile: MobileMount | None = None
+    floor_polygon: np.ndarray | None = None  # scanned floor outline, world xy (N, 2)
 
 
 def world_frame_for(room: Room) -> WorldFrame:
@@ -189,6 +195,14 @@ def _probes(support: Box | None, count: int) -> tuple[Probe, ...]:
     return tuple(probes)
 
 
+def floor_polygon(element: RoomElement, frame: WorldFrame) -> np.ndarray | None:
+    """The floor's outline corners (RoomPlan polygonCorners, element-local) as world xy."""
+    if element.polygon is None:
+        return None
+    arkit = element.polygon @ element.pose_arkit[:3, :3].T + element.pose_arkit[:3, 3]
+    return frame.points(arkit)[:, :2]
+
+
 def build_scene(room: Room, probe_count: int = 6) -> SimScene:
     frame = world_frame_for(room)
     floors = room.of_kind("floor")
@@ -203,4 +217,5 @@ def build_scene(room: Room, probe_count: int = 6) -> SimScene:
         boxes=boxes,
         probes=_probes(_support_surface(boxes), probe_count),
         room_label=room.section_label,
+        floor_polygon=floor_polygon(floors[0], frame) if floors else None,
     )
