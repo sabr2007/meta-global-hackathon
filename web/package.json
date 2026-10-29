@@ -10,7 +10,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "seed": "tsx scripts/seed.ts",
-    "eval": "tsx scripts/eval.ts"
+    "eval": "tsx scripts/eval.ts",
+    "worker": "tsx scripts/worker.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

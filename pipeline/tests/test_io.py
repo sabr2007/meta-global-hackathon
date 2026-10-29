@@ -86,3 +86,12 @@ def test_zip_extraction_blocks_path_traversal(tmp_path):
         zf.writestr("../escape.txt", "nope")
     with pytest.raises(ValueError, match="unsafe path"):
         extract_zip(archive, tmp_path / "out")
+
+
+
+def test_photo_views_carry_the_hero_flag(tmp_path):
+    from scan2sim.capture import _view
+
+    raw = {"intrinsics": [1.0, 0, 0, 0, 1.0, 0, 0, 0, 1.0], "transform": np.eye(4).reshape(-1).tolist(), "timestamp": 1.0}
+    assert _view(tmp_path, "photos/0001.jpg", raw, "intrinsics", (4, 3)).hero is False
+    assert _view(tmp_path, "photos/0002.jpg", {**raw, "hero": True}, "intrinsics", (4, 3)).hero is True

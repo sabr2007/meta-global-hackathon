@@ -57,6 +57,15 @@ def build(args: argparse.Namespace) -> int:
     return 0
 
 
+def _default_photo(capture: Capture, room_index: int, element_name: str | None) -> Path:
+    """The hero shot the Ayna app marks in photos.json, else the most central photo of the table."""
+    hero = next((v.image for v in capture.photos if v.hero), None)
+    if hero is not None and element_name is None:
+        print(f"using the hero shot {hero.name}")
+        return hero
+    return _photo_looking_at(capture, room_index, element_name)
+
+
 def _photo_looking_at(capture: Capture, room_index: int, element_name: str | None) -> Path:
     """Most central photo of a RoomPlan element (default: the largest table top)."""
     room = next(r for r in capture.rooms if r.index == room_index)
@@ -75,7 +84,7 @@ def _photo_looking_at(capture: Capture, room_index: int, element_name: str | Non
 
 def perceive(args: argparse.Namespace) -> int:
     capture = load_capture(_resolve_capture(Path(args.capture), None))
-    photo = capture.root / "photos" / f"{args.photo}.jpg" if args.photo else _photo_looking_at(capture, args.room, args.look_at)
+    photo = capture.root / "photos" / f"{args.photo}.jpg" if args.photo else _default_photo(capture, args.room, args.look_at)
     if not photo.exists():
         print(f"photo not found: {photo}", file=sys.stderr)
         return 2
@@ -110,7 +119,7 @@ def objects(args: argparse.Namespace) -> int:
         print(f"room {args.room} not in capture (available: {sorted(rooms)})", file=sys.stderr)
         return 2
     room = rooms[args.room]
-    photo = capture.root / "photos" / f"{args.photo}.jpg" if args.photo else _photo_looking_at(capture, args.room, args.look_at)
+    photo = capture.root / "photos" / f"{args.photo}.jpg" if args.photo else _default_photo(capture, args.room, args.look_at)
     view = next((v for v in capture.photos if v.image == photo), None)
     if view is None:
         print(f"photo not found: {photo}", file=sys.stderr)
@@ -237,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     objects_cmd.add_argument("capture", help="exported .zip or unpacked capture folder")
     objects_cmd.add_argument("--out", required=True, help="output bundle directory")
-    objects_cmd.add_argument("--photo", help="photo stem, e.g. 0019 (default: best view of --look-at)")
+    objects_cmd.add_argument("--photo", help="photo stem, e.g. 0019 (default: the app's hero shot, else the best view of --look-at)")
     objects_cmd.add_argument("--look-at", help="RoomPlan element name, e.g. table_0 (default: largest table)")
     objects_cmd.add_argument("--room", type=int, default=0)
     objects_cmd.add_argument("--cache", help="keep paid results (masks, SAM 3D meshes) here and reuse them")

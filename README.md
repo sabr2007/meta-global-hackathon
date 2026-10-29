@@ -152,6 +152,16 @@ npm test && npm run build
 npm run eval -- --scan desk --request "Tidy up the table"   # one headless run: live models, MuJoCo in Node
 ```
 
+**Scan builder** (turns mirrors sent from the iPhone into twins; runs where the pipeline runs)
+
+```sh
+cd web && npm run worker            # polls the queue; add -- --once to drain it and exit
+```
+
+The phone pairs with a 6-character code from the Mirrors page, uploads the capture straight to the
+private store (a presigned URL), and the scan shows *queued → processing → ready* in the app. With
+`BLOB_READ_WRITE_TOKEN` in `web/.env.local` (`vercel env pull`) the worker serves production.
+
 **iPhone app** (Xcode 27, `brew install xcodegen`)
 
 ```sh

@@ -29,6 +29,7 @@ class CameraView:
     intrinsics: np.ndarray  # 3x3
     camera_to_world: np.ndarray  # 4x4, ARKit (camera looks down -Z)
     timestamp: float
+    hero: bool = False  # the "before" photo the Ayna app asks for after a scan
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,7 @@ def _view(root: Path, image: str, raw: dict[str, Any], intrinsics_key: str, size
         intrinsics=_mat3_from_column_major(raw[intrinsics_key]),
         camera_to_world=mat4_from_column_major(raw["transform"]),
         timestamp=float(raw["timestamp"]),
+        hero=bool(raw.get("hero", False)),
     )
 
 
