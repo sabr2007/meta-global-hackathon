@@ -45,15 +45,19 @@ def rotation_error(current: np.ndarray, target: np.ndarray) -> np.ndarray:
 
 
 class ArmIk:
-    def __init__(self, model: mujoco.MjModel):
+    """IK for one arm of a model. Other joints (e.g. a mobile base and its lift) keep the values
+    in `self.data.qpos`, so set those first to solve for the arm on a moved base."""
+
+    def __init__(self, model: mujoco.MjModel, spec: arm.ArmSpec = arm.STATIONARY):
         self.model = model
         self.data = mujoco.MjData(model)
-        joints = [model.joint(name) for name in arm.JOINT_NAMES]
+        self.spec = spec
+        joints = [model.joint(name) for name in spec.joint_names]
         self.qpos = np.array([model.jnt_qposadr[j.id] for j in joints])
         self.dofs = np.array([model.jnt_dofadr[j.id] for j in joints])
         self.lower = np.array([j.range[0] for j in joints])
         self.upper = np.array([j.range[1] for j in joints])
-        self.site = model.site(arm.GRIP_SITE).id
+        self.site = model.site(spec.grip_site).id
         self.home = np.array(arm.HOME)
 
     def pose(self, q: np.ndarray, qpos: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
@@ -67,7 +71,7 @@ class ArmIk:
     def facing(self, position: np.ndarray) -> np.ndarray:
         """Home posture turned (joint 1) towards a world point: a good starting guess."""
         self.pose(self.home)
-        base = self.model.body(arm.LINK_NAMES[0]).id
+        base = self.model.body(self.spec.link_names[0]).id
         local = self.data.xmat[base].reshape(3, 3).T @ (np.asarray(position) - self.data.xpos[base])
         q = self.home.copy()
         q[0] = np.clip(np.arctan2(local[1], local[0]), self.lower[0], self.upper[0])

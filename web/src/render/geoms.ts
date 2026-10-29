@@ -30,6 +30,9 @@ export interface GeomLayer {
   sync(): void;
   setGroupVisible(group: GroupId, visible: boolean): void;
   highlight(name: string | null): void;
+  /** Recolour geoms by name (a robot's status lights: lime when fine, orange when it needs
+   * attention); null restores their own colour. */
+  tint(names: readonly string[], color: string | null): void;
 }
 
 function geometryFor(type: number, size: ArrayLike<number>, physics: Physics): THREE.BufferGeometry | null {
@@ -151,6 +154,17 @@ export function buildGeomLayer(physics: Physics): GeomLayer {
     }
   };
 
+  const tint = (names: readonly string[], color: string | null): void => {
+    const wanted = new Set(names);
+    for (const v of views) {
+      if (!wanted.has(v.name)) continue;
+      const target = color === null ? v.baseColor : new THREE.Color(color);
+      const glows = v.material.emissive.r + v.material.emissive.g + v.material.emissive.b > 0;
+      v.material.color.copy(target);
+      if (glows) v.material.emissive.copy(target); // lights glow in their new colour
+    }
+  };
+
   sync();
-  return { root, sync, setGroupVisible, highlight };
+  return { root, sync, setGroupVisible, highlight, tint };
 }

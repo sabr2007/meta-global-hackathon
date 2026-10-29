@@ -12,7 +12,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-from scan2sim import arm
+from scan2sim import arm, mobile, navgrid
 from scan2sim.capture import Capture, extract_zip, load_capture
 from scan2sim.export import write_bundle
 from scan2sim.hero import upright_camera, write_hero
@@ -162,14 +162,17 @@ def objects(args: argparse.Namespace) -> int:
         scene = dataclasses.replace(scene, boxes=scene.boxes + tuple(stands))
     items = [footprint(b.name, b.position + b.hull_vertices) for b in bodies]
     mount = None if args.no_arm else choose_mount(scene.boxes, items)
-    scene = dataclasses.replace(scene, objects=tuple(bodies), arm=mount)
+    floor = scene.floor_polygon if scene.floor_polygon is not None else navgrid.floor_outline(scene.floor)
+    rover = None if args.no_mobile else mobile.choose_start(scene.boxes, floor, surface)
+    scene = dataclasses.replace(scene, objects=tuple(bodies), arm=mount, mobile=rover)
     camera = upright_camera(view, image, scene.frame)
     concepts = {b.name: b.concept for b in bodies}
     paths = write_bundle(
         capture, room, scene, read_lidar_mesh(room.mesh_ply, room.mesh_colors), Path(args.out),
         hero=lambda out: write_hero(out, image, camera, scene.objects, masks, concepts),
     )
-    moved = _settle_distances(paths.mjcf, [b.name for b in bodies] + ([arm.LINK_NAMES[-1]] if mount else []))
+    hands = ([arm.LINK_NAMES[-1]] if mount else []) + ([mobile.ARM.link_names[-1]] if rover else [])
+    moved = _settle_distances(paths.mjcf, [b.name for b in bodies] + hands)
 
     where = f" on {surface.name}" if surface is not None else ""
     print(
@@ -191,6 +194,13 @@ def objects(args: argparse.Namespace) -> int:
         )
     elif not args.no_arm:
         print("arm: no free spot within reach of the objects, left out")
+    if rover:
+        print(
+            f"mobile manipulator on the floor at ({rover.position[0]:.2f}, {rover.position[1]:.2f}) "
+            f"facing {rover.near or 'the room'}, hand moves {moved[mobile.ARM.link_names[-1]] * 1000:.1f} mm in {SETTLE_SECONDS:.0f} s"
+        )
+    elif not args.no_mobile:
+        print("mobile manipulator: no open floor near the table, left out")
     checks = json.loads(paths.metadata.read_text())["camera"]["alignment"]
     if checks:
         ious = [c["iou"] for c in checks.values()]
@@ -232,6 +242,7 @@ def main(argv: list[str] | None = None) -> int:
     objects_cmd.add_argument("--room", type=int, default=0)
     objects_cmd.add_argument("--cache", help="keep paid results (masks, SAM 3D meshes) here and reuse them")
     objects_cmd.add_argument("--no-arm", action="store_true", help="leave the robot arm out of the scene")
+    objects_cmd.add_argument("--no-mobile", action="store_true", help="leave the mobile manipulator out of the scene")
     objects_cmd.set_defaults(handler=objects)
 
     args = parser.parse_args(argv)

@@ -25,6 +25,7 @@ class RoomElement:
     confidence: str
     parent: str | None = None
     attributes: dict[str, str] = field(default_factory=dict)
+    polygon: np.ndarray | None = None  # outline corners in the element's local frame (floors), (N, 3)
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,10 @@ def _parse_element(raw: dict[str, Any], kind: str) -> RoomElement:
     confidence = _enum_name(raw.get("confidence", {"medium": {}}), "confidence")
     if confidence not in CONFIDENCE_LEVELS:
         raise ValueError(f"{kind} {raw.get('identifier')}: unknown confidence {confidence!r}")
+    corners = raw.get("polygonCorners") or []
+    polygon = np.asarray(corners, dtype=np.float64) if len(corners) >= 3 else None
+    if polygon is not None and polygon.shape[1:] != (3,):
+        raise ValueError(f"{kind} {raw.get('identifier')}: bad polygonCorners shape {polygon.shape}")
     return RoomElement(
         kind=kind,
         category=_enum_name(raw["category"], "category"),
@@ -61,6 +66,7 @@ def _parse_element(raw: dict[str, Any], kind: str) -> RoomElement:
         confidence=confidence,
         parent=raw.get("parentIdentifier"),
         attributes={str(k): str(v) for k, v in (raw.get("attributes") or {}).items()},
+        polygon=polygon,
     )
 
 

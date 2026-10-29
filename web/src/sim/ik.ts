@@ -4,6 +4,8 @@ import type { Physics } from './physics';
 
 // Damped least-squares IK for the arm's grip point, position + orientation, with a pull towards
 // the home posture in the null space. Same algorithm as pipeline/src/scan2sim/ik.py.
+// Kinematics run on a scratch copy of the live state (so a moved arm base is followed); a planner
+// can override joints outside the arm, e.g. solve for a mobile base parked somewhere else.
 
 const DAMPING = 0.05;
 const ROTATION_WEIGHT = 0.3; // metres of position error worth one radian of orientation error
@@ -86,6 +88,7 @@ export class ArmIk {
   private readonly site: number;
   private readonly base: number;
   private readonly home: number[];
+  private overrides: [number, number][] = [];
 
   constructor(
     private readonly physics: Physics,
@@ -106,9 +109,27 @@ export class ArmIk {
     this.home = arm.home.slice();
   }
 
+  /** Solve as if these qpos entries (address, value) had these values, e.g. a planned base pose and
+   * lift height; everything else follows the live simulation. An empty list means "as it is now". */
+  plannedState(overrides: ReadonlyArray<readonly [number, number]>): void {
+    this.overrides = overrides.map(([adr, value]) => [adr, value]);
+  }
+
+  private syncScratch(): void {
+    const { model, data } = this.physics;
+    const qpos = this.scratch.qpos;
+    qpos.set(data.qpos);
+    if (model.nmocap > 0) {
+      this.scratch.mocap_pos.set(data.mocap_pos);
+      this.scratch.mocap_quat.set(data.mocap_quat);
+    }
+    for (const [adr, value] of this.overrides) qpos[adr] = value;
+  }
+
   /** Grip point position and row-major rotation for joint angles q. */
   pose(q: readonly number[]): { position: Vec3; rotation: number[] } {
     const { mujoco, model } = this.physics;
+    this.syncScratch();
     const qpos = this.scratch.qpos;
     this.qposAdr.forEach((adr, i) => {
       qpos[adr] = q[i];
@@ -121,8 +142,9 @@ export class ArmIk {
 
   /** Home posture with joint 1 turned towards a world point. */
   facing(target: Vec3): number[] {
-    const pos = this.physics.data.xpos;
-    const mat = this.physics.data.xmat;
+    this.pose(this.home); // the base pose (live, or planned) in the scratch state
+    const pos = this.scratch.xpos;
+    const mat = this.scratch.xmat;
     const b = this.base;
     const d = [target[0] - pos[b * 3], target[1] - pos[b * 3 + 1], target[2] - pos[b * 3 + 2]];
     // base frame = xmat^T * d (row-major xmat)

@@ -85,6 +85,27 @@ flowchart LR
   clear long axis). 3 cm is half the smallest object on our desks; Meta's Habitat "tidy house" uses 15 cm
   at room scale.
 
+## Robots
+
+Both robots are ours: kinematics follow published numbers, the MJCF, shells, gripper and controllers are
+written here (`pipeline/src/scan2sim/arm.py`, `mobile.py`, `robots.py`; `web/src/sim/`).
+
+- **Stationary arm:** 7 joints with the Franka Emika Panda's published modified-DH layout (reach 0.28–0.76 m
+  for top-down grasps), hull shells built in code, a parallel gripper that opens to 11 cm and squeezes
+  with 20 N, damped least-squares IK. Its base is a MuJoCo mocap body, so it can be dragged anywhere on
+  the table without rebuilding the scene.
+- **Mobile manipulator:** a round holonomic base (x, y, yaw), a lift that puts the arm base anywhere from
+  0.40 to 1.00 m, and the same arm with a 16 cm gripper. It plans on a 5 cm occupancy grid of the RoomPlan
+  walls and furniture (A*, inflated by its radius), parks where the arm reaches the target, lifts to
+  the surface and grasps. On the desk it takes the 10.8 cm yellow cylinder that is out of the arm's
+  reach and wider than its gripper.
+- **One interface** (`web/src/sim/robot.ts`): `reachOf(object)` answers instantly with a reason ("0.77 m
+  away, reach 0.76 m"), `run({ object, x, y, yawDelta })` does a whole pick and place, `setBasePose` moves
+  a robot. Muse Spark assigns each move to a robot that reaches both ends and refuses the rest.
+- **Physics choices:** elliptic friction cones, a no-slip pass and rolling friction on the pads keep round
+  objects in the grip; robots collide with walls, tables and objects but not with RoomPlan furniture
+  boxes (a chair's box includes the air around its backrest).
+
 ## Numbers
 
 <!-- numbers:start -->
