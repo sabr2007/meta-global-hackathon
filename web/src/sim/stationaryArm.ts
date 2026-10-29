@@ -11,7 +11,8 @@ import { discOnRect, type SceneGeometry } from './sceneGeometry';
 const WIDTH_MARGIN_M = 0.012; // same as ArmController: the fingers need some play around an object
 const OBJECT_CLEARANCE_M = 0.02; // between the base and any object when it is put down
 const SAME_SURFACE_M = 0.015;
-const FOOTPRINT_SHARE = 0.8; // this much of a held object's footprint must rest on the surface
+const FOOTPRINT_SHARE = 0.5; // this much of a held object's footprint radius must rest on the surface (goals often group objects closely)
+const REACH_SLACK_M = 0.02; // the band is for comfortable top-down grasps; the IK still solves a little past it
 const PLACED_HEIGHT_M = 0.03; // after a release the object rests this close to the planned surface
 const PLACED_OFFSET_M = 0.06; // ... and this close to the planned point
 const LOWEST_REACH_M = -0.1; // objects this far below the base (or higher than HIGHEST) are out of reach
@@ -73,7 +74,7 @@ export class StationaryArm extends RobotBase {
     const distance = Math.hypot(shape.center[0] - base.x, shape.center[1] - base.y);
     const [min, max] = this.info.reach_m;
     const problems: string[] = [];
-    if (distance > max) problems.push(`${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`);
+    if (distance > max + REACH_SLACK_M) problems.push(`${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`);
     else if (distance < min) problems.push(`${distance.toFixed(2)} m away, too close to the base (${min.toFixed(2)} m)`);
     const below = shape.bottom - base.z;
     if (below < LOWEST_REACH_M) problems.push(`${(-below).toFixed(2)} m below the arm's base`);
@@ -90,7 +91,7 @@ export class StationaryArm extends RobotBase {
     const base = this.basePose();
     const distance = Math.hypot(x - base.x, y - base.y);
     const [min, max] = this.info.reach_m;
-    if (distance > max) return { ok: false, reason: `${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`, distance_m: distance };
+    if (distance > max + REACH_SLACK_M) return { ok: false, reason: `${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`, distance_m: distance };
     if (distance < min) return { ok: false, reason: `${distance.toFixed(2)} m from the base, too close (${min.toFixed(2)} m)`, distance_m: distance };
     return { ok: true, reason: `${distance.toFixed(2)} m away, within reach`, distance_m: distance };
   }
@@ -114,7 +115,7 @@ export class StationaryArm extends RobotBase {
     const base = this.basePose();
     const distance = Math.hypot(x - base.x, y - base.y);
     const [min, max] = this.info.reach_m;
-    if (distance > max) return refused(`(${x.toFixed(2)}, ${y.toFixed(2)}) is ${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`);
+    if (distance > max + REACH_SLACK_M) return refused(`(${x.toFixed(2)}, ${y.toFixed(2)}) is ${distance.toFixed(2)} m away, reach ${max.toFixed(2)} m`);
     if (distance < min) return refused(`(${x.toFixed(2)}, ${y.toFixed(2)}) is too close to the base`);
     const surface = this.scene.placeSurface(x, y, objectShape(this.physics, held).radius * FOOTPRINT_SHARE, this.bodyOf(held));
     if (typeof surface === 'string') return refused(`Can't put ${this.name(held)} down: ${surface}`);
