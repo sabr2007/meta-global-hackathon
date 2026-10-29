@@ -90,8 +90,10 @@ class PhotoCamera:
         return inside & (depth <= nearest[np.where(inside, cells, 0)] + VISIBLE_SLACK_M)
 
     def _cells(self, points_world: np.ndarray, cell_px: int, cells_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Z-buffer cell of every point, its depth, and whether it lands in front of the camera inside the frame."""
         pixels, depth = self.project(points_world)
-        inside = (depth > MIN_DEPTH_M) & (pixels[:, 0] >= 0) & (pixels[:, 0] < self.width) & (pixels[:, 1] >= 0) & (pixels[:, 1] < self.height)
+        in_frame = (pixels >= 0).all(axis=1) & (pixels[:, 0] < self.width) & (pixels[:, 1] < self.height)
+        inside = (depth > MIN_DEPTH_M) & in_frame
         cell = np.where(inside[:, None], pixels, 0.0).astype(np.int64) // cell_px
         return cell[:, 1] * cells_w + cell[:, 0], depth, inside
 

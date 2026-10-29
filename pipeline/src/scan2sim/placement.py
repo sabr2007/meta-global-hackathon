@@ -11,7 +11,7 @@ next best candidate out of 96 gave 10.6 mm):
 - the pose acts on row vectors, p = (s * v) @ R + t, with R from a (w, x, y, z) quaternion;
 - the camera is PyTorch3D's (x left, y up, z forward) for the upright photo that was sent.
 
-Before the depth is fitted, two corrections from the photo itself:
+Before the depth is fitted, two corrections:
 - level: SAM 3D poses come out 1-13 degrees off the table (the mouse on our desk 12.9), and a tilted
   mesh rocks onto its base in the first steps of the simulation. The mesh turns about its centre
   until the collider face below its centre of mass, the face it would settle on, is flat;
