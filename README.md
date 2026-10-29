@@ -159,7 +159,9 @@ over (5.2 → 0.5 cm), and masses and friction come from Muse Spark with a one-l
 Final round (v8; Spark's decision between rounds and the photo-space check came after it): 12 runs, 12 with an after photo to work from (one went ahead with refusals because no version could be done in full); SAM 3.1 rejected 29 of 47 versions; 43 of 50 requested moves ended within 3 cm of the goal; mean score 73; mean 67 s and $0.09 per run.
 All 56 runs on Desk tonight, every round and every version of the code: 144/215 requested moves done, 5 stopped with no approved after photo, 8 scored 0.
 All 28 runs on Mirror 02 tonight, every round and every version of the code: 41/80 requested moves done, 7 stopped with no approved after photo, 5 scored 0.
-Every round, its failures and what each one taught us: [docs/eval-log.md](docs/eval-log.md).
+Every round, its failures and what each one taught us: [docs/eval-log.md](docs/eval-log.md); every run as one
+JSON line: [docs/eval-runs.jsonl](docs/eval-runs.jsonl) (`node web/scripts/landing-numbers.mjs docs/eval-runs.jsonl`
+recomputes the landing's figures from it).
 
 **Robot policies on the saved episodes** (`npx tsx scripts/policies.ts --scan desk-sam3d`, no model calls): every saved
 run with an approved after photo replayed with the same robots and plan, but a different idea of where

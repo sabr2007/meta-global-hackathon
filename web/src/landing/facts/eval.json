@@ -1,6 +1,6 @@
 {
  "source": "Headless runs of the full Ayna loop: live Meta models, robots in MuJoCo, the same verifier as the app (web/scripts/eval.ts).",
- "generated": "2026-10-29T04:31:47.706Z",
+ "generated": "2026-10-29T06:00:09.947Z",
  "scan": "desk-sam3d",
  "runs": 7,
  "stopped": 0,
@@ -15,7 +15,7 @@
   "Line the small objects up along the back edge",
   "Move the yellow cylinder to the front right corner of the table",
   "tidy up my desk and put the mouse next to the keyboard.",
-  "A request asked in Russian"
+  "tidy up the table and put the mouse next to the keyboard (spoken in Russian)"
  ],
  "objects": {
   "checked": 49,
@@ -152,7 +152,7 @@
    "run": "20261029-042406-d36s",
    "scan": "desk-sam3d",
    "status": "done",
-   "request": "A request asked in Russian",
+   "request": "tidy up the table and put the mouse next to the keyboard (spoken in Russian)",
    "matched": 7,
    "total": 7,
    "medianErrorCm": 0.16,

@@ -24,7 +24,8 @@ const output = path.join(WEB, 'src', 'landing', 'facts', 'eval.json');
 
 // The page is in English: a request spoken in Russian is listed by its language, not its words.
 const CYRILLIC = /[\u0400-\u04ff]/;
-const english = (request) => (CYRILLIC.test(request) ? 'A request asked in Russian' : request);
+const english = (run) =>
+  CYRILLIC.test(run.request) ? 'A request asked in Russian' : run.spoken_language === 'ru' ? `${run.request} (spoken in Russian)` : run.request;
 
 const median = (values) => {
   if (!values.length) return null;
@@ -59,7 +60,7 @@ const numbers = {
   stopped: stopped.length,
   attempted: all.length,
   scans: [...new Set(finished.map((r) => r.scan))],
-  requests: [...new Set(finished.map((r) => english(r.request)))],
+  requests: [...new Set(finished.map((r) => english(r)))],
   objects: { checked: sum(done.map((r) => r.total)), matched: sum(done.map((r) => r.matched)) },
   medianErrorCm: {
     median: round(median(done.map((r) => r.medianErrorCm))),
@@ -94,7 +95,7 @@ const numbers = {
     run: r.run,
     scan: r.scan,
     status: r.status,
-    request: english(r.request),
+    request: english(r),
     matched: r.matched ?? null,
     total: r.total ?? null,
     medianErrorCm: typeof r.medianErrorCm === 'number' ? round(r.medianErrorCm) : null,
