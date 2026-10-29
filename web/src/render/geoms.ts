@@ -29,6 +29,10 @@ export interface GeomLayer {
   readonly root: THREE.Group;
   sync(): void;
   setGroupVisible(group: GroupId, visible: boolean): void;
+  /** Cut these groups with clipping planes (the stage around the table). */
+  clip(groups: readonly GroupId[], planes: THREE.Plane[]): void;
+  /** Repaint a group's geoms (all, or those whose name matches); highlight and tint return to this look. */
+  paint(group: GroupId, color: string, opacity: number, only?: RegExp): void;
   highlight(name: string | null): void;
   /** Recolour geoms by name (a robot's status lights: lime when fine, orange when it needs
    * attention); null restores their own colour. */
@@ -81,7 +85,7 @@ function createView(physics: Physics, index: number): GeomView | null {
   const baseOpacity = material.opacity;
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = !isProxy;
-  mesh.receiveShadow = !isProxy;
+  mesh.receiveShadow = true; // a RoomPlan table catches the shadows of the robots and objects on it
 
   const object = new THREE.Group();
   object.matrixAutoUpdate = false;
@@ -135,6 +139,28 @@ export function buildGeomLayer(physics: Physics): GeomLayer {
     }
   };
 
+  const clip = (groups: readonly GroupId[], planes: THREE.Plane[]): void => {
+    const wanted = new Set<number>(groups);
+    for (const v of views) {
+      if (!wanted.has(v.group)) continue;
+      v.material.clippingPlanes = planes;
+      if (v.edges) (v.edges.material as THREE.LineBasicMaterial).clippingPlanes = planes;
+    }
+  };
+
+  const paint = (group: GroupId, color: string, opacity: number, only?: RegExp): void => {
+    for (const v of views) {
+      if (v.group !== group || (only && !only.test(v.name))) continue;
+      v.baseColor.set(color);
+      v.baseOpacity = opacity;
+      v.material.color.copy(v.baseColor);
+      v.material.opacity = opacity;
+      v.material.transparent = opacity < 1;
+      v.material.depthWrite = opacity >= 1;
+      v.material.needsUpdate = true;
+    }
+  };
+
   // The highlighted collider is drawn on top of everything ("x-ray"), because
   // colliders usually sit inside the scanned surfaces they approximate.
   const highlight = (name: string | null): void => {
@@ -166,5 +192,5 @@ export function buildGeomLayer(physics: Physics): GeomLayer {
   };
 
   sync();
-  return { root, sync, setGroupVisible, highlight, tint };
+  return { root, sync, setGroupVisible, clip, paint, highlight, tint };
 }

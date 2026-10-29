@@ -27,8 +27,17 @@ const ROOM_CLIP_TOP_M = 1.3;
 const ORBIT_TURN = THREE.MathUtils.degToRad(32);
 const ORBIT_PULLBACK = 1.3;
 const ORBIT_RISE_M = 0.85; // look down on the table and the floor around it, where the robots work
+const ROOM_BOXES = [GROUP.structure, GROUP.furniture, GROUP.openings] as const; // RoomPlan's walls, furniture, doors and windows
+const TABLE_COLOR = '#77736b';
+const FURNITURE_LOOK = { color: '#a29d92', opacity: 0.22 };
+const WALL_LOOK = { color: '#d8d5ce', opacity: 0.12 };
+const FLOOR_COLOR = '#2a2a2d';
+const GRID_COLOR = '#3e3e44';
+const GRID_STEP_M = 0.25;
 
 export type View = 'photo' | 'orbit';
+/** The room around the table: the LiDAR scan, or RoomPlan's boxes on a plain floor. */
+export type RoomView = 'scan' | 'boxes';
 
 export interface Twin {
   readonly meta: SceneMeta;
@@ -56,6 +65,8 @@ export interface Twin {
   pointOnPlane(clientX: number, clientY: number, z: number): [number, number] | null;
   tintObjects(colors: ReadonlyMap<string, string>): void;
   setOrbitEnabled(enabled: boolean): void;
+  /** Placing a robot reads better on RoomPlan's clean boxes than on the lumpy LiDAR scan. */
+  setRoomView(view: RoomView): void;
   /** Centre of the scanned objects (robots face it when placed). */
   readonly focus: [number, number];
   onFrame(listener: () => void): void;
@@ -172,6 +183,27 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
     };
     material.needsUpdate = true;
   });
+
+  // The other room: RoomPlan's boxes, cut to the same stage, on a floor with a 25 cm grid (hidden until asked
+  // for). The table is solid, the surface the robots and objects share; other furniture and the walls stay
+  // see-through, so they never hide it.
+  geoms.clip(ROOM_BOXES, clip);
+  geoms.paint(GROUP.furniture, FURNITURE_LOOK.color, FURNITURE_LOOK.opacity);
+  geoms.paint(GROUP.furniture, TABLE_COLOR, 1, /^table_/);
+  geoms.paint(GROUP.structure, WALL_LOOK.color, WALL_LOOK.opacity);
+  const boxFloor = new THREE.Group();
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROOM_CLIP_HALF_M * 2, ROOM_CLIP_HALF_M * 2),
+    new THREE.MeshStandardMaterial({ color: FLOOR_COLOR, roughness: 1 }),
+  );
+  floor.receiveShadow = true;
+  const grid = new THREE.GridHelper(ROOM_CLIP_HALF_M * 2, Math.round((ROOM_CLIP_HALF_M * 2) / GRID_STEP_M), GRID_COLOR, GRID_COLOR);
+  grid.rotation.x = Math.PI / 2; // the helper lies in XZ; the world is Z-up
+  grid.position.z = 0.002;
+  boxFloor.add(floor, grid);
+  boxFloor.position.set(centre.x, centre.y, 0);
+  boxFloor.visible = false;
+  scene.add(boxFloor);
 
   const camera = new THREE.PerspectiveCamera(ORBIT_FOV, 1, NEAR, FAR);
   const photoPose = new THREE.Matrix4();
@@ -361,6 +393,12 @@ export async function loadTwin(canvas: HTMLCanvasElement, files: Record<string, 
       // While a robot is dragged, the pointer places it; the wheel still zooms.
       controls.enableRotate = enabled;
       controls.enablePan = enabled;
+    },
+    setRoomView(view: RoomView) {
+      const boxes = view === 'boxes';
+      room.root.visible = !boxes;
+      boxFloor.visible = boxes;
+      for (const group of ROOM_BOXES) geoms.setGroupVisible(group, boxes);
     },
     focus: [centre.x, centre.y],
     onFrame(listener: () => void) {
