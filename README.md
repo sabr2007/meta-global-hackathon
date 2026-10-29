@@ -94,6 +94,9 @@ flowchart LR
   object and put it down where its gripped footprint will land, on the same surface, not on an object
   that stays; otherwise it is rejected with the blocking number, and Spark's next note to the editor
   avoids it. Spark's own refusals are checked the same way, and a refused move always counts as asked.
+- **The person has the last word.** The after photo waits for approval: yes, another version that passed
+  (the robots plan from that one), or "not this, because …", which Spark turns into a new edit before
+  Muse Image draws again. The timeline records who decided what.
 - **Closing the loop.** A slipped grasp is retried once; objects still off goal get a second plan from
   where they are now.
 
