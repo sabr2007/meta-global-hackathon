@@ -62,7 +62,7 @@ export function planFacts(goals: ObjectGoal[], objects: SceneObject[], fleet: Fl
     robots.push(`- robot ${robot.id} (${robot.kind}, ${robot.label}), gripper opens ${cm(robot.gripWidthM)}:`);
     for (const g of moving) {
       const pick = robot.reachOf(g.name);
-      const put = robot.reachPoint(g.to[0], g.to[1], g.name);
+      const put = robot.reachPoint(g.to[0], g.to[1], g.name, g.yawDelta);
       const verdict = pick.ok && put.ok ? 'can do it' : `cannot: ${!pick.ok ? `object ${pick.reason}` : `target ${put.reason}`}`;
       robots.push(`    ${g.name}: ${verdict}`);
     }
@@ -123,12 +123,12 @@ export function checkPlan(
   const refusals: Refusal[] = [];
   const fixes: string[] = [];
   const handled = new Set<string>();
-  const capable = (g: ObjectGoal): FleetRobot[] => fleet.filter((r) => r.reachOf(g.name).ok && r.reachPoint(g.to[0], g.to[1], g.name).ok);
+  const capable = (g: ObjectGoal): FleetRobot[] => fleet.filter((r) => r.reachOf(g.name).ok && r.reachPoint(g.to[0], g.to[1], g.name, g.yawDelta).ok);
   const blocker = (g: ObjectGoal): string =>
     fleet
       .map((r) => {
         const pick = r.reachOf(g.name);
-        const put = r.reachPoint(g.to[0], g.to[1], g.name);
+        const put = r.reachPoint(g.to[0], g.to[1], g.name, g.yawDelta);
         return `${r.label}: ${!pick.ok ? pick.reason : put.reason}`;
       })
       .join('; ');
@@ -187,7 +187,7 @@ export function infeasible(goals: ObjectGoal[], fleet: FleetRobot[], footprints:
   for (const g of moving) {
     const why = fleet.map((r) => {
       const pick = r.reachOf(g.name);
-      const put = pick.ok ? r.reachPoint(g.to[0], g.to[1], g.name) : pick;
+      const put = pick.ok ? r.reachPoint(g.to[0], g.to[1], g.name, g.yawDelta) : pick;
       return { robot: r, ok: pick.ok && put.ok, reason: put.reason };
     });
     if (!why.some((w) => w.ok)) reasons.push(`no robot can move the ${g.label} there (${why.map((w) => `${w.robot.label}: ${w.reason}`).join('; ')})`);

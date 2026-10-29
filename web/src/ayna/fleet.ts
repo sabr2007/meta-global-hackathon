@@ -1,15 +1,17 @@
 // The robots Ayna can dispatch, behind one small interface: can you reach this object / this spot,
 // and move this object there (a Promise that settles when the robot is done or gives up).
 
-import { objectShape } from '../sim/objectShape';
+import { objectShape, type ObjectShape } from '../sim/objectShape';
 import type { Physics } from '../sim/physics';
 import type { Robot } from '../sim/robot';
 import type { SceneGeometry } from '../sim/sceneGeometry';
 
 const NUDGE_STEP_M = 0.01; // a goal projected just off the table edge is moved onto it in 1 cm steps
 const NUDGE_MAX_M = 0.06;
+const NUDGE_FEASIBLE_M = 0.02; // a version whose goal must move further than this would miss the 3 cm tolerance: redraw it instead
 const NUDGE_DIRECTIONS = 12;
 const FOOTPRINT_SHARE = 0.5; // same share of the footprint the robots check before letting go
+const SAME_SURFACE_M = 0.015; // goals are read on the object's own table: a spot lower or higher (the floor past its edge) is off it
 
 export interface Reach {
   ok: boolean;
@@ -36,7 +38,8 @@ export interface FleetRobot {
   readonly gripWidthM: number;
   reachOf(object: string): Reach;
   /** Can it put something down at (x, y)? With `object`, the exact test for that object's footprint. */
-  reachPoint(x: number, y: number, object?: string): Reach;
+  /** Can this robot put something down at (x, y)? With an object (and its turn), the exact put-down test. */
+  reachPoint(x: number, y: number, object?: string, yawDelta?: number): Reach;
   run(step: MoveStep): Promise<StepResult>;
   /** Called before every physics step. */
   update(): void;
@@ -73,24 +76,46 @@ class RegistryRobot implements FleetRobot {
     return { ok: r.ok, reason: r.reason, distanceM: r.distance_m };
   }
 
-  reachPoint(x: number, y: number, object?: string): Reach {
+  reachPoint(x: number, y: number, object?: string, yawDelta = 0): Reach {
     let [px, py] = [x, y];
     if (object) {
-      const { mujoco, model } = this.physics;
-      const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, object);
-      const radius = objectShape(this.physics, object).radius * FOOTPRINT_SHARE;
-      [px, py] = this.placeable(x, y, radius, body);
-      const surface = this.scene.placeSurface(px, py, radius, body);
+      const landing = this.landing(object, x, y, yawDelta);
+      [px, py] = landing.point;
+      const surface = this.scene.placeSurface(px, py, landing.shape.radius * FOOTPRINT_SHARE, landing.body);
       if (typeof surface === 'string') return { ok: false, reason: `can't put it down there: ${surface}`, distanceM: 0 };
+      if (!surface.object && Math.abs(surface.z - landing.shape.bottom) > SAME_SURFACE_M) {
+        return { ok: false, reason: `can't put it down there: (${px.toFixed(2)}, ${py.toFixed(2)}) is off the ${surface.name.replace(/_\d+$/, '')} it stands on`, distanceM: 0 };
+      }
+      if (landing.nudgedM > NUDGE_FEASIBLE_M) {
+        return { ok: false, reason: `can't put it down there: the spot is ${(landing.nudgedM * 100).toFixed(0)} cm past the edge of the ${surface.name.replace(/_\d+$/, '')}`, distanceM: 0 };
+      }
     }
     const r = this.robot.reachPoint(px, py);
     return { ok: r.ok, reason: r.reason, distanceM: r.distance_m };
   }
 
+  /** Where the gripped footprint centre goes when the object's body origin should land at (x, y)
+   * turned by yawDelta, nudged back onto the object's own surface when that lands just past an edge. */
+  private landing(object: string, x: number, y: number, yawDelta: number): { point: [number, number]; nudgedM: number; body: number; shape: ObjectShape } {
+    const { mujoco, model, data } = this.physics;
+    const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, object);
+    const shape = objectShape(this.physics, object);
+    const ox = shape.center[0] - data.xpos[body * 3];
+    const oy = shape.center[1] - data.xpos[body * 3 + 1];
+    const c = Math.cos(yawDelta);
+    const s = Math.sin(yawDelta);
+    const wanted: [number, number] = [x + c * ox - s * oy, y + s * ox + c * oy];
+    const point = this.placeable(wanted[0], wanted[1], shape.radius * FOOTPRINT_SHARE, body, shape.bottom);
+    return { point, nudgedM: Math.hypot(point[0] - wanted[0], point[1] - wanted[1]), body, shape };
+  }
+
   /** The goal, or the nearest point within a few centimetres where the object can be put down
    * (goals read off a photo can land just past a table edge). The receipt still measures against the goal. */
-  private placeable(x: number, y: number, radius: number, body: number): [number, number] {
-    const ok = (px: number, py: number): boolean => typeof this.scene.placeSurface(px, py, radius, body) !== 'string';
+  private placeable(x: number, y: number, radius: number, body: number, bottom: number): [number, number] {
+    const ok = (px: number, py: number): boolean => {
+      const surface = this.scene.placeSurface(px, py, radius, body);
+      return typeof surface !== 'string' && (Boolean(surface.object) || Math.abs(surface.z - bottom) <= SAME_SURFACE_M);
+    };
     if (ok(x, y)) return [x, y];
     for (let d = NUDGE_STEP_M; d <= NUDGE_MAX_M + 1e-9; d += NUDGE_STEP_M) {
       for (let k = 0; k < NUDGE_DIRECTIONS; k += 1) {
@@ -102,14 +127,7 @@ class RegistryRobot implements FleetRobot {
   }
 
   async run(step: MoveStep): Promise<StepResult> {
-    const { mujoco, model, data } = this.physics;
-    const body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, step.object);
-    const shape = objectShape(this.physics, step.object);
-    const ox = shape.center[0] - data.xpos[body * 3];
-    const oy = shape.center[1] - data.xpos[body * 3 + 1];
-    const c = Math.cos(step.yawDelta);
-    const s = Math.sin(step.yawDelta);
-    const [gx, gy] = this.placeable(step.x + c * ox - s * oy, step.y + s * ox + c * oy, shape.radius * FOOTPRINT_SHARE, body);
+    const [gx, gy] = this.landing(step.object, step.x, step.y, step.yawDelta).point;
     const result = await this.robot.run({ object: step.object, x: gx, y: gy, yawDelta: step.yawDelta });
     // A robot that could not put the object down at the goal puts it back, so the next step starts free.
     if (!result.ok && this.robot.status.holding) await this.robot.run({ action: 'putBack' });

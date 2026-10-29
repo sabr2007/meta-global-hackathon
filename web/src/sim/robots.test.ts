@@ -173,4 +173,13 @@ describe.skipIf(!HAS_ROBOTS)('robots on a scanned desk', async () => {
     fleet.reset();
     expect(arm.basePose().x).toBeCloseTo(spot.x, 6);
   });
+  test('Ayna treats a goal past the table edge as one no robot can put down, and redraws it', async () => {
+    const { fleetOf } = await import('../ayna/fleet');
+    const robots = fleetOf(physics, fleet.robots, fleet.scene);
+    const cylinder = meta.objects!.find((o) => o.label.includes('cylinder'))!;
+    // A real after photo's goal: the front right corner, its centre 6 cm past the edge of the desk.
+    for (const robot of robots) expect(robot.reachPoint(-1.217, 2.21, cylinder.name).reason).toMatch(/6 cm past the edge of the table/);
+    // Where it stands now is on the desk and within the arm's reach.
+    expect(robots.find((r) => r.kind === 'arm')!.reachPoint(cylinder.start[0], cylinder.start[1], cylinder.name)).toMatchObject({ ok: true });
+  });
 });
