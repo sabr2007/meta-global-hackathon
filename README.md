@@ -139,7 +139,7 @@ uv run pytest
 `scan2sim objects` runs Spark + SAM 3.1 + review, lifts masks with LiDAR depth, gets SAM 3D meshes from fal
 (one request for all masks), places them, and writes the bundle: `scene.xml` (MJCF), `scene.json`,
 `room_mesh.glb`, `objects/*.glb`, `hero.jpg`, `masks.json`. `--cache` keeps every paid result, so rebuilds
-are free (~10 s). `--physics` adds Muse Spark's mass and friction per object (one call, cached too).
+are free (~7 s). `--physics` adds Muse Spark's mass and friction per object (one call, cached too).
 `uv run scan2sim report ../data/scenes/mirror --capture ~/Downloads/Mirror.zip --photo 0036` grades every
 object against the capture: LiDAR distance, size against the LiDAR extents, tilt, drift in the first 2 s of
 physics, colour difference from the photo, photo IoU, how open a ring's hole stays, and mass.
