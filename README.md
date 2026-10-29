@@ -36,7 +36,7 @@ automatic check is also a ready evaluation episode for a robot policy in a real 
 | Model | Where | Its job in the loop |
 |---|---|---|
 | **Muse Voice Transcribe** `muse-voice-transcribe-1.0` | `web/server/meta.ts` | Push-to-talk request (English or Russian) from a 16 kHz WAV recorded in the browser |
-| **Muse Spark** `muse-spark-1.3` | `web/server/ayna.ts`, `pipeline/…/discovery.py`, `verify.py` | Writes the edit instruction for this photo from the scene (objects, sizes, robot reach); judges the versions that pass; orders the moves and assigns robots with honest refusals; says in words whether the result matches. In the scan pipeline it lists the objects and reviews SAM's crops and, with `--physics`, estimates each object's mass and friction |
+| **Muse Spark** `muse-spark-1.3` | `web/server/ayna.ts`, `pipeline/…/discovery.py`, `verify.py` | Writes the edit instruction for this photo from the scene (objects, sizes, robot reach); when every version of a round is rejected, reads the reasons and decides to redraw (with its own note to the editor), narrow the request or stop; judges the versions that pass; orders the moves and assigns robots with honest refusals; says in words whether the result matches. In the scan pipeline it lists the objects and reviews SAM's crops and, with `--physics`, estimates each object's mass and friction |
 | **Muse Image** `muse-image-1.0` | `web/server/meta.ts` | Develops 3 versions of the after photo in parallel by editing the real hero photo (same camera, same lighting) |
 | **SAM 3.1** `sam-3.1` | `web/server/meta.ts`, `pipeline/…/segmentation.py` | Finds every scanned object in the real photo and in each version; the conservation check rejects versions where an object vanished, appeared or changed size; the after masks become metric goals |
 | **SAM 3D Objects** (open weights, hosted on fal) | `pipeline/…/reconstruct.py` | A full 3D mesh and pose for every object mask; levelled, matched to its silhouette in the photo, placed on the LiDAR points (or on the table when LiDAR sees through it), painted with the photo's colours and simulated as a body |
@@ -61,8 +61,9 @@ flowchart LR
   subgraph app["Ayna web app + server"]
     voice["Voice Transcribe"] --> instruct["Spark writes the edit"]
     instruct --> imagine["Muse Image × 3"]
-    imagine --> check["SAM 3.1 conservation check"]
-    check -- rejected, with the reason --> instruct
+    imagine --> check["SAM 3.1 conservation check + robots' reach and put-down test"]
+    check -- every version rejected --> decide["Spark decides: redraw · narrow · stop"]
+    decide -- its note to the editor --> instruct
     check --> judge["Spark picks the best"]
     judge --> approve["You approve the after photo"]
     approve --> goals["Masks → rays → table plane → (x, y, θ)"]
@@ -87,6 +88,10 @@ flowchart LR
   at room scale. The score is *requested moves done × objects left in place*, so a refused or failed move
   always costs points. Positions are checked against the goals the robots were sent to; the independent
   check is how well the twin, rendered from the photo's camera, overlaps the imagined photo's masks.
+- **Feasible before it is shown.** A version passes only if, for every move, some robot can pick the
+  object and put it down where its gripped footprint will land, on the same surface, not on an object
+  that stays; otherwise it is rejected with the blocking number, and Spark's next note to the editor
+  avoids it. Spark's own refusals are checked the same way, and a refused move always counts as asked.
 - **Closing the loop.** A slipped grasp is retried once; objects still off goal get a second plan from
   where they are now.
 
