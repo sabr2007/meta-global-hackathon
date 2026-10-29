@@ -289,7 +289,8 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
     // On a phone the after photo and its slider are on the stage, above the panel: show them first.
     if (narrow()) stageWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
     else reveal(review);
-    const actions = h('div', 'review__actions');
+    // On a phone the answer floats at the bottom of the screen, so it stays next to the after photo above.
+    const actions = h('div', `review__actions${narrow() ? ' review__actions--floating' : ''}`);
     const yes = h('button', 'pill pill--lime', 'Do it');
     yes.type = 'button';
     const no = h('button', 'pill pill--outline', 'Not this');

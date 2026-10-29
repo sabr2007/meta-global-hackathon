@@ -1150,6 +1150,20 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .review__actions--floating {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    padding: 10px;
+    border-radius: var(--radius-card);
+    background: var(--bg);
+    box-shadow:
+      0 0 0 1px var(--line-strong),
+      0 18px 40px -18px rgb(0 0 0 / 0.8);
+  }
+
   .scan__stage {
     position: relative;
     top: 0;
