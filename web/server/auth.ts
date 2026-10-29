@@ -2,7 +2,7 @@
 // hashes, sessions are HMAC-signed cookies, and an iPhone pairs with a one-time code for a device token.
 
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { getJson, putJson, store } from './store';
+import { getJson, putJson, store } from './store.js';
 
 export const SESSION_COOKIE = 'ayna_session';
 const SESSION_DAYS = 14;

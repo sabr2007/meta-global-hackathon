@@ -1,7 +1,7 @@
 // Small HTTP helpers shared by the routes: errors, JSON, body parsing, cookies and the live-call gate.
 
-import { currentUser, type User } from './auth';
-import { spend, type Allowance } from './quota';
+import { currentUser, type User } from './auth.js';
+import { spend, type Allowance } from './quota.js';
 
 export interface Route {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';

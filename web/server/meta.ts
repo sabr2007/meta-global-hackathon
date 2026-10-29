@@ -7,7 +7,7 @@ import {
   recordsOfKind,
   type ResponsesEvent,
 } from '@meta-sam/parser';
-import { encodeRle, type Rle } from '../src/ayna/rle';
+import { encodeRle, type Rle } from '../src/ayna/rle.js';
 
 export const SPARK_MODEL = 'muse-spark-1.3';
 export const SAM_MODEL = 'sam-3.1';

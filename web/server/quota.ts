@@ -1,7 +1,7 @@
 // Per-user daily allowance for live model calls, so a shared demo account cannot burn the credits.
 
-import type { User } from './auth';
-import { getJson, putJson, store } from './store';
+import type { User } from './auth.js';
+import { getJson, putJson, store } from './store.js';
 
 export type Allowance = 'run' | 'imagine' | 'listen' | 'step';
 

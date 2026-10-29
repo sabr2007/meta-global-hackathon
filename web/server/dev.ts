@@ -41,7 +41,7 @@ export function aynaApi(env: Record<string, string>): Plugin {
           return;
         }
         void (async () => {
-          const { handle } = (await server.ssrLoadModule('/server/router.ts')) as typeof import('./router');
+          const { handle } = (await server.ssrLoadModule('/server/router.ts')) as typeof import('./router.js');
           await send(await handle(await toRequest(req)), res);
         })().catch((error: unknown) => {
           console.error(error);

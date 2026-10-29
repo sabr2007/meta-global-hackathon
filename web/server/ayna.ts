@@ -1,7 +1,7 @@
 // Ayna's model steps. Each handler takes plain JSON from the browser, calls Meta models and returns
 // JSON plus the usage of every call, so the UI can show which model did what and what it cost.
 
-import { editImage, MetaError, segmentBox, segmentConcept, sparkJson, transcribe, type InputContent, type SamMask, type Usage } from './meta';
+import { editImage, MetaError, segmentBox, segmentConcept, sparkJson, transcribe, type InputContent, type SamMask, type Usage } from './meta.js';
 
 const GRID = 1000; // Muse Spark grounding grid for boxes
 const SAM_CONCURRENCY = 6;

@@ -7,10 +7,10 @@
 //   uploads/<owner>/<scan>.zip                    capture sent from the iPhone, waiting for the worker
 
 import { randomBytes } from 'node:crypto';
-import type { User } from '../auth';
-import { currentUser } from '../auth';
-import { HttpError, json, readJson, requireUser, type Route } from '../http';
-import { checkFileSignature, getJson, putJson, store } from '../store';
+import type { User } from '../auth.js';
+import { currentUser } from '../auth.js';
+import { HttpError, json, readJson, requireUser, type Route } from '../http.js';
+import { checkFileSignature, getJson, putJson, store } from '../store.js';
 
 const MAX_RUN_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_RUN_JSON_BYTES = 1024 * 1024;
@@ -96,7 +96,7 @@ export const scanRoutes: Route[] = [
         }
       } else if (demo) {
         const meta = await scanMeta(demo.owner, demo.id);
-        if (meta) metas.push({ ...meta, runs: await runCount(demo.owner, demo.id) });
+        if (meta) metas.push({ ...meta, members: undefined, runs: await runCount(demo.owner, demo.id) });
       }
       metas.sort((a, b) => b.created.localeCompare(a.created));
       return json({ user, demo, scans: metas });

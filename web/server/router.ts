@@ -1,10 +1,10 @@
 // One entry point for every /api route: the Vercel function and the Vite dev server both call `handle`.
 
-import * as ayna from './ayna';
-import { MetaError } from './meta';
-import { accountRoutes } from './routes/account';
-import { scanRoutes, serveDevFile } from './routes/scans';
-import { liveGate, HttpError, json, readJson, type Route } from './http';
+import * as ayna from './ayna.js';
+import { MetaError } from './meta.js';
+import { accountRoutes } from './routes/account.js';
+import { scanRoutes, serveDevFile } from './routes/scans.js';
+import { liveGate, HttpError, json, readJson, type Route } from './http.js';
 
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 

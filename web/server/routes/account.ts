@@ -1,7 +1,7 @@
 // Sign in / out, who am I, and pairing the iPhone scanner with an account.
 
-import { checkPassword, clearedCookie, createPairCode, currentUser, redeemPairCode, sessionCookie } from '../auth';
-import { HttpError, json, readJson, requireUser, type Route } from '../http';
+import { checkPassword, clearedCookie, createPairCode, currentUser, redeemPairCode, sessionCookie } from '../auth.js';
+import { HttpError, json, readJson, requireUser, type Route } from '../http.js';
 
 const LOGIN_DELAY_MS = 400; // slows down password guessing without a rate-limit store
 
