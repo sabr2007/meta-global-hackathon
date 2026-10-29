@@ -379,16 +379,19 @@ export const PlanBeat: React.FC = () => {
       detail: run.steps.find((s) => s.label === e.label)?.why ?? '',
     })),
     ...refusals().map((r) => ({ tone: 'orange' as const, tag: 'Refused', label: r.label, detail: r.reason })),
-  ].slice(0, 4);
+  ];
+  // Five rows fit when the type steps down a size; anything beyond is counted, never silently dropped.
+  const shown = rows.slice(0, 5);
+  const dense = shown.length > 4;
   return (
     <AbsoluteFill style={{ opacity: fade }}>
       <AbsoluteFill style={{ padding: '200px 56px 0' }}>
-        <Card style={{ display: 'flex', flexDirection: 'column', gap: 26, padding: '32px 36px' }}>
+        <Card style={{ display: 'flex', flexDirection: 'column', gap: dense ? 18 : 26, padding: '32px 36px' }}>
           <Eyebrow color={C.text} size={17}>
             The plan · {run.executed.length} {run.executed.length === 1 ? 'move' : 'moves'}
             {refusals().length ? `, ${refusals().length} refused` : ''}
           </Eyebrow>
-          {rows.map((row, i) => {
+          {shown.map((row, i) => {
             const show = ramp(frame, 12 + i * 12, 24 + i * 12);
             return (
               <div key={i} style={{ display: 'flex', gap: 18, alignItems: 'flex-start', opacity: show, transform: `translateY(${(1 - show) * 12}px)` }}>
@@ -400,13 +403,29 @@ export const PlanBeat: React.FC = () => {
                     <Tag tone={row.tone} size={18}>
                       {row.tag}
                     </Tag>
-                    <span style={{ fontFamily: FONT.body, fontWeight: 650, fontSize: 34, color: C.text }}>{row.label}</span>
+                    <span style={{ fontFamily: FONT.body, fontWeight: 650, fontSize: dense ? 30 : 34, color: C.text }}>{row.label}</span>
                   </div>
-                  <span style={{ fontFamily: FONT.body, fontSize: 28, lineHeight: 1.35, color: row.tone === 'orange' ? C.orange : C.neutral }}>{sentence(row.detail)}</span>
+                  <span
+                    style={{
+                      fontFamily: FONT.body,
+                      fontSize: dense ? 24 : 28,
+                      lineHeight: 1.35,
+                      color: row.tone === 'orange' ? C.orange : C.neutral,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {sentence(row.detail)}
+                  </span>
                 </div>
               </div>
             );
           })}
+          {rows.length > shown.length ? (
+            <div style={{ fontFamily: FONT.body, fontSize: 24, color: C.secondary }}>+ {rows.length - shown.length} more</div>
+          ) : null}
           {run.orderReason ? (
             <div style={{ fontFamily: FONT.body, fontSize: 26, lineHeight: 1.4, color: C.secondary, opacity: ramp(frame, 40, 56), borderTop: `1px solid ${C.line}`, paddingTop: 20 }}>
               Order: {run.orderReason}

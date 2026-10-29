@@ -155,14 +155,16 @@ over (5.2 → 0.5 cm), and masses and friction come from Muse Spark with a one-l
 | Mirror 02 | Line the small objects up along the back edge | none fully doable: went ahead with refusals | 6/6 | 3/5 | 0 | 1.7 cm | 76 s | $0.12 |
 | Mirror 02 | Spoken in Russian: “gather the pen, the spoon and the calculator on one side of the table” (Voice Transcribe) | approved | 1/3 | 2/3 | 67 | 0.3 cm | 60 s | $0.08 |
 
-Final round (v8; Spark's decision between rounds and the photo-space check came after it): 12 runs, 12 with an approved after photo; SAM 3.1 rejected 29 of 47 versions; 43 of 50 requested moves ended within 3 cm of the goal; mean score 73; mean 67 s and $0.09 per run.
+Final round (v8; Spark's decision between rounds and the photo-space check came after it): 12 runs, 12 with an after photo to work from (one went ahead with refusals because no version could be done in full); SAM 3.1 rejected 29 of 47 versions; 43 of 50 requested moves ended within 3 cm of the goal; mean score 73; mean 67 s and $0.09 per run.
 All 56 runs on Desk tonight, every round and every version of the code: 144/215 requested moves done, 5 stopped with no approved after photo, 8 scored 0.
 All 28 runs on Mirror 02 tonight, every round and every version of the code: 41/80 requested moves done, 7 stopped with no approved after photo, 5 scored 0.
 Every round, its failures and what each one taught us: [docs/eval-log.md](docs/eval-log.md).
 
 **Robot policies on the saved episodes** (`npx tsx scripts/policies.ts --scan desk-sam3d`, no model calls): every saved
 run with an approved after photo replayed with the same robots and plan, but a different idea of where
-each object is when the robot reaches for it; scored by the same verifier.
+each object is when the robot reaches for it; scored by the same verifier. The twin's objects were placed
+to match this same photo, so the "only the photo" row measures how far mask centres sit from the bodies
+rather than independent perception noise; the noise rows are the stress test.
 
 | Scene | Policy | Episodes | Requested moves done | Objects left in place | Mean score | Median error of moved objects | Slipped grasps |
 |---|---|---|---|---|---|---|---|
