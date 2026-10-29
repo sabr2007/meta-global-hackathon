@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import loadMujoco from '@mujoco/mujoco';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { SceneMeta } from '../scene/bundle';
+import type { MobileRobotInfo, SceneMeta } from '../scene/bundle';
 import { angleTo } from './motion';
+import { rectDistance } from './navigation';
 import { objectShape } from './objectShape';
 import { physicsFrom, type Physics } from './physics';
 import { createRobots, type Robot, type RobotFleet, type StepResult } from './robots';
@@ -21,7 +22,7 @@ interface Timed extends StepResult {
 }
 
 /** Step the simulation (robots updated before every step) until the command settles. */
-async function settle(physics: Physics, fleet: RobotFleet, pending: Promise<StepResult>, maxSeconds = 90): Promise<Timed> {
+async function settle(physics: Physics, fleet: RobotFleet, pending: Promise<StepResult>, maxSeconds = 90, watch?: () => void): Promise<Timed> {
   let result: StepResult | null = null;
   void pending.then((r) => {
     result = r;
@@ -30,6 +31,7 @@ async function settle(physics: Physics, fleet: RobotFleet, pending: Promise<Step
   await Promise.resolve();
   while (!result && physics.time() - start < maxSeconds) {
     physics.advance(STEP_S, fleet.update);
+    watch?.();
     await Promise.resolve();
   }
   return { ...(result ?? { ok: false, reason: `still busy after ${maxSeconds} s` }), seconds: physics.time() - start };
@@ -88,6 +90,26 @@ describe.skipIf(!HAS_ROBOTS)('robots on a scanned desk', async () => {
     expect(Math.abs(end.bottom - DESK_TOP_M)).toBeLessThan(0.015);
     expect(Math.hypot(end.center[0] - target[0], end.center[1] - target[1])).toBeLessThan(0.04);
     expect(picked.seconds + home.seconds + placed.seconds).toBeLessThan(60);
+  });
+
+  test('drives across the room around the furniture, never touching it', async () => {
+    const cylinder = byLabel('cylinder');
+    expect(rover.setBasePose(1.5, -1.0, Math.PI)).toMatchObject({ ok: true });
+    const obstacles = fleet.scene.obstacles();
+    const footprint = (rover.info as MobileRobotInfo).footprint_radius;
+    let closest = Infinity;
+    let travelled = 0;
+    let last = rover.basePose();
+    const picked = await settle(physics, fleet, rover.run({ action: 'pick', object: cylinder }), 90, () => {
+      const p = rover.basePose();
+      for (const r of obstacles) closest = Math.min(closest, rectDistance(r, p.x, p.y));
+      travelled += Math.hypot(p.x - last.x, p.y - last.y);
+      last = p;
+    });
+    console.info(`mobile: drove ${travelled.toFixed(2)} m and picked in ${picked.seconds.toFixed(1)} s, ${(closest - footprint).toFixed(3)} m to spare`);
+    expect(picked).toMatchObject({ ok: true });
+    expect(travelled).toBeGreaterThan(3);
+    expect(closest).toBeGreaterThan(footprint); // the base disc never overlapped a wall or furniture box
   });
 
   test('a pick-and-place step in one run() call', async () => {
