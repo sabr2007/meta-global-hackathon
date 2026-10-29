@@ -73,6 +73,7 @@ class ScannedObject:
     fit_error_m: float  # mean LiDAR-to-mesh distance after placement
     concept: str = ""  # the SAM 3.1 noun phrase that finds it in a photo
     level_deg: float = 0.0  # tilt of its SAM 3D pose that placement removed
+    photo_scale: float = 1.0  # size correction that matched its silhouette to the photo mask
 
 
 @dataclass(frozen=True)

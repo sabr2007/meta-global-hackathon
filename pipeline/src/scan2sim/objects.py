@@ -17,6 +17,7 @@ from scan2sim.object_mesh import convex_hull, mean_color, oriented_size, simplif
 from scan2sim.placement import place_mesh
 from scan2sim.reconstruct import ObjectReconstruction
 from scan2sim.scene import Box, ScannedObject
+from scan2sim.segmentation import ObjectMask
 
 DROP_GAP_M = 0.003  # start just above the support so the drop is gentle
 SUPPORT_TOLERANCE_M = 0.05  # RoomPlan tops can sit a few cm above the real surface
@@ -99,10 +100,12 @@ def build_scanned_object(
     view: CameraView,
     frame: WorldFrame,
     boxes: tuple[Box, ...],
+    mask: ObjectMask | None = None,
 ) -> ScannedObject:
+    """`mask` is the object's SAM 3.1 mask in `image`: the mesh is matched to it in the photo."""
     raw = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
-    light = simplify(raw)  # decimate first: placement measures the mesh many times
-    placement = place_mesh(light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world)
+    light = simplify(raw)  # decimate first: placement renders and measures the mesh several times
+    placement = place_mesh(light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world, mask)
     world = placement.vertices_world
     low, high = world.min(axis=0), world.max(axis=0)
     # Lift objects out of the RoomPlan collider they rest on; never push them down.
@@ -124,4 +127,5 @@ def build_scanned_object(
         depth_scale=placement.depth_scale,
         fit_error_m=placement.fit_error_m,
         level_deg=placement.level_deg,
+        photo_scale=placement.photo_scale,
     )

@@ -6,8 +6,9 @@ from scipy.spatial.transform import Rotation
 
 from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
+from scan2sim.hero import silhouette, upright_camera
 from scan2sim.images import UprightImage
-from scan2sim.object_mesh import tilt_deg, up_axis
+from scan2sim.object_mesh import oriented_size, tilt_deg, up_axis
 from scan2sim.placement import (
     DEPTH_BIN_RAD,
     GLB_TO_SAM3D,
@@ -21,6 +22,7 @@ from scan2sim.placement import (
     upright_cv_to_arkit,
 )
 from scan2sim.reconstruct import ObjectPose
+from scan2sim.segmentation import ObjectMask
 
 SENSOR = (64, 48)
 IDENTITY = ObjectPose(rotation_wxyz=np.array([1.0, 0.0, 0.0, 0.0]), translation=np.zeros(3), scale=1.0)
@@ -169,3 +171,35 @@ def test_place_mesh_levels_a_slightly_tilted_object():
     assert placed.level_deg == pytest.approx(5.0, abs=0.2)
     assert tilt_deg(up_axis(placed.vertices_world)) < 0.2
     assert placed.depth_scale == pytest.approx(1.0, abs=0.02)
+
+
+def _desk_camera() -> tuple[UprightImage, CameraView, WorldFrame]:
+    """A 320 x 240 photo looking 50 degrees down at a desk."""
+    sensor = (320, 240)
+    image = UprightImage(Image.new("RGB", sensor), sensor, 0, 1.0)
+    pose = np.eye(4)
+    pose[:3, :3] = Rotation.from_euler("x", -50, degrees=True).as_matrix()
+    intrinsics = np.array([[300.0, 0.0, 160.0], [0.0, 300.0, 120.0], [0.0, 0.0, 1.0]])
+    return image, CameraView(None, *sensor, intrinsics, pose, 0.0), WorldFrame(origin_arkit=np.zeros(3))
+
+
+def test_place_mesh_matches_an_oversized_shifted_mesh_to_its_photo_silhouette():
+    image, view, frame = _desk_camera()
+    to_world = camera_to_world(view, frame, image)
+    box = _box_mesh()
+    box.apply_scale(0.08)  # 8 x 3.2 x 4.8 cm
+    truth = box.vertices + [0.02, 0.5, -0.45]
+    truth_cv = (truth - to_world[:3, 3]) @ to_world[:3, :3]
+    center = truth_cv.mean(axis=0)
+    guess_cv = ((truth_cv - center) * 1.2 + center + [0.008, -0.004, 0.0]) * 1.15  # SAM 3D: too big, off, too far
+    mask = ObjectMask("box", "1", (0, 0, 320, 240), None, (0, 0), silhouette(upright_camera(view, image, frame), truth, box.faces))
+    lidar = _nearest_per_ray(truth_cv) @ to_world[:3, :3].T + to_world[:3, 3]
+
+    unmatched = place_mesh(guess_cv @ PYTORCH3D_TO_CV @ GLB_TO_SAM3D, box.faces, IDENTITY, image, view, frame, lidar)
+    placed = place_mesh(guess_cv @ PYTORCH3D_TO_CV @ GLB_TO_SAM3D, box.faces, IDENTITY, image, view, frame, lidar, mask)
+
+    assert oriented_size(unmatched.vertices_world)[0] > 1.15 * 0.08  # the depth fit alone keeps it too big
+    assert placed.photo_scale == pytest.approx(1 / 1.2, rel=0.02)
+    assert oriented_size(placed.vertices_world) == pytest.approx(oriented_size(truth), rel=0.03)
+    assert placed.vertices_world.mean(axis=0) == pytest.approx(truth.mean(axis=0), abs=0.003)
+    assert placed.fit_error_m < unmatched.fit_error_m

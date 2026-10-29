@@ -11,9 +11,14 @@ next best candidate out of 96 gave 10.6 mm):
 - the pose acts on row vectors, p = (s * v) @ R + t, with R from a (w, x, y, z) quaternion;
 - the camera is PyTorch3D's (x left, y up, z forward) for the upright photo that was sent.
 
-Before the depth is fitted the mesh is levelled: SAM 3D poses come out 1-13 degrees off the table
-(the mouse on our desk 12.9), and a tilted base rocks down onto the table in the first steps of the
-simulation. The mesh turns about its centre until the base of its convex hull is flat.
+Before the depth is fitted, two corrections from the photo itself:
+- level: SAM 3D poses come out 1-13 degrees off the table (the mouse on our desk 12.9), and a tilted
+  base rocks down onto the table in the first steps of the simulation. The mesh turns about its
+  centre until the base of its convex hull is flat;
+- silhouette: seen through the phone's camera, SAM 3D meshes cover 10-40% more pixels than their
+  SAM 3.1 masks and sit 10-35 px off (SAM 3D lays objects out in MoGe's estimated camera, not the
+  phone's), so after the depth fit small objects came out 15-25% too large. The mesh is scaled about
+  its centre and moved across the image until its silhouette has the mask's area and centroid.
 """
 
 from __future__ import annotations
@@ -25,9 +30,11 @@ from scipy.spatial.transform import Rotation
 
 from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
+from scan2sim.hero import PhotoCamera, full_raster, silhouette, upright_camera
 from scan2sim.images import UprightImage
 from scan2sim.object_mesh import surface_distances, tilt_deg, up_axis
 from scan2sim.reconstruct import ObjectPose
+from scan2sim.segmentation import ObjectMask
 
 GLB_TO_SAM3D = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]])
 PYTORCH3D_TO_CV = np.diag([-1.0, -1.0, 1.0])  # both look along +z; flip x left -> right, y up -> down
@@ -36,6 +43,8 @@ MIN_DEPTH_MATCHES = 20
 LEVEL_MAX_DEG = 20.0  # a base tilted further is not a pose error (a book leaning on something)
 LEVEL_DONE_DEG = 0.2
 LEVEL_STEPS = 3  # the hull's base changes as it turns; three steps settle every object we scanned
+SILHOUETTE_STEPS = 2  # the second step absorbs perspective; a third changes nothing we can measure
+MAX_PHOTO_SCALE = 1.25  # a partly hidden mask must not shrink (or grow) a mesh by more than this
 
 
 @dataclass(frozen=True)
@@ -44,6 +53,7 @@ class Placement:
     depth_scale: float  # metric depth / SAM 3D depth
     fit_error_m: float  # mean distance from the object's LiDAR points to the placed mesh surface
     level_deg: float = 0.0  # tilt of the SAM 3D pose that levelling removed
+    photo_scale: float = 1.0  # size correction from the photo silhouette
 
 
 def rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -77,6 +87,28 @@ def level_rotation(points: np.ndarray) -> np.ndarray:
             break
         rotation, tilt = candidate, candidate_tilt
     return rotation
+
+
+def _centroid(raster: np.ndarray) -> np.ndarray:
+    return np.argwhere(raster).mean(axis=0)[::-1]
+
+
+def silhouette_correction(
+    mesh_cv: np.ndarray, faces: np.ndarray, camera: PhotoCamera, cv_to_world: np.ndarray, mask: ObjectMask
+) -> tuple[float, np.ndarray]:
+    """Scale about the mesh centre and camera-frame shift that give the mesh's silhouette in the photo
+    the area and centroid of its mask (to first order: perspective is left to a second step)."""
+    rendered = silhouette(camera, _transform(cv_to_world, mesh_cv), faces)
+    observed = full_raster(mask, (camera.width, camera.height))
+    if not rendered.any() or not observed.any():
+        return 1.0, np.zeros(3)
+    scale = float(np.sqrt(observed.sum() / rendered.sum()))
+    center = mesh_cv.mean(axis=0)
+    focal, principal = np.array([camera.fx, camera.fy]), np.array([camera.cx, camera.cy])
+    center_px = focal * center[:2] / center[2] + principal
+    scaled_px = center_px + scale * (_centroid(rendered) - center_px)  # where the centroid goes when scaled
+    ray = lambda px: np.array([*((px - principal) / focal), 1.0])  # noqa: E731
+    return scale, center[2] * (ray(_centroid(observed)) - ray(scaled_px))
 
 
 def rotation_matrix(rotation_wxyz: np.ndarray) -> np.ndarray:
@@ -140,8 +172,10 @@ def place_mesh(
     view: CameraView,
     frame: WorldFrame,
     lidar_points_world: np.ndarray,
+    mask: ObjectMask | None = None,
 ) -> Placement:
-    """SAM 3D mesh -> world: levelled on its base, depth (and so size) taken from its LiDAR points."""
+    """SAM 3D mesh -> world: levelled on its base, matched to its photo silhouette when the mask is
+    given, depth (and so metric size) taken from its LiDAR points."""
     to_world = camera_to_world(view, frame, image)
     rotation = to_world[:3, :3]
     mesh_cv = mesh_in_camera(vertices_glb, pose)
@@ -150,10 +184,19 @@ def place_mesh(
     level = rotation.T @ level_rotation(mesh_cv @ rotation.T) @ rotation  # the same turn in camera axes
     mesh_cv = (mesh_cv - center) @ level.T + center
     level_deg -= tilt_deg(up_axis(mesh_cv @ rotation.T))
+    photo_scale = 1.0
+    if mask is not None:
+        camera = upright_camera(view, image, frame)
+        for _ in range(SILHOUETTE_STEPS):
+            scale, shift = silhouette_correction(mesh_cv, faces, camera, to_world, mask)
+            scale = float(np.clip(photo_scale * scale, 1 / MAX_PHOTO_SCALE, MAX_PHOTO_SCALE)) / photo_scale
+            center = mesh_cv.mean(axis=0)
+            mesh_cv = (mesh_cv - center) * scale + center + shift
+            photo_scale *= scale
     lidar_world = np.asarray(lidar_points_world, dtype=np.float64)
     k = depth_scale(mesh_cv, _transform(np.linalg.inv(to_world), lidar_world))
     if k is None:
         raise ValueError("the object's LiDAR points do not overlap its mesh in the photo")
     world = _transform(to_world, mesh_cv * k)
     fit = float(surface_distances(world, faces, lidar_world).mean())
-    return Placement(vertices_world=world, depth_scale=k, fit_error_m=fit, level_deg=level_deg)
+    return Placement(vertices_world=world, depth_scale=k, fit_error_m=fit, level_deg=level_deg, photo_scale=photo_scale)
