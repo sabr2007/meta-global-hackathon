@@ -46,7 +46,19 @@ function header(): HTMLElement {
 function errorView(main: HTMLElement, error: unknown): void {
   const box = h('div', 'app-error card');
   box.setAttribute('role', 'alert');
-  box.append(h('h1', 'title', 'Something went wrong'), h('p', '', error instanceof Error ? error.message : String(error)));
+  const message = error instanceof Error ? error.message : String(error);
+  // The twin and its physics need WebGL; without it, point to the film of a real run instead of a stack.
+  if (/WebGL/i.test(message)) {
+    box.append(
+      h('h1', 'title', 'This browser has no WebGL'),
+      h('p', '', 'The twin and its robots are drawn with WebGL, which this browser (or its settings) does not provide. The landing page’s film shows a full run from a real desk.'),
+    );
+    const film = h('a', 'pill pill--lime', 'Watch the film');
+    film.href = '/';
+    box.append(film);
+  } else {
+    box.append(h('h1', 'title', 'Something went wrong'), h('p', '', message));
+  }
   const back = h('a', 'pill pill--outline', 'Back to mirrors');
   back.href = '#/';
   box.append(back);
