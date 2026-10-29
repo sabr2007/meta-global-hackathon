@@ -8,7 +8,7 @@ import { physicsFrom, type Physics } from './physics';
 
 // Runs the arm on a real scene bundle (`scan2sim objects` output). Bundles are photos of a
 // home and stay out of git, so this suite skips when the bundle is missing.
-const SCENE_DIR = resolve(process.env.SCAN2SIM_SCENE ?? 'public/scenes/desk-sam3d');
+const SCENE_DIR = resolve(process.env.SCAN2SIM_SCENE ?? '../data/scenes/desk-sam3d');
 const HAS_SCENE = existsSync(`${SCENE_DIR}/scene.json`);
 const MAX_TASK_SECONDS = 20;
 

@@ -211,10 +211,13 @@ export const scanRoutes: Route[] = [
       checkIds(user.id, scan);
       const meta = await scanMeta(user.id, scan);
       if (!meta) throw new HttpError(404, 'Unknown upload');
-      if (!(await store().getBytes(`uploads/${user.id}/${scan}.zip`))) throw new HttpError(409, 'The .zip has not arrived yet');
+      const url = `/app/#/scan/${user.id}/${scan}`;
+      // The phone retries confirmations it missed, possibly hours later: confirming twice is fine.
+      if (meta.status === 'queued' || meta.status === 'processing' || meta.status === 'ready') return json({ status: meta.status, url });
+      if (!(await store().exists(`uploads/${user.id}/${scan}.zip`))) throw new HttpError(409, 'The .zip has not arrived yet');
       await putJson(store(), `scans/${user.id}/${scan}/meta.json`, { ...meta, status: 'queued', error: undefined });
       await putJson(store(), `queue/${user.id}--${scan}.json`, { owner: user.id, scan, queued: new Date().toISOString() });
-      return json({ status: 'queued' });
+      return json({ status: 'queued', url });
     },
   },
 ];

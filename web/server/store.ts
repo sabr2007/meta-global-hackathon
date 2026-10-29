@@ -16,6 +16,7 @@ export interface UploadTarget {
 export interface Store {
   readonly kind: 'blob' | 'disk';
   getBytes(key: string): Promise<Uint8Array | null>;
+  exists(key: string): Promise<boolean>;
   putBytes(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
   list(prefix: string): Promise<string[]>;
   remove(key: string): Promise<void>;
@@ -66,6 +67,13 @@ function diskStore(root: string): Store {
         return new Uint8Array(await readFile(file(key)));
       } catch {
         return null;
+      }
+    },
+    async exists(key) {
+      try {
+        return (await stat(file(key))).isFile();
+      } catch {
+        return false;
       }
     },
     async putBytes(key, bytes) {
@@ -131,6 +139,15 @@ function blobStore(): Store {
       const result = await get(safeKey(key), { access: 'private' });
       if (!result || result.statusCode !== 200) return null;
       return new Uint8Array(await new Response(result.stream).arrayBuffer());
+    },
+    async exists(key) {
+      const { head } = await sdk;
+      try {
+        await head(safeKey(key));
+        return true;
+      } catch {
+        return false;
+      }
     },
     async putBytes(key, bytes, contentType) {
       const { put } = await sdk;

@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   const scanId = args('scan')[0] ?? 'desk-sam3d';
   const requests = args('request');
   if (!requests.length) throw new Error('pass at least one --request');
-  const dir = path.join(ROOT, 'public', 'scenes', scanId);
+  const dir = path.join(ROOT, '..', 'data', 'scenes', scanId);
   if (!existsSync(dir)) throw new Error(`no bundle at ${dir}`);
   const meta = JSON.parse(readFileSync(path.join(dir, 'scene.json'), 'utf8')) as SceneMeta;
   if (!meta.camera || !meta.objects) throw new Error('bundle has no hero camera or objects; rebuild it with scan2sim objects');

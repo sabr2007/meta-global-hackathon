@@ -1,7 +1,7 @@
 // Load scene bundles into the private store and create the accounts that may open them.
 //
 //   npx tsx scripts/seed.ts --owner you@example.com:PASSWORD --member judge@example.com:PASSWORD \
-//     --scan desk-sam3d="Desk" --scan mirror02-sam3d="Mirror 02" [--demo desk-sam3d]
+//     --scan desk-sam3d="Desk" --scan mirror02-sam3d="Mirror 02" [--demo desk-sam3d] [--runs-from ../data/store]
 //
 // Uses the private Vercel Blob store when BLOB_READ_WRITE_TOKEN is set (e.g. after `vercel env pull`),
 // otherwise ../data/store on disk. Bundles are read from ../data/scenes/<id> or public/scenes/<id>.
@@ -68,6 +68,15 @@ async function main(): Promise<void> {
     };
     await putJson(store(), `scans/${owner.id}/${id}/meta.json`, meta);
     console.log(`scan ${id}: ${meta.objects} objects, uploaded from ${path.relative(ROOT, dir)}`);
+    const runsFrom = args('runs-from')[0];
+    const runsDir = runsFrom ? path.resolve(ROOT, runsFrom, 'scans', owner.id, id, 'runs') : null;
+    if (runsDir && existsSync(runsDir)) {
+      const runFiles = await files(runsDir);
+      for (const file of runFiles) {
+        await store().putBytes(`scans/${owner.id}/${id}/runs/${file}`, new Uint8Array(await readFile(path.join(runsDir, file))), contentType(file));
+      }
+      console.log(`  ${runFiles.filter((f) => f.endsWith('run.json')).length} saved runs copied`);
+    }
   }
   const demo = args('demo')[0];
   if (demo) console.log(`AYNA_DEMO_SCAN=${owner.id}/${demo}`);
