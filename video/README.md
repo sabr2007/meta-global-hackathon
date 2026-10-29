@@ -2,11 +2,12 @@
 
 Two compositions, built only from real material: the desk scan's hero photo, the SAM 3.1 masks
 from that scan, the versions Muse Image developed in a saved run (with the verdicts SAM 3.1 gave
-them), and numbers from the eval log.
+them), the verifier's render of the twin from the photo's camera, the run's receipt, and (in the
+demo skeleton) numbers from the eval log.
 
 | Composition | Size | Length | What it is |
 |---|---|---|---|
-| `AynaLoop` | 1080 x 1350, 30 fps | 39 s | The landing page's film. One run from request to receipt; the last frame is the first, so it loops. |
+| `AynaLoop` | 1080 x 1350, 30 fps | 42 s | The landing page's film. One run from request to receipt: SAM 3.1 outlines, Spark's edit, the versions developing with their verdicts, the before/after wipe, the plan, the twin render, the receipt. The last frame is the first, so it loops. |
 | `AynaDemo` | 1920 x 1080, 30 fps | 180 s | Skeleton of the 3-minute demo: the 8 beats of the video script, each with a slot labelled "screen recording goes here". Not the final edit. |
 
 ## Render the landing film
