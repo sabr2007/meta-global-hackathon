@@ -10,8 +10,10 @@ import re
 import numpy as np
 import trimesh
 
+from scan2sim.bake import bake_photo_colors
 from scan2sim.capture import CameraView
 from scan2sim.frames import WorldFrame
+from scan2sim.hero import full_raster, upright_camera
 from scan2sim.images import UprightImage
 from scan2sim.object_mesh import convex_hull, mean_color, oriented_size, simplify
 from scan2sim.placement import place_mesh
@@ -103,8 +105,9 @@ def build_scanned_object(
     mask: ObjectMask | None = None,
     surface: Box | None = None,
 ) -> ScannedObject:
-    """`mask` is the object's SAM 3.1 mask in `image` (the mesh is matched to it in the photo);
-    `surface` is the table it stands on (a mesh the LiDAR puts inside it is slid back onto it)."""
+    """`mask` is the object's SAM 3.1 mask in `image` (the mesh is matched to it in the photo and
+    takes the photo's colours inside it); `surface` is the table it stands on (a mesh the LiDAR puts
+    inside it is slid back onto it)."""
     raw = trimesh.load(io.BytesIO(reconstruction.glb), file_type="glb", force="mesh")
     light = simplify(raw)  # decimate first: placement renders and measures the mesh several times
     rest_z = surface.top_z + DROP_GAP_M if surface is not None else None
@@ -112,13 +115,18 @@ def build_scanned_object(
         light.vertices, light.faces, reconstruction.pose, image, view, frame, lidar_points_world, mask, rest_z
     )
     world = placement.vertices_world
+    colors = light.visual.vertex_colors
+    if mask is not None:  # where the photo sees the mesh, before any lift moves it off its pixels
+        camera = upright_camera(view, image, frame)
+        placed = trimesh.Trimesh(world, light.faces, vertex_colors=colors, process=False)
+        colors = bake_photo_colors(placed, camera, np.asarray(image.image), full_raster(mask, (camera.width, camera.height)))
     low, high = world.min(axis=0), world.max(axis=0)
     # Lift objects out of the RoomPlan collider they rest on; never push them down.
     support = support_top(boxes, (low[:2] + high[:2]) / 2, low[2])
     world = world + np.array([0.0, 0.0, max(0.0, support + DROP_GAP_M - low[2])])
     low, high = world.min(axis=0), world.max(axis=0)
     origin = (low + high) / 2
-    visual = trimesh.Trimesh(world - origin, light.faces, vertex_colors=light.visual.vertex_colors, process=False)
+    visual = trimesh.Trimesh(world - origin, light.faces, vertex_colors=colors, process=False)
     hull_vertices, hull_faces = convex_hull(visual.vertices)
     return ScannedObject(
         name=name,

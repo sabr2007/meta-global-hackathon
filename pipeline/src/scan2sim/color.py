@@ -1,4 +1,4 @@
-"""Colour conversions for comparing meshes with photos: sRGB (0-255) -> linear RGB -> CIELAB (D65)."""
+"""Colour conversions for comparing meshes with photos: sRGB (0-255) <-> linear RGB <-> CIELAB (D65)."""
 
 from __future__ import annotations
 
@@ -22,11 +22,26 @@ def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
     return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
 
 
+def linear_to_srgb(linear: np.ndarray) -> np.ndarray:
+    """Linear light 0-1 -> sRGB values 0-255 (float, clipped to the gamut)."""
+    c = np.clip(np.asarray(linear, dtype=np.float64), 0.0, 1.0)
+    return 255.0 * np.where(c <= 0.0031308, 12.92 * c, 1.055 * c ** (1 / 2.4) - 0.055)
+
+
 def srgb_to_lab(rgb: np.ndarray) -> np.ndarray:
     """(..., 3) sRGB values 0-255 -> CIELAB (L 0-100) under D65."""
     xyz = srgb_to_linear(rgb) @ SRGB_TO_XYZ.T / D65_WHITE
     f = np.where(xyz > LAB_EPSILON, np.cbrt(xyz), (LAB_KAPPA * xyz + 16) / 116)
     return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], axis=-1)
+
+
+def lab_to_srgb(lab: np.ndarray) -> np.ndarray:
+    """(..., 3) CIELAB under D65 -> sRGB values 0-255 (float, clipped to the gamut)."""
+    lab = np.asarray(lab, dtype=np.float64)
+    fy = (lab[..., 0] + 16) / 116
+    f = np.stack([fy + lab[..., 1] / 500, fy, fy - lab[..., 2] / 200], axis=-1)
+    xyz = np.where(f**3 > LAB_EPSILON, f**3, (116 * f - 16) / LAB_KAPPA) * D65_WHITE
+    return linear_to_srgb(xyz @ np.linalg.inv(SRGB_TO_XYZ).T)
 
 
 def delta_e(lab_a: np.ndarray, lab_b: np.ndarray) -> np.ndarray:

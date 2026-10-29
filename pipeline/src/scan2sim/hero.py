@@ -72,6 +72,13 @@ class PhotoCamera:
             float(block["cx"]), float(block["cy"]), np.asarray(block["camera_to_world"], dtype=np.float64),
         )
 
+    def facing(self, points_world: np.ndarray, normals_world: np.ndarray) -> np.ndarray:
+        """Cosine between each surface normal and the direction to the camera (1 = head-on, < 0 = away)."""
+        to_camera = self.camera_to_world[:3, 3] - np.asarray(points_world, dtype=np.float64)
+        to_camera /= np.linalg.norm(to_camera, axis=1, keepdims=True)
+        normals = np.asarray(normals_world, dtype=np.float64)
+        return np.einsum("ij,ij->i", normals / np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-12), to_camera)
+
     def seen(self, points_world: np.ndarray, surface_world: np.ndarray, cell_px: int = DEPTH_CELL_PX) -> np.ndarray:
         """Which points the photo shows: in front, inside the frame, and not hidden behind `surface_world`
         (dense samples of everything that can occlude them, e.g. the object's own surface)."""

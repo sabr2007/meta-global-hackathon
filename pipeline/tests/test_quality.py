@@ -8,6 +8,7 @@ from PIL import Image
 
 from fixtures import CUP_RGB, DROP_GAP, cup_on_table, look_at, room_document
 from scan2sim.cli import main
+from scan2sim.color import lab_to_srgb, srgb_to_lab
 from scan2sim.export import _object_metadata
 from scan2sim.hero import MASKS_FILE, PhotoCamera, encode_rle, silhouette
 from scan2sim.mjcf import scene_to_mjcf
@@ -146,3 +147,8 @@ def test_report_command_prints_the_table_and_writes_json(scene, tmp_path, capsys
     assert "cup" in printed and "median" in printed
     (row,) = json.loads(out.read_text())
     assert row["color_de"] > 20  # the photo shows a red cup, the mesh is orange
+
+
+def test_lab_round_trips_to_srgb():
+    rgb = np.array([[230, 120, 30], [200, 35, 30], [40, 200, 60], [250, 250, 250], [5, 5, 5]], dtype=np.float64)
+    assert lab_to_srgb(srgb_to_lab(rgb)) == pytest.approx(rgb, abs=1e-6)

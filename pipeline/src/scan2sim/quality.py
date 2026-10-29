@@ -113,8 +113,9 @@ def object_quality(
         ratio = robust_extents(seen, axes, base_z) / robust_extents(lidar_points, axes, base_z)
         size = tuple(round(float(v), 3) for v in ratio)
     if camera is not None and photo is not None and mask is not None:
-        colors = np.asarray(mesh_world.visual.vertex_colors)
-        color_de = mean_color_difference(photo, full_raster(mask, (camera.width, camera.height)), colors[camera.seen(vertices, surface)])
+        visible = camera.seen(vertices, surface) & (camera.facing(vertices, mesh_world.vertex_normals) > 0)
+        colors = np.asarray(mesh_world.visual.vertex_colors)[visible]
+        color_de = mean_color_difference(photo, full_raster(mask, (camera.width, camera.height)), colors)
     return ObjectQuality(name, label, lidar_mm, size, tilt_deg(up_axis(vertices)), drift_m * 100, color_de, iou, depth)
 
 
