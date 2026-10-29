@@ -9,6 +9,11 @@ import type { Twin } from './twin';
 const LIME = '#b8ff5e';
 const ORANGE = '#ee7f35';
 
+/** An idle robot's last finished step reads as history, not as what it is doing now. */
+function said(status: { phase: string; text: string; error: boolean }): string {
+  return status.phase === 'idle' && !status.error && /^(Put|On) /.test(status.text) ? `Ready · last: ${status.text}` : status.text;
+}
+
 export interface FleetPanel {
   readonly root: HTMLElement;
   setBusy(busy: boolean): void;
@@ -71,10 +76,10 @@ export function fleetPanel(twin: Twin, stage: Stage): FleetPanel {
       ...robots.map((robot) => {
         const row = h('li', 'fleet__robot');
         const dot = h('span', `dot ${robot.status.error ? 'dot--orange' : 'dot--lime'}`);
-        const status = h('span', 'fleet__status', robot.status.text);
+        const status = h('span', 'fleet__status', said(robot.status));
         unsubscribe.push(
           robot.subscribe((s) => {
-            status.textContent = s.text;
+            status.textContent = said(s);
             dot.className = `dot ${s.error ? 'dot--orange' : 'dot--lime'}`;
           }),
         );
