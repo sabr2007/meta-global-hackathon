@@ -34,6 +34,7 @@ export interface GripperInfo {
   fingers: [string, string];
   max_width: number; // widest object the fingers close around, m
   tip_below_grip: number; // fingertips reach this far below the grip point, m
+  palm_above_grip?: number; // the palm starts this far above the grip point, m (0.05 when absent)
 }
 
 /** The robot arm placed by `scan2sim objects` (pipeline/src/scan2sim/arm.py). */

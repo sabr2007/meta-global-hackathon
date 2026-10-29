@@ -44,6 +44,7 @@ def _gripper(spec: arm.ArmSpec) -> dict[str, Any]:
         "fingers": list(spec.finger_joints),
         "max_width": round(spec.max_width, 4),
         "tip_below_grip": round(arm.TIP_BELOW_GRIP, 4),
+        "palm_above_grip": round(arm.GRIP_POINT - arm.PALM_BOTTOM, 4),  # objects must stay below the palm
     }
 
 

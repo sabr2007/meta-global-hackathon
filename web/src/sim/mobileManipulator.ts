@@ -15,6 +15,8 @@ const APPROACH_M = 0.12; // pre-grasp height above the grasp point
 const LIFT_M = 0.15;
 const TABLE_GAP_M = 0.006; // fingertips stay this far above the surface the object rests on
 const TOP_MARGIN_M = 0.012; // grasp at least this far below the object's top
+const PALM_CLEARANCE_M = 0.012; // a tall object's top stays this far below the palm
+const PALM_ABOVE_GRIP_M = 0.05; // default for bundles that do not say
 const DROP_GAP_M = 0.012; // release this far above the target surface
 const WIDTH_MARGIN_M = 0.012;
 const LIFTED_M = 0.04; // the object has to rise this much for a grasp to count
@@ -30,8 +32,9 @@ const STOWED_RAD = 0.05;
 // The arm reaches furthest with the grasp point ~8 cm above its base (pipeline: measured band).
 const ARM_BELOW_GRASP_M = 0.08;
 const GRASP_ABOVE_BASE_M: [number, number] = [-0.05, 0.25];
+// Parking keeps targets inside the measured band (0.28-0.76 m; facing the target IK reaches ~0.79 m).
 const REACH_INNER_MARGIN_M = 0.03;
-const REACH_OUTER_MARGIN_M = 0.05;
+const REACH_OUTER_MARGIN_M = 0.03;
 const PREFERRED_REACH_M = 0.5;
 const PARKING_TRIES = 8;
 const ROUND_RATIO = 1.15; // an object this close to round can be grasped from any side
@@ -310,10 +313,10 @@ export class MobileManipulator extends RobotBase {
         nearest = Math.min(nearest, Math.hypot(x - target[0], y - target[1]) - this.info.arm_offset_m);
       }
     }
-    const reach = this.info.reach_m[1].toFixed(2);
+    const reach = (this.info.reach_m[1] - REACH_OUTER_MARGIN_M).toFixed(2);
     return Number.isFinite(nearest)
-      ? `no free floor within reach: the arm would stand ${nearest.toFixed(2)} m away, reach ${reach} m`
-      : `no free floor within reach (reach ${reach} m)`;
+      ? `no free floor close enough: parked, the arm would be ${nearest.toFixed(2)} m away, it reaches ${reach} m`
+      : `no free floor close enough (the arm reaches ${reach} m)`;
   }
 
   /** Lift joint value that puts the arm base ARM_BELOW_GRASP_M under a grasp at height z. */
@@ -327,9 +330,14 @@ export class MobileManipulator extends RobotBase {
     return q;
   }
 
+  /** Mid-height, but never so low that a tall object's top runs into the palm. */
   private graspHeight(shape: ObjectShape): number {
-    const tipBelow = this.info.gripper.tip_below_grip;
-    return Math.max(shape.bottom + tipBelow + TABLE_GAP_M, Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M));
+    const { tip_below_grip: tipBelow, palm_above_grip: palm = PALM_ABOVE_GRIP_M } = this.info.gripper;
+    return Math.max(
+      shape.bottom + tipBelow + TABLE_GAP_M,
+      Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M),
+      shape.top - palm + PALM_CLEARANCE_M,
+    );
   }
 
   private widthProblem(shape: ObjectShape): string | null {

@@ -10,6 +10,8 @@ const APPROACH_M = 0.12; // pre-grasp height above the grasp point
 const LIFT_M = 0.15;
 const TABLE_GAP_M = 0.006; // fingertips stay this far above the surface the object rests on
 const TOP_MARGIN_M = 0.012; // grasp at least this far below the object's top
+const PALM_CLEARANCE_M = 0.012; // a tall object's top stays this far below the palm
+const PALM_ABOVE_GRIP_M = 0.05; // default for bundles that do not say
 const DROP_GAP_M = 0.012; // release this far above the target surface
 const WIDTH_MARGIN_M = 0.012;
 const REACH_SLACK_M = 0.02;
@@ -127,7 +129,13 @@ export class ArmController {
       return;
     }
     const tipBelow = this.arm.gripper.tip_below_grip;
-    const graspZ = Math.max(shape.bottom + tipBelow + TABLE_GAP_M, Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M));
+    const palm = this.arm.gripper.palm_above_grip ?? PALM_ABOVE_GRIP_M;
+    // Mid-height, but never so low that a tall object's top runs into the palm.
+    const graspZ = Math.max(
+      shape.bottom + tipBelow + TABLE_GAP_M,
+      Math.min((shape.bottom + shape.top) / 2, shape.top - TOP_MARGIN_M),
+      shape.top - palm + PALM_CLEARANCE_M,
+    );
     const [x, y] = shape.center;
     const plan = this.planVertical([x, y, graspZ], [APPROACH_M, 0, LIFT_M], [shape.yaw, shape.yaw + Math.PI]);
     if (!plan) {
