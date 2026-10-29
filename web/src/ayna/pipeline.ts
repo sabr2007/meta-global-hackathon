@@ -17,10 +17,12 @@ export interface SceneRuntime {
   meshes: Map<string, TriangleMesh>;
 }
 
+const PERSON_REDRAWS = 1; // how many times "Not this, because …" sends the after photo back to be drawn again
+
 export interface RunHooks {
   /** The person's answer to the after photo: true for Spark's pick, the id of another version that passed to
-   * plan from that one instead, false to stop. */
-  approve(imagined: Imagined): Promise<boolean | string>;
+   * plan from that one instead, { redraw: reason } to have it drawn again, false to stop. */
+  approve(imagined: Imagined): Promise<boolean | string | { redraw: string }>;
   drive<T>(work: Promise<T>): Promise<T>;
   /** Let the simulation run for a while (objects come to rest). */
   settle(seconds: number): Promise<void>;
@@ -109,32 +111,43 @@ export async function runAyna(scene: SceneRuntime, request: string, models: Mode
   };
   let imagined: Imagined | null = null;
   try {
-    imagined = await imagineAfter(scene.ctx, request, scene.fleet, models, trace, options);
-    record.instruction = imagined.instruction;
-    record.feedback = imagined.feedback;
-    for (const c of imagined.candidates) {
-      const file = `candidate-${c.id}.${extension(c.image)}`;
-      files[file] = c.image;
-      record.candidates.push({ id: c.id, round: c.round, file, width: c.width, height: c.height, passed: c.check.passed, reasons: c.check.reasons, notes: c.check.notes });
-    }
-    if (!imagined.chosen) {
-      record.status = 'no-after';
-      return finish();
-    }
-    let chosen = imagined.chosen;
     const keep = (candidate: Candidate): void => {
       record.chosen = candidate.id;
       record.thumb = record.candidates.find((c) => c.id === candidate.id)!.file;
       record.goals = candidate.check.goals.map((g) => ({ name: g.name, label: g.label, found: g.found, moves: g.moves, from: g.from, to: g.to, yawDelta: g.yawDelta, distanceM: g.distanceM, mask: g.mask }));
     };
-    keep(chosen);
-    record.judgement = imagined.judgement;
-    const approved = await hooks.approve(imagined);
-    if (!approved) {
+    let from: { round: number; feedback?: string } = { round: 1 };
+    let approved: Awaited<ReturnType<RunHooks['approve']>> = false;
+    for (let asked = 0; ; asked += 1) {
+      imagined = await imagineAfter(scene.ctx, request, scene.fleet, models, trace, options, from);
+      record.instruction = imagined.instruction;
+      record.feedback.push(...imagined.feedback);
+      for (const c of imagined.candidates) {
+        const file = `candidate-${c.id}.${extension(c.image)}`;
+        files[file] = c.image;
+        record.candidates.push({ id: c.id, round: c.round, file, width: c.width, height: c.height, passed: c.check.passed, reasons: c.check.reasons, notes: c.check.notes });
+      }
+      if (!imagined.chosen) {
+        record.status = 'no-after';
+        return finish();
+      }
+      keep(imagined.chosen);
+      record.judgement = imagined.judgement;
+      approved = await hooks.approve(imagined);
+      // "Not this, because …": Spark rewrites the edit with the person's note and Muse Image draws again (once).
+      if (typeof approved === 'object' && asked < PERSON_REDRAWS) {
+        trace({ step: 'judge', state: 'info', text: `You turned it down: ${approved.redraw}` });
+        from = { round: Math.max(...imagined.candidates.map((c) => c.round)) + 1, feedback: `the person turned the after photo down: ${approved.redraw}` };
+        continue;
+      }
+      break;
+    }
+    if (!approved || typeof approved === 'object') {
       record.status = 'failed';
       record.error = 'Not approved';
       return finish();
     }
+    let chosen = imagined.chosen;
     const picked = typeof approved === 'string' ? imagined.candidates.find((c) => c.id === approved && c.check.passed) : undefined;
     if (picked && picked.id !== chosen.id) {
       trace({ step: 'judge', state: 'info', text: `You picked version ${picked.id} over Muse Spark's ${chosen.id}` });

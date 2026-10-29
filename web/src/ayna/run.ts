@@ -154,7 +154,17 @@ function candidateFacts(c: Candidate): string {
 }
 
 /** Steps 1-4: Spark writes the edit, Muse Image draws candidates, SAM 3.1 checks them, Spark judges. */
-export async function imagineAfter(ctx: SceneContext, request: string, fleet: FleetRobot[], models: Models, trace: Trace, options = DEFAULT_OPTIONS): Promise<Imagined> {
+/** `from` continues a run: the first round's number (so version ids stay unique) and a note for the editor,
+ * e.g. the person's reason for turning the last after photo down. */
+export async function imagineAfter(
+  ctx: SceneContext,
+  request: string,
+  fleet: FleetRobot[],
+  models: Models,
+  trace: Trace,
+  options = DEFAULT_OPTIONS,
+  from: { round: number; feedback?: string } = { round: 1 },
+): Promise<Imagined> {
   const segmentList = ctx.objects.map((o) => ({ name: o.name, concept: o.concept, label: o.label }));
   // Instances per concept on the real photo: the baseline for "an extra object appeared".
   const baseline = models.segment({ image: ctx.photo, width: ctx.camera.width, height: ctx.camera.height, objects: segmentList });
@@ -164,11 +174,12 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
   });
   const objectBriefs = briefs(ctx, fleet);
   const footprints = footprintsOf(ctx);
-  const feedback: string[] = [];
+  const feedback: string[] = from.feedback ? [from.feedback] : [];
   const candidates: Candidate[] = [];
   let instruction: Instruction | null = null;
+  const last = from.round + options.rounds - 1;
 
-  for (let round = 1; round <= options.rounds; round += 1) {
+  for (let round = from.round; round <= last; round += 1) {
     trace({ step: 'instruct', state: 'start', text: round === 1 ? 'Muse Spark is writing the edit for this photo' : 'Muse Spark is rewriting the edit' });
     const instructed = await models.instruct({ request, photo: ctx.photo, objects: objectBriefs, robots: robotLines(fleet), feedback: feedback.at(-1) });
     instruction = instructed.instruction;
@@ -233,12 +244,12 @@ export async function imagineAfter(ctx: SceneContext, request: string, fleet: Fl
     }
     const reasons = [...new Set(roundCandidates.flatMap((c) => c.check.reasons))];
     const said = reasons.length ? reasons.join('; ') : 'the image model failed to answer';
-    if (round >= options.rounds) {
+    if (round >= last) {
       feedback.push(said);
       trace({ step: 'judge', state: 'fail', text: 'No version passed the check' });
       break;
     }
-    const next = await decideNext(ctx, request, instruction, round, options.rounds - round, roundCandidates, said, models, trace);
+    const next = await decideNext(ctx, request, instruction, round, last - round, roundCandidates, said, models, trace);
     feedback.push(next.feedback);
     if (next.stop) break;
   }

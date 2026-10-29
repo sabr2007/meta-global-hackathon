@@ -94,7 +94,7 @@ have done the job. The edited photo becomes the robots' goal, so it must be phys
   end with "Keep every other object exactly where it is. Do not add, remove, duplicate or resize anything.";
 - name every object by its look (colour + noun), never by its id.
 List every object in "moves" (move or stay). Put objects the request implies but no robot can handle in
-"refusals" with a short reason (and keep them in place in the image).${input.feedback ? `\n\nThe previous edits were rejected by an automatic check: ${input.feedback}\nRewrite the instruction so this does not happen again.` : ''}`;
+"refusals" with a short reason (and keep them in place in the image).${input.feedback ? `\n\nThe previous edits were rejected (by the automatic check, or by the person, who has the last word): ${input.feedback}\nRewrite the instruction so this does not happen again.` : ''}`;
   const { value, usage } = await sparkJson<Instruction>('ayna_instruction', INSTRUCTION_SCHEMA, [
     { type: 'input_text', text },
     { type: 'input_image', image_url: input.photo },

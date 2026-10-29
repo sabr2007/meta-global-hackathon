@@ -621,6 +621,29 @@ body {
   font-size: 0.8125rem;
 }
 
+.review__why {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.review__why-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.review__why-input:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
 .review__refusals {
   margin: 0;
   padding-left: 1.1em;

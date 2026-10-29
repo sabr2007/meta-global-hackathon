@@ -260,7 +260,14 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
   };
 
   /** Show the chosen version, the slider and wait for "Do it". */
-  const approveStep = (chosenId: string, summary: string, refusals: { object: string; reason: string }[], auto: boolean, alternatives: string[] = []): Promise<boolean | string> => {
+  const approveStep = (
+    chosenId: string,
+    summary: string,
+    refusals: { object: string; reason: string }[],
+    auto: boolean,
+    alternatives: string[] = [],
+    canRedraw = false,
+  ): Promise<boolean | string | { redraw: string }> => {
     const mark = (id: string): void => {
       for (const v of versionViews.values()) v.chosen = v.id === id;
       renderVersions();
@@ -297,14 +304,36 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       text.textContent = id === chosenId ? summary : `You picked version ${id.toUpperCase()}; Muse Spark preferred ${chosenId.toUpperCase()}. “Do it” plans from your pick.`;
     };
     return new Promise((resolve) => {
-      const done = (ok: boolean): void => {
+      const finish = (answer: boolean | string | { redraw: string }): void => {
         actions.remove();
         stage.setSlider(false);
         picker = null;
-        resolve(ok && pending !== chosenId ? pending : ok);
+        resolve(answer);
       };
+      const done = (ok: boolean): void => finish(ok && pending !== chosenId ? pending : ok);
       yes.addEventListener('click', () => done(true));
-      no.addEventListener('click', () => done(false));
+      // Live, "Not this" asks what should change: Spark rewrites the edit with it and Muse Image draws again.
+      const askWhy = (): void => {
+        const form = h('form', 'review__why');
+        const field = h('input', 'review__why-input');
+        field.type = 'text';
+        field.placeholder = 'What should change? e.g. keep the cylinder where it is';
+        field.setAttribute('aria-label', 'What should change in the after photo');
+        const redraw = h('button', 'pill pill--lime', 'Draw again');
+        redraw.type = 'submit';
+        const stop = h('button', 'pill pill--outline', 'Stop');
+        stop.type = 'button';
+        form.append(field, redraw, stop);
+        actions.replaceChildren(form);
+        field.focus({ preventScroll: true });
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const why = field.value.trim();
+          finish(why ? { redraw: why } : false);
+        });
+        stop.addEventListener('click', () => finish(false));
+      };
+      no.addEventListener('click', () => (canRedraw ? askWhy() : done(false)));
       if (auto) setTimeout(() => done(true), REVIEW_AUTOPLAY_MS);
       else yes.focus({ preventScroll: true });
     });
@@ -349,7 +378,7 @@ export async function scanPage(root: HTMLElement, session: Session, owner: strin
       approve: async (imagined: Imagined) => {
         for (const c of imagined.candidates) goalsByVersion.set(c.id, c.check.goals);
         const passed = imagined.candidates.filter((c) => c.check.passed && c.id !== imagined.chosen!.id).map((c) => c.id);
-        return approveStep(imagined.chosen!.id, imagined.instruction.summary, imagined.instruction.refusals, false, passed);
+        return approveStep(imagined.chosen!.id, imagined.instruction.summary, imagined.instruction.refusals, false, passed, true);
       },
       onPlan: async (planned) => {
         list = await beginExecution(planned.steps, planned.refusals);
