@@ -207,7 +207,10 @@ xcodebuild -project Ayna.xcodeproj -scheme Ayna -configuration Release \
 **Deploy:** `cd web && vercel deploy --prod` (one Vercel Function serves `/api`; scans and runs live in a
 private Vercel Blob store; set `META_API_KEY`, `META_API_BASE`, `AUTH_SECRET`, `AYNA_DEMO_SCAN` (and
 optionally `AYNA_DEMO_RUN`, the run the one-take plays) with
-`vercel env add`).
+`vercel env add`). Without Blob (its free quota runs out under a night of evals), `AYNA_STORE=snapshot`
+serves a private copy of the store from inside the function: seed one into `web/snapshot/` with
+`AYNA_STORE_DIR=$PWD/snapshot npx tsx scripts/seed.ts …`; it is deployed with the function, never to the
+public folder or git, and new runs then last as long as the server instance.
 
 ## Repository
 
